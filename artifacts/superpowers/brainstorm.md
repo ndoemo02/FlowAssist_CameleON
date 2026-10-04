@@ -1,3 +1,6 @@
+> **HISTORYCZNE** — dokument sprzed CameleONa (brainstorm promocji asystenta głosowego sprzed CameleONa). Nie opisuje aktualnej architektury.
+> Aktualny stan projektu: [`AGENTS.md`](../../AGENTS.md).
+
 # Brainstorm: Creative Promotion of Voice Assistant & Intelligent Spaces
 
 ## 1. Project Overview

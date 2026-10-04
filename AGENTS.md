@@ -1,191 +1,332 @@
-# FlowAssistant (FlowAssist XR)
-Immersywna scena 3D w przestrzeni galaktycznej.
-Curved screen + AI avatar Amber. Audytowanie postepow projektow.
+# FlowAssist XR / CameleON
+
+Immersyjne środowisko AI-to-UI osadzone w scenie 3D.
+FlowAssist jest przestrzenią roboczą, a CameleON warstwą adaptacyjnego interfejsu,
+która zamienia dane i działania agenta w dynamiczne reprezentacje UI.
+
+> Ten plik jest głównym źródłem prawdy o projekcie dla ludzi i agentów.
+> Szczegóły modułu AI-to-UI: [`src/features/aiui/README.md`](src/features/aiui/README.md).
+> Materiały sprzed CameleONa (dawny sprint, stare raporty sesji): [`docs/history/AGENTS-history.md`](docs/history/AGENTS-history.md).
+
+## Koncepcja
+
+Scena 360° w przestrzeni galaktycznej:
+
+- Front:
+  - zakrzywiony ekran,
+  - avatar Amber,
+  - deep-view dla treści wymagających skupienia,
+  - narracja / prezentacja wyników.
+
+- Back:
+  - Workspace,
+  - karty, wykresy, KPI, tabele, mapy,
+  - manipulacja przez użytkownika,
+  - przyszłe reprezentacje przestrzenne / 3D.
+
+- HUD:
+  - taski,
+  - status agenta,
+  - narracja,
+  - approval / decyzje.
+
+Kluczowa zasada:
+dane są niezależne od sposobu prezentacji.
+
+Ten sam element może być pokazany jako:
+card → focus → screen → później spatial/3D,
+bez kopiowania danych.
 
 ## Stack techniczny
-- Next.js 14.2.0 + React 18 + TypeScript
+
+- Next.js 14.2
+- React 18 + TypeScript
 - React Three Fiber + Drei
-- Three.js 0.160 + framer-motion + GSAP
-- Leva panel dev do strojenia kamery/sceny
-- Tailwind CSS + lucide-react
-- MapLibre / react-map-gl dla widokow mapowych
-- Zustand: stan feature modules (`features/showcase`, `features/aiui`)
-- Warstwa AI-to-UI: `src/features/aiui/` (kontrakt A2UI v0.9.1 + katalog `flowassist/v1`, mock agenta); plan: `C:\Develop\Flow Assist\PLAN_AI-to-UI_v1.md`
-- Testy: vitest (`npm test`) dla czystej logiki AI-to-UI
-- Avatar: VideoTexture + chroma key shader
-- Generowanie wideo: VEO3 (magenta tlo) -> MatAnyone 2
-- Planowane API: GitHub, Hugging Face
+- Three.js 0.160
+- Framer Motion + GSAP
+- Tailwind CSS
+- lucide-react
+- MapLibre / react-map-gl
+- Zustand
+- @use-gesture/react (gesty kart)
+- Vitest
+- Leva (panel strojenia, tylko dev / `?dev`)
+- Avatar: VideoTexture + shader chroma-key — **nieukończony / odłożony**: shader istnieje, ale ustawienia (`keyColor #000000`, `similarity 0`) nie wycinają tła, więc zielone tło avatara jest widoczne
 
-## Sciezki
-- Projekt: C:\FlowAssistant
-- Junction: C:\Develop\FlowAssistant
+## AI-to-UI
 
-## Planowane rozszerzenie
-- Agregacja nowosci z GitHub / Hugging Face per projekt
-- Przestrzen organizacji pracy i sledzenia postepow
-- Powiazanie z aktualnymi projektami wlasciciela
+Kod:
+`src/features/aiui/`
 
-## Aktualny sprint
-- [ ] Pipeline avatara: VEO3 -> MatAnyone 2 -> VideoTexture
-- [ ] Integracja GitHub API
-- [ ] Integracja Hugging Face API
-- [ ] Widok agregacji nowosci per projekt
+Aktualny kontrakt:
+`flowassist/v2` (koperta A2UI v0.9.1 + rozszerzenia `stage` i `narration`)
 
-## E2E Testing — Perplexity Comet
-> **Uwaga (2026-10-04):** Perplexity Comet nie może już testować UI — nawigowanie i klikanie jak użytkownik przeniesiono do płatnej funkcji „Computer Use”. Do czasu decyzji właściciela prompt poniżej służy jako scenariusz E2E dla dowolnego testera (człowiek lub agent przeglądarkowy). W sesji 2026-10-04 kontrole przeglądarkowe wykonano przez `agent-browser` (osobna instancja Chrome w trybie headless — nie koliduje z przeglądarką właściciela; na Windows wyjście CLI kierować do pliku, nie przez potok `|`, bo demon trzyma potok otwarty).
+- surface'y: `workspace`, `tasks-drawer`, `hud`
+- komponenty: `Workspace` (członkostwo przez `children`), `WorkspaceItem`, `TaskList`, `Approval`
+- rodzaje elementów: `chart`, `kpi`, `table`, `map`, `slides`
+- reprezentacje zaimplementowane: `chart2d`, `cards2d`, `table2d`, `map2d`, `slides2d`;
+  `liquid3d`, `ribbon3d`, `kpi3d` są w katalogu, ale **nie mają implementacji** (v1.3)
+- hint prezentacji od agenta: `card` / `focus` / `screen`; `dismissed` jest wyłącznie lokalny (użytkownik)
 
-Comet to przegladarka AI ktora nawiguje i klika jak realny uzytkownik.
-Agent ktory skonczyl implementacje GENERUJE prompt ponizej.
-Wynik testu wraca do wlasciciela i trafia do raportu sesji.
+Model odpowiedzialności:
 
-### Szablon promptu dla Comet
-`
-Jestes testerem aplikacji [NAZWA].
-URL startowy: [URL]
+- agent:
+  - treść,
+  - semantyka,
+  - dostępne reprezentacje,
+  - hinty prezentacji,
+  - akcje semantyczne.
 
-Wykonaj kroki w tej kolejnosci:
-1. [co kliknac / wpisac / czego sie spodziewac]
-2. [krok 2]
-3. [krok N]
+- klient / użytkownik:
+  - pozycja,
+  - rozmiar,
+  - kolejność warstw,
+  - lokalne manipulacje,
+  - finalny układ Workspace.
 
-Po kazdym kroku:
-- Opisz co widzisz na ekranie
-- Zaznacz PASS lub FAIL
-- Przy FAIL: opisz dokladnie blad (tekst, element, screenshot jesli mozliwy)
+Agent nie wysyła surowych współrzędnych.
+Zmiany formy (drag, resize, focus, ukryj) nie trafiają do agenta; akcja semantyczna
+niesie `itemId` i migawkę układu (`screen`, `focus`, `dismissed`).
 
-Raport koncowy:
-PASS: [kroki ktore przeszly]
-FAIL: [kroki + opis bledu]
-BLOKERY: [co uniemozliwia dalsze testowanie]
-SUGESTIE: [co naprawic w pierwszej kolejnosci]
-`
+## Główne elementy AI-to-UI
 
-### Aktualny prompt E2E
-`
-Jestes testerem aplikacji FlowAssist XR.
-URL startowy: http://127.0.0.1:3000
+- Workspace surface
+- Tasks drawer
+- HUD
+- ScreenLayer
+- ScreenAnchor
+- WorkspaceLayer
+- coordinator surface/layout
+- presentation/layout state
+- semantic actions
+- mock transport agenta
+- gesture layer
+- keyboard accessibility
+- hybrid screen mode
 
-Wykonaj kroki w tej kolejnosci:
-1. Otworz URL i poczekaj az animacja intro FlowAssist zniknie. Spodziewaj sie sceny 3D z galaktycznym tlem, zakrzywionym ekranem i napisem "Scroll to Explore".
-2. Po intro obserwuj przez 2 sekundy kadr 3D. Spodziewaj sie plynnego dolotu kamery do kadru Front: zakrzywiony ekran z wideo, po lewej avatar Amber na podescie z cyjanowym pierscieniem. Bez przeskoku i bez pustego canvasa. Na dole przycisk "Zleć research: popyt na rezerwacje online" ze "Start".
-3. Przewin strone w dol o okolo jeden ekran, potem wroc na gore. Spodziewaj sie plynnego zblizenia i powrotu kamery, bez utraty menu.
-4. Kliknij "360 View", ustaw suwak na okolo 90 stopni, potem z powrotem na 0. Kamera reaguje plynnie, scena pozostaje widoczna. Zamknij panel przyciskiem "360 View".
-5. Kliknij "Start" w przycisku "Zleć research". Spodziewaj sie: u gory chip "agent pracuje…", po prawej panel "Research: rezerwacje online" z 3 zadaniami (Scout, Parser, Analyst) i paskami postepu do 100%, na dole napis z etykieta AMBER. Wideo na ekranie sceny wycisza sie i przyciemnia.
-6. Poczekaj okolo 7 sekund. Spodziewaj sie obrotu kamery o 180 stopni (Back), zamkniecia panelu zadan i "stolu roboczego" z 3 kartami: wykres "Zapytania o rezerwacje online…", "Najważniejsze wskaźniki" (+60%, Q3, 42%), tabela "Dzielnice · Q4". Karty moga przez chwile pokazywac szkielet ladowania - to poprawne.
-7. Poczekaj okolo 3 sekund. Agent wysyla wykres na ekran: kamera sama wraca na Front, a wykres pojawia sie w panelu dopasowanym do zakrzywionego ekranu (przyciski "Na stół" i "Ukryj"). Po chwili na wykresie dochodzi trzecia linia "Plan 2026". Pod napisami pojawia sie pasek "Decyzja: Pilotaż asystenta 24/7" z przyciskiem "Szczegóły".
-8. Kliknij "Na stół" w panelu ekranu, potem w "360 View" ustaw suwak na 180 stopni (Back) i zamknij panel suwaka. Na stole: kliknij jedna karte - powinna sie powiekszyc i pokazac przyciski "Na ekran", "−", "+", "Ukryj". Kliknij w puste tlo - karta wraca do normalnego rozmiaru.
-9. Przeciagnij dowolna karte mysza w inne miejsce stolu - powinna zostac tam, gdzie ja upusciles. Przeciagnij uchwyt w prawym dolnym rogu karty - karta zmienia rozmiar.
-10. Kliknij karte "Najważniejsze wskaźniki", potem "Ukryj". Karta znika, u gory pojawia sie "Pokaż ukryte (1)". Kliknij go i "Przywróć" - karta wraca.
-11. Kliknij dwukrotnie karte "Dzielnice · Q4". Kamera wraca na Front, tabela pojawia sie w panelu ekranu. Kliknij "⋯", potem "Pogłęb analizę". Na stole (Back) powinna dojsc czwarta karta - mapa "Warszawa · zapytania Q4 (schemat)" - a napis Amber wspomina Prage-Poludnie i Mokotow.
-12. Kliknij pasek "Decyzja…" → "Szczegóły", potem "Zatwierdź". Spodziewaj sie napisu "Zatwierdzone…", znikniecia karty decyzji, powrotu kamery na Front i przycisku "Uruchom research ponownie". Gdy na ekranie nie ma juz zadnej karty, wideo wraca do pelnej jasnosci.
-13. Otworz http://127.0.0.1:3000/?demo=research w oknie telefonu w poziomie (np. DevTools 844x390). Scenariusz startuje sam po intro. Na Back karty sa w poziomym pasku przewijanym palcem/myszka, kazda ma przyciski; "Na ekran" wysyla karte do panelu na zakrzywionym ekranie. Napisy nie nachodza na pasek kart.
-14. Otworz ten sam URL w oknie telefonu w pionie (np. 390x844). Element wyslany na ekran pokazuje sie jako wysrodkowany panel nad scena (nie na zakrzywionym ekranie).
+## ScreenAnchor
 
-Po kazdym kroku:
-- Opisz co widzisz na ekranie
-- Zaznacz PASS lub FAIL
-- Przy FAIL: opisz dokladnie blad (tekst, element, screenshot jesli mozliwy)
+Tryb hybrydowy:
 
-Raport koncowy:
-PASS: [kroki ktore przeszly]
-FAIL: [kroki + opis bledu]
-BLOKERY: [co uniemozliwia dalsze testowanie]
-SUGESTIE: [co naprawic w pierwszej kolejnosci]
-`
+- desktop + landscape mobile:
+  panel jest zakotwiczony w zakrzywionym ekranie sceny.
 
-## Single Source of Truth — zasady dla wszystkich agentów
-Ten plik AGENTS.md jest jedynym zrodlem prawdy o projekcie.
-Kazdy agent czyta go na poczatku i dopisuje raport na koncu.
+- portrait / narrow (proporcje < 1,2 lub szerokość < 600 px):
+  centered deep-view.
 
-| Agent            | Rola                                | Czyta               | Aktualizuje |
-| ---------------- | ----------------------------------- | ------------------- | ----------- |
-| Codex Opus | Architektura, zlecone zmiany        | TAK                 | TAK         |
-| Codex            | Cleanup, rutyna (AUDIT przed exec!) | TAK                 | TAK         |
-| Antigravity      | Implementacja                       | TAK                 | TAK         |
-| Perplexity Comet | E2E testing (klika jak uzytkownik) — **nieaktywny: testowanie UI przeniesione do płatnego „Computer Use”** | prompt z sekcji E2E | NIE         |
+Widoczność ma histerezę i jest zależna od:
+- pokrycia widocznego obszaru ekranu (włączenie ≥ 82%, wyłączenie < 75%),
+- kąta kamery od Frontu (włączenie ≤ 16°, wyłączenie > 20°).
 
-Zasady:
-- Kazdy agent ZACZYNA od przeczytania tego pliku
-- Kazdy agent KONCZY dopisujac raport sesji (format ponizej)
-- Prompt E2E dla Comet generuje agent ktory skonczyl implementacje
-- Nigdy nie dzialaj na podstawie ustnej instrukcji — tylko to co tu jest
+Poza zakresem panel jest wygaszony, nieklikalny i wyłączony z Tab (`inert`).
+Gdy ekran jest zajęty lub trwa przebieg agenta, wideo ekranu jest wyciszone i przyciemnione.
+
+ScreenAnchor przeszedł osobny spike wydajności i stabilności.
+
+## Interakcje
+
+Działają (desktop):
+
+- tap → focus
+- double tap → send to screen
+- drag (karta wychodzi na wierzch)
+- resize (uchwyt w prawym dolnym rogu)
+- pinch / trackpad scale (ctrl + kółko)
+- dismiss („Ukryj” lub flick w dół na karcie z focusem)
+- restore hidden („Pokaż ukryte” → „Przywróć”)
+- context menu (prawy klik) i przycisk „⋯” → akcje semantyczne
+- klik w tło → zdjęcie focusu
+
+Klawiatura:
+
+- Tab przechodzi po kartach stołu (tylko gdy stół jest widoczny),
+- skróty działają, gdy fokus jest na samej karcie (nie na jej przycisku):
+  - strzałki → przesunięcie karty,
+  - Enter → screen,
+  - Delete → ukryj,
+  - Escape → remove focus.
+
+Compact (telefon):
+
+- karty w poziomym pasku z natywnym scrollem,
+- tap → focus, wszystkie operacje przyciskami na karcie,
+- „− / +” zmienia szerokość karty w pasku,
+- pinch tylko na treści panelu ekranu (lokalny zoom).
+
+Nieobsługiwane: long press na iOS (menu akcji tylko przez contextmenu lub „⋯”).
+
+## Uruchamianie
+
+```bash
+npm install
+npm run dev        # http://localhost:3000
+npm test           # vitest
+npm run build
+```
+
+Parametry URL (dev / demo):
+
+- `?demo=research` — autostart scenariusza po intro (ukrywa Leva)
+- `?speed=N` — mnożnik prędkości mock transportu
+- `?anchor=probe` — panel testowy ze spike'u ScreenAnchor (zostaje do czasu potwierdzenia warstwy ekranu)
+- `?dev` — wymusza panel Leva
+
+Haki dev w konsoli: `window.__aiui` (store), `window.__anchorRegistry`
+(`getScreenMeshes`, `getAnchorState`), `window.__screenAnchor` (tylko z `?anchor=probe`).
+
+TypeScript: globalny `npx tsc --noEmit` zwraca stare błędy z `archive/`;
+sprawdzaj zakres `src/features/aiui` i `src/app/page.tsx`.
+
+## Stan implementacji
+
+Branch:
+`feat/aiui-prototype`
+
+Checkpointy:
+
+- `0b6007d` — v1.1 + ScreenAnchor spike
+- `8c6e4ca` — v1.2.1, kroki 2–6
+- `2e2debc` — cleanup tekstur
+- `6e96223` — poprawki po review Astry + AGENTS.md
+
+Stan na `6e96223`:
+
+- 106/106 testów PASS (10 plików w `src/features/aiui/__tests__/`)
+- TypeScript clean (zakres `src/features/aiui`, `src/app/page.tsx`)
+- niezależny review Astry: GO WITH FIXES
+- wszystkie 7 uwag z review poprawione
+- runtime sprawdzany przez osobny agent-browser
+- agent-browser nie korzysta z aktywnego Chrome użytkownika
+
+## Obecny scenariusz demo
+
+1. agent rozpoczyna zadanie
+2. pojawiają się taski
+3. Workspace dostaje elementy strumieniowo
+4. skeletony zastępowane są danymi
+5. agent może wysłać element na główny ekran
+6. kamera wraca na Front
+7. użytkownik może manipulować kartami
+8. „Pogłęb” może dostarczyć nowe elementy
+9. approval w HUD kończy przebieg
+
+Terminalny stan runu jest trwały i nie może zostać reaktywowany
+przez spóźnioną odpowiedź transportu.
+
+## Testowanie
+
+### Testy jednostkowe
+
+`npm test` — vitest dla czystej logiki (`contract`, `reducer`, `layout`, `workspace`,
+`gestureLogic`, `measureScreen`, `jsonPointer`, `resolveTree`, `loop`, `scenario`).
+Bez testów renderowania 3D.
+
+### Testy przeglądarkowe: agent-browser
+
+Kontrole runtime wykonuje `agent-browser` — osobna instancja Chrome w trybie headless,
+w izolowanej sesji (`--session <nazwa>`). Nie koliduje z przeglądarką właściciela
+i nie zatrzymuje się, gdy okno jest zasłonięte.
+
+- Na maszynie właściciela CLI nie jest w PATH:
+  `C:\Users\frees\AppData\Local\hermes\tools\agent-browser-0.26.0-win32-x64\bin\agent-browser-win32-x64.exe`
+  (`npx skills add …agent-browser` instaluje tylko opis skilla, nie CLI).
+- **Nie przepuszczaj wyjścia przez potok** (`| tail`, `| head`): demon dziedziczy stdout
+  i powłoka się zawiesza. Kieruj wyjście do pliku:
+  `"$AB" --session flow <cmd> > out.txt 2>&1 < /dev/null; cat out.txt`.
+- Rzeczywiste zdarzenia myszy CDP (`mouse move/down/up`) obsługują drag `@use-gesture`.
+- WebGL w headless jest programowy (SwiftShader): wystarcza do logiki i kliknięć, nie do pomiaru FPS.
+- Karta przeglądarki w tle wstrzymuje `requestAnimationFrame` — w zwykłym Chrome intro
+  i scenariusz nie ruszą, dopóki karta nie jest widoczna.
+
+### Scenariusz E2E v1.2.1
+
+Checklista dla dowolnego testera (człowiek lub agent przeglądarkowy).
+URL startowy: `http://127.0.0.1:3000`
+
+1. Otwórz URL i poczekaj, aż animacja intro FlowAssist zniknie. Spodziewaj się sceny 3D z galaktycznym tłem, zakrzywionym ekranem i napisem „Scroll to Explore”.
+2. Po intro obserwuj przez 2 sekundy kadr 3D. Spodziewaj się płynnego dolotu kamery do kadru Front: zakrzywiony ekran z wideo, po lewej avatar Amber na podeście z cyjanowym pierścieniem. Bez przeskoku i bez pustego canvasa. Na dole przycisk „Zleć research: popyt na rezerwacje online” ze „Start”.
+3. Przewiń stronę w dół o około jeden ekran, potem wróć na górę. Spodziewaj się płynnego zbliżenia i powrotu kamery, bez utraty menu.
+4. Kliknij „360 View”, ustaw suwak na około 90°, potem z powrotem na 0. Kamera reaguje płynnie, scena pozostaje widoczna. Zamknij panel przyciskiem „360 View”.
+5. Kliknij „Start” w przycisku „Zleć research”. Spodziewaj się: u góry chip „agent pracuje…”, po prawej panel „Research: rezerwacje online” z 3 zadaniami (Scout, Parser, Analyst) i paskami postępu do 100%, na dole napis z etykietą AMBER. Wideo na ekranie sceny wycisza się i przyciemnia.
+6. Poczekaj około 7 sekund. Spodziewaj się obrotu kamery o 180° (Back), zamknięcia panelu zadań i stołu roboczego z 3 kartami: wykres „Zapytania o rezerwacje online…”, „Najważniejsze wskaźniki” (+60%, Q3, 42%), tabela „Dzielnice · Q4”. Karty mogą przez chwilę pokazywać szkielet ładowania — to poprawne.
+7. Poczekaj około 3 sekund. Agent wysyła wykres na ekran: kamera sama wraca na Front, a wykres pojawia się w panelu dopasowanym do zakrzywionego ekranu (przyciski „Na stół” i „Ukryj”). Po chwili na wykresie dochodzi trzecia linia „Plan 2026”. Pod napisami pojawia się pasek „Decyzja: Pilotaż asystenta 24/7” z przyciskiem „Szczegóły”.
+8. Kliknij „Na stół” w panelu ekranu, potem w „360 View” ustaw suwak na 180° (Back) i zamknij panel suwaka. Na stole kliknij jedną kartę — powinna się powiększyć i pokazać przyciski „Na ekran”, „−”, „+”, „Ukryj”. Kliknij w puste tło — karta wraca do normalnego rozmiaru.
+9. Przeciągnij dowolną kartę myszą w inne miejsce stołu — powinna zostać tam, gdzie ją upuszczono. Przeciągnij uchwyt w prawym dolnym rogu karty — karta zmienia rozmiar.
+10. Kliknij kartę „Najważniejsze wskaźniki”, potem „Ukryj”. Karta znika, u góry pojawia się „Pokaż ukryte (1)”. Kliknij go i „Przywróć” — karta wraca.
+11. Kliknij dwukrotnie kartę „Dzielnice · Q4”. Kamera wraca na Front, tabela pojawia się w panelu ekranu. Kliknij „⋯”, potem „Pogłęb analizę”. Na stole (Back) powinna dojść czwarta karta — mapa „Warszawa · zapytania Q4 (schemat)” — a napis Amber wspomina Pragę-Południe i Mokotów.
+12. Kliknij pasek „Decyzja…” → „Szczegóły”, potem „Zatwierdź”. Spodziewaj się napisu „Zatwierdzone…”, zniknięcia karty decyzji, powrotu kamery na Front i przycisku „Uruchom research ponownie”. Gdy na ekranie nie ma już żadnej karty, wideo wraca do pełnej jasności.
+13. Otwórz `http://127.0.0.1:3000/?demo=research` w oknie telefonu w poziomie (np. 844×390). Scenariusz startuje sam po intro. Na Back karty są w poziomym pasku przewijanym palcem/myszką, każda ma przyciski; „Na ekran” wysyła kartę do panelu na zakrzywionym ekranie. Napisy nie nachodzą na pasek kart.
+14. Otwórz ten sam URL w oknie telefonu w pionie (np. 390×844). Element wysłany na ekran pokazuje się jako wyśrodkowany panel nad sceną (nie na zakrzywionym ekranie).
+
+Po każdym kroku: opis tego, co widać, PASS lub FAIL, a przy FAIL dokładny opis błędu
+(tekst, element, zrzut ekranu, jeśli możliwy). Raport końcowy: PASS / FAIL / BLOKERY / SUGESTIE.
+
+## Zasady dla agentów
+
+- Każdy agent zaczyna od przeczytania tego pliku.
+- Nie zakładaj — weryfikuj w kodzie i testach. Jeśli czegoś nie wiesz, zapytaj właściciela, zanim zaczniesz działać.
+- Właściciel bramkuje etapy: plan → niezależny review (Astra, tylko odczyt) → implementacja → checkpoint commit. Nie przechodź do kolejnego etapu, nie commituj i nie pushuj bez wyraźnej zgody.
+- Nie rozszerzaj zakresu i nie sprzątaj niezwiązanego kodu legacy.
+- Po zakończeniu implementacji zaktualizuj scenariusz E2E powyżej, jeśli zmieniło się zachowanie.
+- Agent kończy sesję raportem w formacie poniżej.
+
+| Agent | Rola |
+| ----- | ---- |
+| Claude Code | implementacja AI-to-UI, kontrole agent-browser |
+| Astra (GPT) | niezależny review planu i kodu, tylko odczyt |
+| Codex Opus | architektura, zlecone zmiany |
+| Codex | cleanup, rutyna (audit przed wykonaniem) |
+| Antigravity | implementacja |
 
 ## Format raportu sesji
-Po kazdej sesji dopisz na gorze sekcji RAPORTY:
 
----
-### Raport [DATA] — [AGENT: Codex/Codex/Antigravity]
+```
+### Raport [DATA] — [AGENT]
 **Co zrobiono:**
-- [konkretna zmiana] w [plik] — [powod]
+- [konkretna zmiana] w [plik] — [powód]
 
 **Problemy:**
-- [problem] — [proba rozwiazania]
+- [problem] — [próba rozwiązania]
 
-**Nastepny krok:**
-- [jedno konkretne zadanie na nastepna sesje]
+**Następny krok:**
+- [jedno konkretne zadanie na następną sesję]
 
-**Status testow:**
-- node --check: PASS / FAIL
+**Status testów:**
 - vitest: PASS X/Y / FAIL
-- E2E Comet: PASS / FAIL / NIE WYKONANO
----
+- tsc (zakres aiui + page.tsx): PASS / FAIL
+- next build: PASS / FAIL / NIE WYKONANO
+- E2E (agent-browser lub ręcznie): PASS / FAIL / NIE WYKONANO
+```
 
-## [AI] Instrukcja wejscia w projekt
-Po otwarciu tego projektu wykonaj kolejno:
-1. Przejrzyj strukture plikow i katalogów (ls / tree)
-2. Znajdz package.json / requirements.txt / go.mod — zidentyfikuj stack
-3. Uzupelnij sekcje [Stack techniczny] powyzej jesli pusta lub niekompletna
-4. Jesli czegos nie wiesz — zapytaj wlasciciela ZANIM zaczniesz dzialac
-5. Nie zakladaj — weryfikuj
-6. Dopisz raport na koncu tego pliku po zakonczeniu pracy
+## Aktualne priorytety
 
----
-<!-- RAPORTY SESJI — najnowszy na gorze -->
+Przed v1.3:
 
----
-### Raport 2026-10-04 — AGENT: Claude Code (Opus 5.5)
-**Co zrobiono:**
-- Naprawiono crash HEAD (`Could not load /models/Flowassist3d/scene.gltf … 404`, plik usunięty w 35bb81b): galaktyka przywrócona z historii do `public/models/galaxy/` (gltf + bin + licencja CC-BY-4.0), ścieżka w `StarField` — `src/app/page.tsx`.
-- `Avatar` znów widoczny domyślnie; każdy model sceny w `SceneErrorBoundary` (`src/components/SceneErrorBoundary.tsx`) — brak assetu nie zabija już całego Canvasu.
-- Nowa warstwa AI-to-UI `src/features/aiui/`: kontrakt (A2UI v0.9.1 + rozszerzenia `stage`/`narration`), czysty reducer, JSON Pointer, resolver drzewa, store zustand z directorem kamery (Front 0° ↔ Back 180°), `MockTransport` z cyklem przebiegu (`runId`, bramka gotowości po intro), scenariusz `research`, katalog 7 widoków (TaskList, Chart, InsightCards, DataTable, MapView, Presentation, Approval) + Stack/ActionBar/Fallback, overlay DOM (Back canvas, drawer Tasks, globalne napisy, pill startowy).
-- Suwak 360° wydzielony do `features/aiui/overlay/OrbitSlider.tsx` (ten sam wygląd); `HomePage` nie subskrybuje store'u — 0 renderów strony podczas obrotu kamery (zmierzone).
-- `CameraSetup`: kąt czytany ze store'u w `useFrame`; gałąź orbit z tłumionym dojazdem zamiast skoku z cue `close`.
-- Leva i `setDebug` co klatkę tylko w dev (`src/lib/devTools.ts`; `?dev` wymusza, `?demo` wyłącza); naprawiona hydracja SSR panelu Leva.
-- `tailwind.config.js`: dodano `./src/features/**` do `content` (wcześniej klasy z `features/*` nie były generowane — dotyczyło też `features/showcase`).
+- szeroki audit istniejących wzorców AI-to-UI
+- audit bibliotek i skills
+- REUSE / ADAPT / CUSTOM / AVOID
+- analiza agent workspaces
+- adaptive / generative UI
+- spatial / infinite canvas
+- multimodal comparison UI
+- mobile interaction patterns
+- DOM-over-3D / R3F patterns
 
-**Problemy:**
-- Karta przeglądarki w tle wstrzymuje `requestAnimationFrame` → `IntroOverlay` nie kończy się i scenariusz nie startuje, dopóki karta nie jest widoczna (zachowanie przeglądarki, nie błąd; istotne przy testach automatycznych).
-- Na compact (np. 844×390) otwarty bottom-sheet z taskami chowa napisy (reguła: nigdy oba naraz) — pierwsze zdanie narracji jest wtedy niewidoczne.
-- `npm install` (npm 12) przepisał format `package-lock.json` — duży diff bez zmian zależności poza `vitest`.
+Dopiero potem plan v1.3.
 
-**Nastepny krok:**
-- Zatwierdzić kierunek v2: `SseTransport` + `/api/agent` → agent inference.sh z katalogiem `flowassist/v1` w system prompcie (oraz decyzja o przywróceniu wideo-intro `public/Freeflow Mind XR_123929.mp4`).
+## Odłożone
 
-**Status testow:**
-- vitest: PASS 55/55
-- tsc (zakres `src/features/aiui`, `src/app/page.tsx`, nowe pliki): PASS
-- next build: PASS
-- E2E ręczne w Chrome (desktop 1920×889 + iframe 840×386): PASS — pełny scenariusz, prezentacja, akceptacja, powrót na Front, ręczny suwak w trakcie tweena
-- E2E Comet: NIE WYKONANO (prompt zaktualizowany wyżej)
+- loader z cząstek (krok 7 planu v1.2.1)
+- chroma-key avatara (zielone tło nadal widoczne)
+- finalna strefa wykluczenia Amber po keyingu
+- test na fizycznym telefonie i kalibracja kadru mobile
+- ponowny test histerezy po zmianie dopasowania kamery
+- long press na iOS
+- spatial representations:
+  - liquid3d
+  - ribbon3d
+  - kpi3d
+- compare/group/stash
+- prawdziwy transport agenta (SSE / inference.sh zamiast mocka)
 
----
-### Raport 2026-05-29 - AGENT: Codex
-**Co zrobiono:**
-- Dodano cinematic camera cues w src/app/page.tsx - plynne wejscie po intro oraz scroll push-in z kadru szerokiego do bliskiego.
-- Dodano osobne cue-punkty mobile/desktop w src/app/page.tsx - animacja zachowuje sensowny kadr na telefonie i desktopie.
-- Wyciszono spam logow OrbitControls/ScreenFrame w src/app/page.tsx - konsola dev zostaje czytelna podczas animacji.
-- Uzupelniono stack i prompt E2E Comet w AGENTS.md - dokumentacja odzwierciedla aktualny Next/R3F stack i scenariusz testu.
-
-**Problemy:**
-- `npx tsc --noEmit` obejmuje archive/legacy/_BACKUP katalogi i zwraca stare bledy spoza aktualnej zmiany - sprawdzono filtr dla `src/app/page.tsx`, bez nowych bledow.
-- `npm run build` skompilowal i wygenerowal strony, ale po finalizacji Next static worker zalogowal OOM (`Zone Allocation failed`) - do obserwacji przy kolejnych buildach.
-
-**Nastepny krok:**
-- Dopracowac wejscie samego avatara i ekranu: fade/scale ring, opoznione pojawienie Amber oraz delikatny light sweep po ekranie.
-
-**Status testow:**
-- node --check: NIE WYKONANO (zmiana w TSX/Next)
-- vitest: NIE WYKONANO (brak skonfigurowanego vitest w package.json)
-- next build: PASS z ostrzezeniem OOM static worker po finalizacji
-- E2E Comet: NIE WYKONANO
----
+Plan i decyzje: `C:\Develop\Flow Assist\PLAN_AI-to-UI_v1.md` (poza repo).

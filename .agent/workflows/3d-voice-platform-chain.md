@@ -2,6 +2,10 @@
 description: Łańcuch 5 agentów do budowy landing page FlowAssist - Intent Control Layer dla B2B lead generation
 ---
 
+> **HISTORYCZNE** — dokument sprzed CameleONa (łańcuch agentów dla landing page B2B ze stycznia 2026). Nie opisuje aktualnej architektury.
+> Aktualny stan projektu: [`AGENTS.md`](../../AGENTS.md).
+
+
 # 🎯 Agent Chain: FlowAssist Landing Page
 
 Landing page B2B dla deterministycznego NLU - lead generation, nie sprzedaż online.

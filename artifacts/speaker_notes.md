@@ -1,3 +1,6 @@
+> **HISTORYCZNE** — dokument sprzed CameleONa (notatki do wystąpienia, kierunek marketingowy sprzed CameleONa). Nie opisuje aktualnej architektury.
+> Aktualny stan projektu: [`AGENTS.md`](../AGENTS.md).
+
 # Notatki Prelegenta (Speaker Notes) - FlowAssist TED Talk
 
 ## Slide 1: Opening Hook (60% Uwagi)

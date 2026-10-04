@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FlowAssist XR / CameleON
 
-## Getting Started
+Prototyp AI-to-UI na scenie 360° (Next.js 14 + React Three Fiber). Agent emituje
+ustrukturyzowane zdarzenia (koperta A2UI v0.9.1, katalog `flowassist/v2`), a klient
+pokazuje je jako kontrolowane widoki: stół roboczy z kartami (Back), deep-view na
+zakrzywionym ekranie (Front) i HUD z taskami, narracją i decyzjami. Na razie agent
+jest mockiem (`MockTransport` + scenariusz `research`).
 
-First, run the development server:
+## Uruchomienie
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # http://localhost:3000
+npm test        # vitest (logika AI-to-UI)
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Demo: `http://localhost:3000/?demo=research` (autostart po intro).
+Pozostałe parametry: `?speed=N`, `?anchor=probe`, `?dev` — opis w `AGENTS.md`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Dokumentacja
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- [`AGENTS.md`](AGENTS.md) — koncepcja, stan implementacji, testowanie, zasady dla agentów
+- [`src/features/aiui/README.md`](src/features/aiui/README.md) — architektura modułu AI-to-UI
+- [`docs/history/`](docs/history/) — materiały historyczne sprzed CameleONa
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Pozostałe pliki w `docs/`, `REPO_AUDIT_2026-02-11.md`, `artifacts/` i `.agent/` są oznaczone
+jako historyczne lub legacy.

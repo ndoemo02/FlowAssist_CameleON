@@ -1,3 +1,6 @@
+> **HISTORYCZNE** — dokument sprzed CameleONa (audyt repo z 2026-02-11; część wskazanych ścieżek, np. `src/app/v2`, `src/app/dev/*`, `src/app/sandbox`, już nie istnieje). Nie opisuje aktualnej architektury.
+> Aktualny stan projektu: [`AGENTS.md`](AGENTS.md).
+
 # 🧠 FlowAssist Repository Audit & Cleanup Plan
 
 **Senior Architect Report**  

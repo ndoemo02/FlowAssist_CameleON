@@ -26,6 +26,7 @@ export class MockTransport implements AgentTransport {
     private timers = new Set<ReturnType<typeof setTimeout>>();
     private listeners = new Set<Listener>();
     private runId = 0;
+    private closedRunId: number | null = null; // przebieg zamknięty decyzją terminalną
     private script: ScenarioScript | null = null;
 
     constructor(
@@ -42,6 +43,7 @@ export class MockTransport implements AgentTransport {
     start(runId: number, request: StartRequest) {
         this.stop();
         this.runId = runId;
+        this.closedRunId = null;
         this.script = this.scripts[request.scenario] ?? null;
         if (!this.script) {
             this.emitStatus(runId, 'error', `Nieznany scenariusz "${request.scenario}"`);
@@ -57,10 +59,16 @@ export class MockTransport implements AgentTransport {
         }
         const { name } = message.action;
         const runId = this.runId;
+        if (this.closedRunId === runId) return; // po decyzji terminalnej agent nie odpowiada na nic więcej
         const response = this.script?.responses[name];
         if (!response) {
             this.play(runId, [{ at: 0, event: { narration: { text: `Nie obsługuję jeszcze akcji „${name}”.` } } }], 'awaiting_action');
             return;
+        }
+        if (response.terminal) {
+            // decyzja terminalna zamyka przebieg: anuluj inne zaplanowane odpowiedzi tego przebiegu
+            this.stop();
+            this.closedRunId = runId;
         }
         this.play(runId, response.steps, response.terminal ? 'done' : 'awaiting_action');
     }

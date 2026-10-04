@@ -2,6 +2,13 @@
 // Zdarzenie agenta: parseEvent → reduce (surface'y) → reconcileLayout → JEDEN zapis → efekty.
 // Komenda użytkownika: presentationReducer → jeden zapis → efekty.
 // Kąt kamery czyta tylko CameraSetup (getState w useFrame) i OrbitSlider (selektor).
+//
+// Semantyka stage.focus: ostatni semantyczny cel kamery (agent lub jawna komenda użytkownika).
+// Ręczny obrót suwakiem przejmuje kamerę (camera.source = 'manual') BEZ zmiany stage.focus; hint agenta
+// 'screen' w trakcie ręcznego obrotu (P3) umieszcza element na ekranie, ale nie rusza ani kamery, ani celu.
+//
+// Zakończenie przebiegu jest trwałe: po 'done'/'error' store odrzuca dalsze statusy i zdarzenia tego runId
+// (np. odpowiedź na akcję wysłaną tuż przed decyzją terminalną) — niezależnie od implementacji transportu.
 
 import { create } from 'zustand';
 import { buildAction, buildError, parseEvent, type ClientError, type DrawerState, type SurfaceId } from './contract';
@@ -19,6 +26,8 @@ export const TWEEN_SECONDS = 1.6;
 export const MANUAL_GRACE_MS = 2000;
 let lastManualAt = -Infinity;
 const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+const isClosed = (status: ScenarioStatus) => status === 'done' || status === 'error';
+
 /** Testy: zapomnij ostatni ręczny obrót (stan modułu współdzielony między testami). */
 export const resetManualInteraction = () => { lastManualAt = -Infinity; };
 
@@ -111,7 +120,7 @@ export const useAiUi = create<AiUiState>()((set, get) => {
         ...initialState(),
 
         dispatch(raw, runId) {
-            if (runId !== undefined && runId !== get().scenario.runId) return; // zdarzenie starego przebiegu
+            if (runId !== undefined && (runId !== get().scenario.runId || isClosed(get().scenario.status))) return; // stary lub zamknięty przebieg
             const event = parseEvent(raw);
             if (!event) {
                 console.warn('[aiui] odrzucony komunikat (niezgodny z kontraktem):', raw);
@@ -123,23 +132,27 @@ export const useAiUi = create<AiUiState>()((set, get) => {
             const r = state.surfaces.workspace !== surfaces.workspace
                 ? reconcileLayout(layout, workspaceMeta(state.surfaces.workspace))
                 : { layout, screenHint: false };
-            if (state.surfaces !== surfaces || state.stage !== stage || state.narration !== narration || r.layout !== layout) {
-                set({ surfaces: state.surfaces, stage: state.stage, narration: state.narration, layout: r.layout });
+            // P3: hint agenta 'screen' przenosi kamerę (i semantyczny cel), o ile użytkownik nie obraca ręcznie
+            const cameraToScreen = r.screenHint && now() - lastManualAt > MANUAL_GRACE_MS;
+            const nextStage = cameraToScreen && state.stage.focus !== 'front' ? { ...state.stage, focus: 'front' as const } : state.stage;
+            if (state.surfaces !== surfaces || nextStage !== stage || state.narration !== narration || r.layout !== layout) {
+                set({ surfaces: state.surfaces, stage: nextStage, narration: state.narration, layout: r.layout });
             }
             runEffects(effects);
-            // P3: hint agenta 'screen' przenosi kamerę, o ile użytkownik nie obraca właśnie ręcznie
-            if (r.screenHint && now() - lastManualAt > MANUAL_GRACE_MS) tweenTo(FOCUS_ANGLE.front);
+            if (cameraToScreen) tweenTo(FOCUS_ANGLE.front);
         },
 
         layoutCommand(cmd) {
             const r = presentationReducer(get().layout, cmd);
-            if (r.changed) set({ layout: r.layout });
-            // P3: jawna komenda użytkownika „na ekran” zawsze przenosi kamerę
+            // P3: jawna komenda użytkownika „na ekran” zawsze przenosi kamerę — cel ustawiany w tym samym zapisie
+            const stage = get().stage;
+            const nextStage = r.cameraFront && stage.focus !== 'front' ? { ...stage, focus: 'front' as const } : stage;
+            if (r.changed || nextStage !== stage) set({ layout: r.layout, stage: nextStage });
             if (r.cameraFront) tweenTo(FOCUS_ANGLE.front);
         },
 
         receiveStatus(runId, status, error) {
-            if (runId !== get().scenario.runId) return;
+            if (runId !== get().scenario.runId || isClosed(get().scenario.status)) return; // zakończenie jest trwałe
             set({ scenario: { ...get().scenario, status, error } });
         },
 

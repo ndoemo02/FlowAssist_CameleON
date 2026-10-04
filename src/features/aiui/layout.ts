@@ -13,9 +13,14 @@ export interface LayoutEntry {
     scale: number;                 // 0.6..2
     z: number;                     // kolejność nakładania
     lastHint: Presentation | null; // ostatni hint agenta (P4)
-    rev: number;                   // rośnie przy zmianach od agenta — anulowanie gestów (II.6)
+    instance: number;              // unikalna instancja wpisu (ponowne dodanie tego samego id = nowa instancja)
+    rev: number;                   // rośnie przy każdej zmianie spoza gestu (agent, siatka, degradacja focusu/ekranu)
     moved: boolean;                // użytkownik przesunął kartę (P9)
 }
+
+// Licznik instancji: gest rozpoczęty na usuniętym i ponownie dodanym elemencie nie może zmienić nowego wpisu.
+let instanceSeq = 0;
+const nextInstance = () => ++instanceSeq;
 
 export type Layout = Record<string, LayoutEntry>;
 
@@ -45,7 +50,8 @@ function enforceSingle(layout: Layout, kind: 'screen' | 'focus', keep: string | 
     if (holders.length <= 1) return layout;
     const winner = keep && holders.includes(keep) ? keep : holders[holders.length - 1];
     const next = { ...layout };
-    for (const id of holders) if (id !== winner) next[id] = { ...next[id], presentation: 'card' };
+    // degradacja to zmiana spoza gestu tej karty → rev++ (unieważnia trwający na niej gest)
+    for (const id of holders) if (id !== winner) next[id] = { ...next[id], presentation: 'card', rev: next[id].rev + 1 };
     return next;
 }
 
@@ -71,7 +77,10 @@ export function reconcileLayout(prev: Layout, items: ItemMeta[] | null): { layou
             // P6: nowy wpis (także dla „jeszcze niedostarczonego” — szkielet z zarezerwowanym miejscem)
             const hint = it.delivered ? it.hint : null;
             const presentation: LocalPresentation = hint ?? 'card';
-            next[it.id] = { presentation, ...autoSlot(rankOf.get(it.id)!, items.length), scale: 1, z: maxZ + 1 + rankOf.get(it.id)!, lastHint: hint, rev: 0, moved: false };
+            next[it.id] = {
+                presentation, ...autoSlot(rankOf.get(it.id)!, items.length), scale: 1, z: maxZ + 1 + rankOf.get(it.id)!,
+                lastHint: hint, instance: nextInstance(), rev: 0, moved: false,
+            };
             if (presentation === 'screen') { screenHint = true; lastScreen = it.id; }
             if (presentation === 'focus') lastFocus = it.id;
             changed = true;
@@ -103,7 +112,7 @@ export function reconcileLayout(prev: Layout, items: ItemMeta[] | null): { layou
             const e = next[it.id];
             if (e.moved) continue;
             const slot = autoSlot(rankOf.get(it.id)!, items.length);
-            if (e.x !== slot.x || e.y !== slot.y) next[it.id] = { ...e, ...slot };
+            if (e.x !== slot.x || e.y !== slot.y) next[it.id] = { ...e, ...slot, rev: e.rev + 1 }; // zmiana spoza gestu
         }
     }
 
@@ -117,10 +126,10 @@ export type LayoutCommand =
     | { type: 'blur' }
     | { type: 'toScreen'; id: string }
     | { type: 'toCard'; id: string }
-    | { type: 'dismiss'; id: string }
+    | { type: 'dismiss'; id: string; rev?: number; instance?: number }
     | { type: 'restore'; id: string }
-    | { type: 'move'; id: string; x: number; y: number; rev: number }
-    | { type: 'resize'; id: string; scale: number; rev?: number }
+    | { type: 'move'; id: string; x: number; y: number; rev: number; instance?: number }
+    | { type: 'resize'; id: string; scale: number; rev?: number; instance?: number }
     | { type: 'raise'; id: string };
 
 /**
@@ -139,6 +148,9 @@ export function presentationReducer(layout: Layout, cmd: LayoutCommand): { layou
 
     const e = layout[cmd.id];
     if (!e) return none; // element usunięty (np. w trakcie gestu) — komenda anulowana
+    // II.6: komendy z gestu niosą tożsamość z chwili startu — nieaktualna instancja/rewizja = anulowanie
+    if ('instance' in cmd && cmd.instance !== undefined && cmd.instance !== e.instance) return none;
+    if ('rev' in cmd && cmd.rev !== undefined && cmd.rev !== e.rev) return none;
 
     switch (cmd.type) {
         case 'focus': {
@@ -161,11 +173,10 @@ export function presentationReducer(layout: Layout, cmd: LayoutCommand): { layou
             return e.presentation !== 'dismissed' ? none
                 : { layout: set(cmd.id, { presentation: 'card', z: topZ() }), changed: true, cameraFront: false };
         case 'move':
-            // II.6: zapis gestu tylko, gdy wpis się nie zmienił od startu gestu
-            if (e.rev !== cmd.rev || e.presentation === 'dismissed') return none;
+            if (e.presentation === 'dismissed') return none;
             return { layout: set(cmd.id, { x: clamp(cmd.x, 0, 1), y: clamp(cmd.y, 0, 1), moved: true }), changed: true, cameraFront: false };
         case 'resize':
-            if ((cmd.rev !== undefined && e.rev !== cmd.rev) || e.presentation === 'dismissed') return none;
+            if (e.presentation === 'dismissed') return none;
             return { layout: set(cmd.id, { scale: clamp(cmd.scale, SCALE_MIN, SCALE_MAX) }), changed: true, cameraFront: false };
         case 'raise':
             return { layout: set(cmd.id, { z: topZ() }), changed: true, cameraFront: false };

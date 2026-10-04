@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useRef, useState, type RefObject } from 'react';
+import { memo, useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAiUi } from '../store';
 import { FOCUS_ANGLE, slotVisibility } from '../slots';
@@ -9,6 +9,7 @@ import ActionBar from '../components/ActionBar';
 import { cardKeyHandler, useCardGestures, useResizeHandle, visualScale } from './gestures';
 import { ItemBody, KIND_LABEL, useItemView } from './ItemContent';
 import { useZones } from './zones';
+import { setLayerInert } from './inert';
 
 // Stół roboczy (Back 180°, plan v1.2.1 II.2/II.6): karty 2.5D w DOM.
 // Każda karta subskrybuje WŁASNY wpis układu — zmiana jednego elementu nie renderuje pozostałych.
@@ -16,11 +17,20 @@ import { useZones } from './zones';
 const EMPTY: string[] = [];
 const BASE_W = 300; // px szerokości karty przy scale = 1 (desktop)
 
+/** Compact: rozmiar karty („− / +”) to jej szerokość w pasku (78vw / 360px przy scale = 1, w granicach 0.75–1.25). */
+const compactWidth = (scale: number) => {
+    const s = Math.min(1.25, Math.max(0.75, scale));
+    return `min(${Math.round(78 * s)}vw, ${Math.round(360 * s)}px)`;
+};
+
 export default function WorkspaceLayer({ compact }: { compact: boolean }) {
     const ids = useAiUi(useShallow((s) => workspaceChildren(s.surfaces.workspace) ?? EMPTY));
     const visibility = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.back));
     const zones = useZones(compact);
     const container = useRef<HTMLDivElement>(null);
+    const section = useRef<HTMLElement>(null);
+    // stół widoczny tylko z Back: przy częściowej widoczności poza Tab i bez fokusu (jak panel ekranu)
+    useLayoutEffect(() => setLayerInert(section.current, visibility <= 0.6), [visibility, ids.length]);
     if (ids.length === 0) return null;
 
     const blurOnBackground = (e: React.MouseEvent) => {
@@ -29,6 +39,7 @@ export default function WorkspaceLayer({ compact }: { compact: boolean }) {
 
     return (
         <section
+            ref={section}
             aria-label="Stół roboczy"
             className="absolute inset-x-0 transition-opacity duration-200"
             style={{
@@ -90,8 +101,9 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
     const controls = (
         <div data-nodrag className="flex flex-wrap items-center gap-1.5 border-t border-white/10 px-3 py-2">
             <CardButton onClick={() => cmd({ type: 'toScreen', id })} primary>Na ekran</CardButton>
-            <CardButton onClick={() => cmd({ type: 'resize', id, scale: entry.scale / 1.15 })} label="Zmniejsz">−</CardButton>
-            <CardButton onClick={() => cmd({ type: 'resize', id, scale: entry.scale * 1.15 })} label="Powiększ">+</CardButton>
+            {/* skala liczona z bieżącego stanu w chwili kliknięcia (szybkie kliknięcia nie gubią kroków) */}
+            <CardButton onClick={() => cmd({ type: 'resize', id, scale: (useAiUi.getState().layout[id]?.scale ?? 1) / 1.15 })} label="Zmniejsz">−</CardButton>
+            <CardButton onClick={() => cmd({ type: 'resize', id, scale: (useAiUi.getState().layout[id]?.scale ?? 1) * 1.15 })} label="Powiększ">+</CardButton>
             <CardButton onClick={() => cmd({ type: 'dismiss', id })}>Ukryj</CardButton>
             {view.status === 'ready' && view.actions.length > 0 && (
                 <CardButton onClick={() => setMenu((m) => !m)} label="Akcje">⋯</CardButton>
@@ -108,11 +120,11 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
             onContextMenu={(e) => { e.preventDefault(); setMenu(true); }}
             onClick={(e) => { if (compact && entry.presentation === 'card' && !(e.target as HTMLElement).closest('[data-nodrag]')) cmd({ type: 'focus', id }); }}
             aria-label={title}
-            className={`${compact ? 'relative h-full w-[78vw] max-w-[360px] shrink-0 snap-center' : 'absolute touch-none select-none'} flex flex-col overflow-hidden rounded-2xl border bg-[#07040f]/90 text-white shadow-2xl outline-none transition-[box-shadow,border-color] ${
+            className={`${compact ? 'relative h-full shrink-0 snap-center' : 'absolute touch-none select-none'} flex flex-col overflow-hidden rounded-2xl border bg-[#07040f]/90 text-white shadow-2xl outline-none transition-[box-shadow,border-color] ${
                 focused ? 'border-cyan-400/60 shadow-cyan-900/40' : 'border-white/10 hover:border-white/25'
             } ${compact ? '' : 'cursor-grab active:cursor-grabbing'}`}
             style={compact
-                ? undefined
+                ? { width: compactWidth(entry.scale) }
                 : { left: `${entry.x * 100}%`, top: `${entry.y * 100}%`, width: BASE_W, transform: `translate(-50%, -50%) scale(${scale})`, zIndex: entry.z }}
         >
             <header className="flex items-center justify-between gap-2 px-3 pt-2.5">

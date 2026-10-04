@@ -8,6 +8,7 @@ import type { AnchorMode } from '../scene/measureScreen';
 import type { AnchorState } from '../scene/anchorRegistry';
 import ActionBar from '../components/ActionBar';
 import { useScreenPinch } from './gestures';
+import { setLayerInert } from './inert';
 import { ItemBody, KIND_LABEL, useItemView } from './ItemContent';
 
 // Ekran (Front 0°, deep view — plan v1.2.1 II.2, wariant hybrydowy po spike #2):
@@ -39,7 +40,7 @@ function ScreenPanel({ id }: { id: string }) {
         if (!el) return;
         if (!s || s.mode !== 'anchor') {
             el.style.transform = el.style.width = el.style.height = '';
-            if (!s) { el.style.opacity = '0'; el.style.pointerEvents = 'none'; }
+            if (!s) { el.style.opacity = '0'; el.style.pointerEvents = 'none'; setLayerInert(el, true); }
             return;
         }
         if (s.panel) {
@@ -49,6 +50,7 @@ function ScreenPanel({ id }: { id: string }) {
         }
         el.style.opacity = s.active ? '1' : '0';
         el.style.pointerEvents = s.active ? 'auto' : 'none';
+        setLayerInert(el, !s.active); // niewidoczny panel nie może przyjmować Tab/Enter
     };
     // Subskrypcja ScreenAnchor uruchamia pomiar w Canvasie tylko wtedy, gdy coś jest na ekranie.
     useEffect(() => subscribeAnchor((s) => {
@@ -57,6 +59,8 @@ function ScreenPanel({ id }: { id: string }) {
         apply();
     }), []);
     useLayoutEffect(apply);
+    // tryb centered: aktywny tylko, gdy kamera patrzy na Front
+    useLayoutEffect(() => { if (mode === 'centered') setLayerInert(panel.current, frontVisible <= 0.6); }, [mode, frontVisible]);
 
     const cmd = useAiUi.getState().layoutCommand;
     const title = view.status !== 'pending' || view.title ? view.title ?? id : 'Ładowanie…';

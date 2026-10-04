@@ -138,6 +138,58 @@ describe('pętla action → transport → event → UI', () => {
     });
 });
 
+describe('trwałe zakończenie przebiegu (Astra #2)', () => {
+    it('odpowiedź na akcję wysłaną przed decyzją terminalną nie wznawia zakończonego przebiegu', () => {
+        st().startScenario('test');
+        vi.advanceTimersByTime(1000);
+        st().sendAction('deepen', 'workspace', 'chart');   // w locie: dane mapy + komponenty po 200 ms
+        st().sendAction('approve', 'hud', 'root');         // decyzja terminalna
+        vi.advanceTimersByTime(2000);
+        expect(st().scenario.status).toBe('done');
+        expect(st().layout.map).toBeUndefined();            // późne zdarzenia zamkniętego przebiegu odrzucone
+    });
+
+    it('store ignoruje statusy i zdarzenia przebiegu po done (niezależnie od transportu)', () => {
+        st().startScenario('test');
+        vi.advanceTimersByTime(1000);
+        const runId = st().scenario.runId;
+        st().receiveStatus(runId, 'done');
+        st().receiveStatus(runId, 'awaiting_action');
+        st().dispatch({ narration: { text: 'spóźnione' } }, runId);
+        expect(st().scenario.status).toBe('done');
+        expect(st().narration.text).toBeNull();
+    });
+});
+
+describe('stage.focus spójny z kamerą (Astra #3)', () => {
+    it('hint agenta "screen" ustawia stage.focus = front razem z ruchem kamery', () => {
+        st().startScenario('test');
+        vi.advanceTimersByTime(1000);
+        expect(st().stage.focus).toBe('back');
+        st().sendAction('present', 'workspace', 'chart');
+        vi.advanceTimersByTime(200);
+        expect(st().stage.focus).toBe('front');
+    });
+
+    it('komenda użytkownika „na ekran” ustawia stage.focus = front', () => {
+        st().startScenario('test');
+        vi.advanceTimersByTime(1000);
+        st().layoutCommand({ type: 'toScreen', id: 'kpis' });
+        expect(st().stage.focus).toBe('front');
+    });
+
+    it('w trakcie ręcznego obrotu hint "screen" nie zmienia ani kamery, ani stage.focus (jawna semantyka)', () => {
+        st().startScenario('test');
+        vi.advanceTimersByTime(1000);
+        st().setAngle(FOCUS_ANGLE.back, 'manual');
+        st().sendAction('present', 'workspace', 'chart');
+        vi.advanceTimersByTime(200);
+        expect(st().layout.chart.presentation).toBe('screen');
+        expect(st().stage.focus).toBe('back');
+        expect(st().camera.source).toBe('manual');
+    });
+});
+
 describe('koordynator: ekran i kamera (P3)', () => {
     it('hint agenta "screen" przenosi kamerę na Front', () => {
         st().startScenario('test');

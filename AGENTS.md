@@ -32,6 +32,8 @@ Curved screen + AI avatar Amber. Audytowanie postepow projektow.
 - [ ] Widok agregacji nowosci per projekt
 
 ## E2E Testing — Perplexity Comet
+> **Uwaga (2026-10-04):** Perplexity Comet nie może już testować UI — nawigowanie i klikanie jak użytkownik przeniesiono do płatnej funkcji „Computer Use”. Do czasu decyzji właściciela prompt poniżej służy jako scenariusz E2E dla dowolnego testera (człowiek lub agent przeglądarkowy). W sesji 2026-10-04 kontrole przeglądarkowe wykonano przez `agent-browser` (osobna instancja Chrome w trybie headless — nie koliduje z przeglądarką właściciela; na Windows wyjście CLI kierować do pliku, nie przez potok `|`, bo demon trzyma potok otwarty).
+
 Comet to przegladarka AI ktora nawiguje i klika jak realny uzytkownik.
 Agent ktory skonczyl implementacje GENERUJE prompt ponizej.
 Wynik testu wraca do wlasciciela i trafia do raportu sesji.
@@ -65,16 +67,19 @@ URL startowy: http://127.0.0.1:3000
 
 Wykonaj kroki w tej kolejnosci:
 1. Otworz URL i poczekaj az animacja intro FlowAssist zniknie. Spodziewaj sie sceny 3D z galaktycznym tlem, zakrzywionym ekranem i napisem "Scroll to Explore".
-2. Po intro obserwuj przez 2 sekundy kadr 3D. Spodziewaj sie plynnego dolotu kamery do szerokiego ujecia, bez przeskoku lub pustego canvasa.
-3. Przewin strone w dol o okolo jeden ekran. Spodziewaj sie plynnego zblizenia kamery na ekran/scena, bez utraty menu i bez zasloniecia przez panel dev.
-4. Wroc na gore strony. Spodziewaj sie plynnego powrotu do szerokiego ujecia.
-5. Kliknij przycisk "360 View", ustaw suwak na okolo 90 stopni i sprawdz, czy kamera reaguje bez awarii oraz czy scena pozostaje widoczna. Ustaw suwak z powrotem na 0 i zamknij panel przyciskiem "360 View".
-6. (AI-to-UI) Wroc na gore strony. Na dole kadru powinien byc przycisk "Zleć research: popyt na rezerwacje online" ze "Start". Kliknij go. Spodziewaj sie: po prawej panel "Research: rezerwacje online" z 3 zadaniami (Scout, Parser, Analyst), paski postepu rosnace do 100%, na dole napis z etykieta AMBER.
-7. Poczekaj okolo 8 sekund. Spodziewaj sie plynnego obrotu kamery o 180 stopni (Back), zamkniecia panelu zadan i pojawienia sie panelu "Canvas agenta" z wykresem liniowym (2026 vs 2025), 3 kartami (+60%, Q3, 42%) i przyciskami akcji. Dane wykresu moga dojsc chwile po pojawieniu sie panelu (szkielet ladowania) - to poprawne.
-8. Kliknij "Pokaż jako prezentację". Spodziewaj sie slajdu "Popyt rośnie" (1/3); strzalka → przechodzi do kolejnych slajdow.
-9. Kliknij "Wyślij do akceptacji". Spodziewaj sie karty "Pilotaż asystenta 24/7" z przyciskami "Zatwierdź" i "Odrzuć".
-10. Kliknij "Zatwierdź". Spodziewaj sie napisu "Zatwierdzone..." i po ok. 2 s plynnego powrotu kamery na Front oraz przycisku "Uruchom research ponownie".
-11. Otworz http://127.0.0.1:3000/?demo=research w oknie o rozmiarze telefonu w poziomie (np. DevTools 844x390). Scenariusz startuje sam po intro. Sprawdz, ze przyciski akcji na Back sa widoczne i klikalne, a napisy nie nachodza na suwak ani panel zadan.
+2. Po intro obserwuj przez 2 sekundy kadr 3D. Spodziewaj sie plynnego dolotu kamery do kadru Front: zakrzywiony ekran z wideo, po lewej avatar Amber na podescie z cyjanowym pierscieniem. Bez przeskoku i bez pustego canvasa. Na dole przycisk "Zleć research: popyt na rezerwacje online" ze "Start".
+3. Przewin strone w dol o okolo jeden ekran, potem wroc na gore. Spodziewaj sie plynnego zblizenia i powrotu kamery, bez utraty menu.
+4. Kliknij "360 View", ustaw suwak na okolo 90 stopni, potem z powrotem na 0. Kamera reaguje plynnie, scena pozostaje widoczna. Zamknij panel przyciskiem "360 View".
+5. Kliknij "Start" w przycisku "Zleć research". Spodziewaj sie: u gory chip "agent pracuje…", po prawej panel "Research: rezerwacje online" z 3 zadaniami (Scout, Parser, Analyst) i paskami postepu do 100%, na dole napis z etykieta AMBER. Wideo na ekranie sceny wycisza sie i przyciemnia.
+6. Poczekaj okolo 7 sekund. Spodziewaj sie obrotu kamery o 180 stopni (Back), zamkniecia panelu zadan i "stolu roboczego" z 3 kartami: wykres "Zapytania o rezerwacje online…", "Najważniejsze wskaźniki" (+60%, Q3, 42%), tabela "Dzielnice · Q4". Karty moga przez chwile pokazywac szkielet ladowania - to poprawne.
+7. Poczekaj okolo 3 sekund. Agent wysyla wykres na ekran: kamera sama wraca na Front, a wykres pojawia sie w panelu dopasowanym do zakrzywionego ekranu (przyciski "Na stół" i "Ukryj"). Po chwili na wykresie dochodzi trzecia linia "Plan 2026". Pod napisami pojawia sie pasek "Decyzja: Pilotaż asystenta 24/7" z przyciskiem "Szczegóły".
+8. Kliknij "Na stół" w panelu ekranu, potem w "360 View" ustaw suwak na 180 stopni (Back) i zamknij panel suwaka. Na stole: kliknij jedna karte - powinna sie powiekszyc i pokazac przyciski "Na ekran", "−", "+", "Ukryj". Kliknij w puste tlo - karta wraca do normalnego rozmiaru.
+9. Przeciagnij dowolna karte mysza w inne miejsce stolu - powinna zostac tam, gdzie ja upusciles. Przeciagnij uchwyt w prawym dolnym rogu karty - karta zmienia rozmiar.
+10. Kliknij karte "Najważniejsze wskaźniki", potem "Ukryj". Karta znika, u gory pojawia sie "Pokaż ukryte (1)". Kliknij go i "Przywróć" - karta wraca.
+11. Kliknij dwukrotnie karte "Dzielnice · Q4". Kamera wraca na Front, tabela pojawia sie w panelu ekranu. Kliknij "⋯", potem "Pogłęb analizę". Na stole (Back) powinna dojsc czwarta karta - mapa "Warszawa · zapytania Q4 (schemat)" - a napis Amber wspomina Prage-Poludnie i Mokotow.
+12. Kliknij pasek "Decyzja…" → "Szczegóły", potem "Zatwierdź". Spodziewaj sie napisu "Zatwierdzone…", znikniecia karty decyzji, powrotu kamery na Front i przycisku "Uruchom research ponownie". Gdy na ekranie nie ma juz zadnej karty, wideo wraca do pelnej jasnosci.
+13. Otworz http://127.0.0.1:3000/?demo=research w oknie telefonu w poziomie (np. DevTools 844x390). Scenariusz startuje sam po intro. Na Back karty sa w poziomym pasku przewijanym palcem/myszka, kazda ma przyciski; "Na ekran" wysyla karte do panelu na zakrzywionym ekranie. Napisy nie nachodza na pasek kart.
+14. Otworz ten sam URL w oknie telefonu w pionie (np. 390x844). Element wyslany na ekran pokazuje sie jako wysrodkowany panel nad scena (nie na zakrzywionym ekranie).
 
 Po kazdym kroku:
 - Opisz co widzisz na ekranie
@@ -97,7 +102,7 @@ Kazdy agent czyta go na poczatku i dopisuje raport na koncu.
 | Codex Opus | Architektura, zlecone zmiany        | TAK                 | TAK         |
 | Codex            | Cleanup, rutyna (AUDIT przed exec!) | TAK                 | TAK         |
 | Antigravity      | Implementacja                       | TAK                 | TAK         |
-| Perplexity Comet | E2E testing (klika jak uzytkownik)  | prompt z sekcji E2E | NIE         |
+| Perplexity Comet | E2E testing (klika jak uzytkownik) — **nieaktywny: testowanie UI przeniesione do płatnego „Computer Use”** | prompt z sekcji E2E | NIE         |
 
 Zasady:
 - Kazdy agent ZACZYNA od przeczytania tego pliku

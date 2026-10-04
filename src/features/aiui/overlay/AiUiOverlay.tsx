@@ -5,9 +5,14 @@ import { useEffect, useRef } from 'react';
 import SurfaceRenderer from '../SurfaceRenderer';
 import { FOCUS_ANGLE, slotVisibility } from '../slots';
 import { useAiUi, type ScenarioStatus } from '../store';
+import HudLayer from './HudLayer';
+import ScreenLayer from './ScreenLayer';
 import { useCompact } from './useCompact';
+import WorkspaceLayer from './WorkspaceLayer';
+import { useZones } from './zones';
 
-// Warstwa DOM nad sceną 3D (screen-space). Sloty wygaszają się wg kąta kamery; agent nie zna pozycji.
+// Warstwa DOM nad sceną 3D (screen-space), plan v1.2.1: stół roboczy (Back), ekran (Front, ScreenAnchor
+// lub centered), HUD (status, taski, decyzje, napisy). Agent nie zna pozycji — tylko semantykę.
 // Kontener ma pointer-events: none, żeby nie blokować OrbitControls — klikalne są tylko widoczne panele.
 
 const DEMO_PROMPT = 'Zbadaj popyt na rezerwacje online w salonach usługowych w Warszawie';
@@ -18,8 +23,11 @@ export default function AiUiOverlay() {
 
     return (
         <div className="pointer-events-none absolute inset-0 z-20">
-            <BackCanvas compact={compact} />
+            <WorkspaceLayer compact={compact} />
+            <ScreenLayer />
+            <AgentStatus compact={compact} />
             <TasksDrawer compact={compact} />
+            <HudLayer compact={compact} />
             <NarrationCaption compact={compact} />
             <PromptPill compact={compact} />
         </div>
@@ -39,13 +47,6 @@ function useDemoAutostart() {
     }, [ready]);
 }
 
-// ── strefy pionowe (px) ────────────────────────────────────────────
-function useBottomReserve(compact: boolean) {
-    const orbit = useAiUi((s) => s.ui.orbitPanel);
-    if (compact) return { caption: 12, panel: orbit ? 176 : 84 };
-    return { caption: orbit ? 180 : 64, panel: orbit ? 270 : 156 };
-}
-
 const STATUS_LABEL: Record<ScenarioStatus, string | null> = {
     idle: null,
     running: 'agent pracuje…',
@@ -54,41 +55,19 @@ const STATUS_LABEL: Record<ScenarioStatus, string | null> = {
     error: 'błąd przebiegu',
 };
 
-function BackCanvas({ compact }: { compact: boolean }) {
-    const hasSurface = useAiUi((s) => Boolean(s.surfaces['back-canvas']));
-    const visibility = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.back));
+/** HUD: status agenta (niezależny od kąta kamery). */
+function AgentStatus({ compact }: { compact: boolean }) {
     const status = useAiUi((s) => s.scenario.status);
-    const reserve = useBottomReserve(compact);
-    if (!hasSurface) return null;
-
+    const zones = useZones(compact);
+    const label = STATUS_LABEL[status];
+    if (!label) return null;
     return (
-        <section
-            aria-label="Canvas agenta"
-            className={`absolute left-1/2 flex w-[min(960px,calc(100%-32px))] flex-col rounded-2xl border border-white/10 transition-[opacity,transform] duration-200 ${
-                compact ? 'bg-[#07040f]/95' : 'bg-[#07040f]/80 backdrop-blur-md'
-            }`}
-            style={{
-                top: compact ? 60 : 84,
-                maxHeight: `calc(100% - ${compact ? 60 : 84}px - ${reserve.panel}px)`,
-                opacity: visibility,
-                transform: `translateX(-50%) scale(${0.96 + 0.04 * visibility})`,
-                visibility: visibility === 0 ? 'hidden' : 'visible',
-                pointerEvents: visibility > 0.6 ? 'auto' : 'none',
-            }}
-        >
-            <header className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
-                <span className="text-[11px] uppercase tracking-widest text-white/40">Canvas agenta</span>
-                {STATUS_LABEL[status] && (
-                    <span className="flex items-center gap-1.5 text-[11px] text-white/50">
-                        <span className={`h-1.5 w-1.5 rounded-full ${status === 'running' ? 'animate-pulse bg-cyan-400' : status === 'error' ? 'bg-rose-500' : 'bg-purple-400'}`} />
-                        {STATUS_LABEL[status]}
-                    </span>
-                )}
-            </header>
-            <div className={`min-h-0 flex-1 overflow-y-auto ${compact ? 'p-3' : 'p-4'}`}>
-                <SurfaceRenderer surfaceId="back-canvas" />
-            </div>
-        </section>
+        <div className="absolute inset-x-0 flex justify-center" style={{ top: zones.top - (compact ? 4 : 8) }}>
+            <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-black/60 px-3 py-1 text-[11px] text-white/60">
+                <span className={`h-1.5 w-1.5 rounded-full ${status === 'running' ? 'animate-pulse bg-cyan-400' : status === 'error' ? 'bg-rose-500' : 'bg-purple-400'}`} />
+                {label}
+            </span>
+        </div>
     );
 }
 
@@ -96,7 +75,7 @@ function TasksDrawer({ compact }: { compact: boolean }) {
     const tasks = useAiUi((s) => s.surfaces['tasks-drawer']);
     const open = useAiUi((s) => s.stage.drawer === 'open');
     const setDrawer = useAiUi((s) => s.setDrawer);
-    const reserve = useBottomReserve(compact);
+    const reserve = useZones(compact);
     if (!tasks) return null;
 
     const all = Object.values((tasks.data.tasks ?? {}) as Record<string, { status: string }>);
@@ -151,7 +130,7 @@ function NarrationCaption({ compact }: { compact: boolean }) {
     const text = useAiUi((s) => s.narration.text);
     const drawerOpen = useAiUi((s) => s.stage.drawer === 'open');
     const hasTasks = useAiUi((s) => Boolean(s.surfaces['tasks-drawer']));
-    const reserve = useBottomReserve(compact);
+    const reserve = useZones(compact);
     const hidden = compact && drawerOpen; // na compact bottom-sheet i napisy nigdy naraz
 
     return (
@@ -187,7 +166,7 @@ function PromptPill({ compact }: { compact: boolean }) {
     const status = useAiUi((s) => s.scenario.status);
     const onFront = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.front) > 0.6);
     const hasCaption = useAiUi((s) => Boolean(s.narration.text));
-    const reserve = useBottomReserve(compact);
+    const reserve = useZones(compact);
     const startScenario = useAiUi((s) => s.startScenario);
 
     const idle = status === 'idle' || status === 'done' || status === 'error';

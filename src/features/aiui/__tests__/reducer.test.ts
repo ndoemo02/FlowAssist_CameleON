@@ -3,8 +3,8 @@ import { initialCoreState, reduce, type CoreState } from '../reducer';
 import type { AiUiEvent } from '../contract';
 
 const V = 'v0.9.1' as const;
-const create = (surfaceId: 'back-canvas' | 'tasks-drawer'): AiUiEvent =>
-    ({ version: V, createSurface: { surfaceId, catalogId: 'flowassist/v1' } });
+const create = (surfaceId: 'workspace' | 'tasks-drawer'): AiUiEvent =>
+    ({ version: V, createSurface: { surfaceId, catalogId: 'flowassist/v2' } });
 
 function run(events: AiUiEvent[], start: CoreState = initialCoreState()) {
     return events.reduce(
@@ -18,17 +18,17 @@ function run(events: AiUiEvent[], start: CoreState = initialCoreState()) {
 
 describe('reducer: surface lifecycle', () => {
     it('createSurface tworzy pusty surface', () => {
-        const { state } = run([create('back-canvas')]);
-        expect(state.surfaces['back-canvas']).toEqual({ catalogId: 'flowassist/v1', components: {}, data: {} });
+        const { state } = run([create('workspace')]);
+        expect(state.surfaces['workspace']).toEqual({ catalogId: 'flowassist/v2', components: {}, data: {} });
     });
 
     it('duplikat createSurface jest odrzucany bez resetu i raportowany', () => {
         const { state, effects } = run([
-            create('back-canvas'),
-            { version: V, updateDataModel: { surfaceId: 'back-canvas', path: '/x', value: 1 } },
-            create('back-canvas'),
+            create('workspace'),
+            { version: V, updateDataModel: { surfaceId: 'workspace', path: '/x', value: 1 } },
+            create('workspace'),
         ]);
-        expect(state.surfaces['back-canvas']?.data).toEqual({ x: 1 });
+        expect(state.surfaces['workspace']?.data).toEqual({ x: 1 });
         expect(effects).toContainEqual(expect.objectContaining({ type: 'reportError', error: expect.objectContaining({ code: 'SURFACE_EXISTS' }) }));
     });
 
@@ -38,8 +38,8 @@ describe('reducer: surface lifecycle', () => {
     });
 
     it('update do nieistniejącego surface’u raportuje błąd bez crasha', () => {
-        const { state, effects } = run([{ version: V, updateDataModel: { surfaceId: 'back-canvas', path: '/x', value: 1 } }]);
-        expect(state.surfaces['back-canvas']).toBeUndefined();
+        const { state, effects } = run([{ version: V, updateDataModel: { surfaceId: 'workspace', path: '/x', value: 1 } }]);
+        expect(state.surfaces['workspace']).toBeUndefined();
         expect(effects[0]).toMatchObject({ type: 'reportError', error: { code: 'SURFACE_NOT_FOUND' } });
     });
 });
@@ -47,15 +47,15 @@ describe('reducer: surface lifecycle', () => {
 describe('reducer: komponenty i data model', () => {
     it('updateComponents robi upsert po id (podmiana root = zmiana widoku)', () => {
         const { state } = run([
-            create('back-canvas'),
-            { version: V, updateComponents: { surfaceId: 'back-canvas', components: [
-                { id: 'root', component: 'Stack', children: ['chart'] },
+            create('workspace'),
+            { version: V, updateComponents: { surfaceId: 'workspace', components: [
+                { id: 'root', component: 'Workspace', children: ['chart'] },
                 { id: 'chart', component: 'Chart', kind: 'line' },
             ] } },
-            { version: V, updateComponents: { surfaceId: 'back-canvas', components: [{ id: 'root', component: 'Presentation' }] } },
+            { version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Approval' }] } },
         ]);
-        const comps = state.surfaces['back-canvas']!.components;
-        expect(comps.root.component).toBe('Presentation');
+        const comps = state.surfaces['workspace']!.components;
+        expect(comps.root.component).toBe('Approval');
         expect(comps.chart.component).toBe('Chart');
     });
 
@@ -72,9 +72,9 @@ describe('reducer: komponenty i data model', () => {
     });
 
     it('zmiana jednego surface’u zachowuje referencję drugiego', () => {
-        const { state } = run([create('back-canvas'), create('tasks-drawer')]);
+        const { state } = run([create('workspace'), create('tasks-drawer')]);
         const next = reduce(state, { version: V, updateDataModel: { surfaceId: 'tasks-drawer', path: '/a', value: 1 } }).state;
-        expect(next.surfaces['back-canvas']).toBe(state.surfaces['back-canvas']);
+        expect(next.surfaces['workspace']).toBe(state.surfaces['workspace']);
         expect(next.narration).toBe(state.narration);
     });
 });

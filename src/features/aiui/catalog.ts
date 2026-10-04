@@ -1,7 +1,7 @@
-// Katalog flowassist/v1: czyste walidatory propsów (bez Reacta), używane przez resolveTree.
+// Katalog flowassist/v2: czyste walidatory propsów (bez Reacta), używane przez resolveTree/resolveWorkspace.
 // Każdy walidator zwraca null albo { path, message } — path względny do propsów komponentu.
 
-import type { CatalogName } from './contract';
+import { ITEM_KINDS, PRESENTATIONS, REPRESENTATIONS, type CatalogName, type ItemKind, type Representation } from './contract';
 
 export type ValidationIssue = { path: string; message: string };
 type Validator = (p: Record<string, unknown>) => ValidationIssue | null;
@@ -31,7 +31,10 @@ const isTaskStatus = oneOf(...TASK_STATUSES);
 const isDelta = oneOf('up', 'down', 'flat');
 const isVariant = oneOf('primary', 'secondary');
 
-const validators: Record<CatalogName, Validator> = {
+/** Walidatory widoków (komponenty React z v1) — treść reprezentacji i komponenty HUD/tasków. */
+type ViewName = 'TaskList' | 'Chart' | 'InsightCards' | 'Approval' | 'DataTable' | 'MapView' | 'Presentation';
+
+const views: Record<ViewName, Validator> = {
     TaskList: (p) => {
         if (!isObj(p.tasks)) return issue('/tasks', 'oczekiwano mapy id → task');
         for (const [id, t] of Object.entries(p.tasks)) {
@@ -92,20 +95,67 @@ const validators: Record<CatalogName, Validator> = {
             if (!Array.isArray(s.bullets) || !s.bullets.every(isStr)) return issue('/bullets', 'lista tekstów');
             return null;
         }, 1),
-    Stack: (p) => {
-        if (!optional(p.gap, isNum)) return issue('/gap', 'liczba');
-        if (!optional(p.direction, oneOf('column', 'row'))) return issue('/direction', 'column | row');
+};
+
+const isAction = (a: Record<string, unknown>) => {
+    if (!isStr(a.name)) return issue('/name', 'wymagany tekst');
+    if (!isStr(a.label)) return issue('/label', 'wymagany tekst');
+    if (!optional(a.variant, isVariant)) return issue('/variant', 'primary | secondary');
+    return null;
+};
+
+/** Dozwolone reprezentacje dla rodzaju elementu (pierwsza obsługiwana = domyślna, P10). */
+export const KIND_REPRESENTATIONS: Record<ItemKind, Representation[]> = {
+    chart: ['chart2d', 'ribbon3d', 'liquid3d'],
+    kpi: ['cards2d', 'kpi3d'],
+    table: ['table2d'],
+    map: ['map2d'],
+    slides: ['slides2d'],
+};
+
+/** Reprezentacje obsługiwane przez klienta w v1.2 i widok, który waliduje/rysuje ich treść. */
+export const SUPPORTED_REPRESENTATIONS = {
+    chart2d: 'Chart',
+    cards2d: 'InsightCards',
+    table2d: 'DataTable',
+    map2d: 'MapView',
+    slides2d: 'Presentation',
+} as const satisfies Partial<Record<Representation, ViewName>>;
+export type SupportedRepresentation = keyof typeof SUPPORTED_REPRESENTATIONS;
+
+export const isSupportedRepresentation = (r: unknown): r is SupportedRepresentation =>
+    typeof r === 'string' && r in SUPPORTED_REPRESENTATIONS;
+
+const validators: Record<CatalogName, Validator> = {
+    TaskList: views.TaskList,
+    Approval: views.Approval,
+    Workspace: () => null, // dzieci (kolejność i członkostwo) obsługuje resolveWorkspace
+    WorkspaceItem: (p) => {
+        if (!oneOf(...ITEM_KINDS)(p.kind)) return issue('/kind', ITEM_KINDS.join(' | '));
+        if (!isStr(p.title)) return issue('/title', 'wymagany tekst');
+        if (!Array.isArray(p.representations) || p.representations.length === 0
+            || !p.representations.every((r) => (REPRESENTATIONS as readonly unknown[]).includes(r))) {
+            return issue('/representations', `niepusta lista z ${REPRESENTATIONS.join('|')}`);
+        }
+        const allowed = KIND_REPRESENTATIONS[p.kind as ItemKind];
+        const bad = (p.representations as Representation[]).findIndex((r) => !allowed.includes(r));
+        if (bad >= 0) return issue(`/representations/${bad}`, `niedozwolona dla rodzaju ${String(p.kind)}`);
+        if (!optional(p.presentation, oneOf(...PRESENTATIONS))) return issue('/presentation', PRESENTATIONS.join(' | '));
+        if (!optional(p.priority, isNum)) return issue('/priority', 'liczba');
+        if (p.actions !== undefined) {
+            const r = eachItem('actions', p.actions, isAction);
+            if (r) return r;
+        }
+        if (!isObj(p.content)) return issue('/content', 'oczekiwano obiektu treści');
         return null;
     },
-    ActionBar: (p) =>
-        eachItem('actions', p.actions, (a) => {
-            if (!isStr(a.name)) return issue('/name', 'wymagany tekst');
-            if (!isStr(a.label)) return issue('/label', 'wymagany tekst');
-            if (!optional(a.variant, isVariant)) return issue('/variant', 'primary | secondary');
-            return null;
-        }, 1),
 };
 
 export function validateProps(type: CatalogName, props: Record<string, unknown>): ValidationIssue | null {
     return validators[type](props);
+}
+
+/** Walidacja treści elementu dla wybranej reprezentacji (ścieżka względna do `content`). */
+export function validateContent(rep: SupportedRepresentation, content: Record<string, unknown>): ValidationIssue | null {
+    return views[SUPPORTED_REPRESENTATIONS[rep]](content);
 }

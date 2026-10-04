@@ -6,7 +6,11 @@ import type { ViewProps } from './types';
 type Series = { label: string; points: { x: string | number; y: number }[] };
 
 const COLORS = ['#22d3ee', '#a78bfa', '#f472b6', '#94a3b8'];
-const W = 600, H = 240, PAD = { l: 44, r: 16, t: 16, b: 28 };
+// Układ współrzędnych zależny od gęstości: na karcie mniejszy viewBox → czytelne etykiety po skalowaniu.
+const GEOM = {
+    screen: { W: 600, H: 240, PAD: { l: 44, r: 16, t: 16, b: 28 }, font: 11 },
+    card: { W: 320, H: 170, PAD: { l: 38, r: 10, t: 10, b: 22 }, font: 12 },
+};
 
 /** "Ładny" krok osi (1, 2, 2.5, 5 × 10^n), żeby etykiety nie były w stylu 2486. */
 function niceStep(raw: number) {
@@ -15,7 +19,8 @@ function niceStep(raw: number) {
     return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * 10 ** exp;
 }
 
-export default function Chart({ kind, title, series }: ViewProps<{ kind: 'line' | 'bar'; title?: string; series: Series[] }>) {
+export default function Chart({ kind, title, series, density = 'screen' }: ViewProps<{ kind: 'line' | 'bar'; title?: string; series: Series[] }>) {
+    const { W, H, PAD, font } = GEOM[density];
     const xs = series[0].points.map((p) => String(p.x));
     const rawMax = Math.max(...series.flatMap((s) => s.points.map((p) => p.y)), 1);
     const step = niceStep(rawMax / 4);
@@ -27,17 +32,17 @@ export default function Chart({ kind, title, series }: ViewProps<{ kind: 'line' 
     const slot = innerW / xs.length, barW = (slot * 0.7) / series.length;
 
     return (
-        <figure className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+        <figure className={`rounded-xl border border-white/10 bg-white/[0.03] ${density === 'card' ? 'p-2' : 'p-4'}`}>
             {title && <figcaption className="mb-2 text-sm text-white/80">{title}</figcaption>}
-            <svg viewBox={`0 0 ${W} ${H}`} className="h-auto max-h-[32vh] w-full" role="img" aria-label={title}>
+            <svg viewBox={`0 0 ${W} ${H}`} className={`h-auto w-full ${density === 'screen' ? 'max-h-[32vh]' : ''}`} role="img" aria-label={title}>
                 {ticks.map((v) => (
                     <g key={v}>
                         <line x1={PAD.l} x2={W - PAD.r} y1={yAt(v)} y2={yAt(v)} stroke="rgba(255,255,255,0.08)" />
-                        <text x={PAD.l - 8} y={yAt(v) + 4} textAnchor="end" fontSize="11" fill="rgba(255,255,255,0.4)">{v.toLocaleString('pl-PL')}</text>
+                        <text x={PAD.l - 8} y={yAt(v) + 4} textAnchor="end" fontSize={font} fill="rgba(255,255,255,0.4)">{v.toLocaleString('pl-PL')}</text>
                     </g>
                 ))}
                 {xs.map((x, i) => (
-                    <text key={x} x={kind === 'bar' ? PAD.l + slot * (i + 0.5) : xAt(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="rgba(255,255,255,0.5)">{x}</text>
+                    <text key={x} x={kind === 'bar' ? PAD.l + slot * (i + 0.5) : xAt(i)} y={H - 8} textAnchor="middle" fontSize={font} fill="rgba(255,255,255,0.5)">{x}</text>
                 ))}
                 {series.map((s, si) => {
                     const color = COLORS[si % COLORS.length];

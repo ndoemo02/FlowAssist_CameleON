@@ -1,16 +1,18 @@
 // Anchory i sloty: jedyne miejsce, które tłumaczy semantykę agenta na scenę.
-// Agent mówi "focus: back" i "surfaceId: back-canvas" — nigdy nie podaje współrzędnych.
+// Agent mówi "focus: back" i "surfaceId: workspace" — nigdy nie podaje współrzędnych.
 
 import type { Focus, SurfaceId } from './contract';
 
 /** Kąt orbity kamery dla semantycznego fokusu (ten sam układ co suwak 360°). */
 export const FOCUS_ANGLE: Record<Focus, number> = { front: 0, back: Math.PI };
 
-export type SlotLayout = 'center' | 'edge-right';
+export type SlotLayout = 'table' | 'edge-right' | 'hud';
 
+/** Sloty v1.2: stół roboczy na Back (ekran na Froncie wybiera stan prezentacji elementu, nie slot). */
 export const SLOTS: Record<SurfaceId, { focus: Focus | null; layout: SlotLayout }> = {
-    'back-canvas': { focus: 'back', layout: 'center' },
+    workspace: { focus: 'back', layout: 'table' },
     'tasks-drawer': { focus: null, layout: 'edge-right' }, // compact: bottom-sheet (CSS)
+    hud: { focus: null, layout: 'hud' },
 };
 
 const TWO_PI = Math.PI * 2;

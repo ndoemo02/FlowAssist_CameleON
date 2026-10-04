@@ -1,10 +1,14 @@
-// Scenariusz demonstracyjny "research" — nagrana oś czasu zdarzeń A2UI + rozszerzeń sceny.
-// Wszystkie liczby są danymi demonstracyjnymi (spójnymi wewnętrznie), nie realnym badaniem.
+// Scenariusz demonstracyjny "research" (v1.2, katalog flowassist/v2) — nagrana oś czasu zdarzeń A2UI
+// + rozszerzeń sceny. Wszystkie liczby są danymi demonstracyjnymi (spójnymi wewnętrznie).
+// Plan v1.2.1 II.8: taski → stół roboczy (3 elementy) → wykres na ekran → aktualizacja danych
+// na ekranie → „Pogłęb” dokłada mapę → Approval w HUD.
 
 import type { ScenarioScript, ScenarioStep } from '../transport/mockTransport';
 
 const V = 'v0.9.1';
-const create = (surfaceId: string) => ({ version: V, createSurface: { surfaceId, catalogId: 'flowassist/v1' } });
+const CATALOG = 'flowassist/v2';
+const create = (surfaceId: string) => ({ version: V, createSurface: { surfaceId, catalogId: CATALOG } });
+const remove = (surfaceId: string) => ({ version: V, deleteSurface: { surfaceId } });
 const components = (surfaceId: string, list: object[]) => ({ version: V, updateComponents: { surfaceId, components: list } });
 const data = (surfaceId: string, path: string, value: unknown) => ({ version: V, updateDataModel: { surfaceId, path, value } });
 const say = (text: string) => ({ narration: { text, speak: true } });
@@ -18,12 +22,20 @@ const TASKS = {
 const t = (id: keyof typeof TASKS, status: string, progress: number, note?: string) =>
     task(id, { ...TASKS[id], status, progress, ...(note ? { note } : {}) });
 
-const NEXT_ACTIONS = [
-    { name: 'deepen', label: 'Pogłęb analizę' },
-    { name: 'open_presentation', label: 'Pokaż jako prezentację' },
-    { name: 'open_approval', label: 'Wyślij do akceptacji', variant: 'primary' },
-    { name: 'back', label: 'Wróć do rozmowy', variant: 'secondary' },
-];
+// ── elementy stołu roboczego (WorkspaceItem) ────────────────────────
+const CHART = { id: 'chart-q', component: 'WorkspaceItem', kind: 'chart', title: 'Zapytania o rezerwacje online · Warszawa (dane demo)',
+    content: { path: '/items/chart-q' }, representations: ['chart2d', 'ribbon3d'], priority: 1 };
+const KPIS = { id: 'kpis', component: 'WorkspaceItem', kind: 'kpi', title: 'Najważniejsze wskaźniki',
+    content: { path: '/items/kpis' }, representations: ['cards2d', 'kpi3d'], presentation: 'card', priority: 2 };
+const DISTRICTS = { id: 'districts', component: 'WorkspaceItem', kind: 'table', title: 'Dzielnice · Q4',
+    content: { path: '/items/districts' }, representations: ['table2d'], presentation: 'card', priority: 3,
+    actions: [{ name: 'deepen', label: 'Pogłęb analizę', variant: 'primary' }] };
+const MAP = { id: 'district-map', component: 'WorkspaceItem', kind: 'map', title: 'Warszawa · zapytania Q4 (schemat)',
+    content: { path: '/items/district-map' }, representations: ['map2d'], presentation: 'card', priority: 4 };
+
+const SERIES_2026 = { label: '2026', points: [{ x: 'Q1', y: 1240 }, { x: 'Q2', y: 1510 }, { x: 'Q3', y: 1980 }, { x: 'Q4', y: 2260 }] };
+const SERIES_2025 = { label: '2025', points: [{ x: 'Q1', y: 980 }, { x: 'Q2', y: 1105 }, { x: 'Q3', y: 1290 }, { x: 'Q4', y: 1410 }] };
+const SERIES_PLAN = { label: 'Plan 2026', points: [{ x: 'Q1', y: 1200 }, { x: 'Q2', y: 1500 }, { x: 'Q3', y: 1800 }, { x: 'Q4', y: 2100 }] };
 
 const timeline: ScenarioStep[] = [
     { at: 0, event: say('Jasne. Uruchamiam trzech agentów: źródła, dane i analizę trendów.') },
@@ -48,33 +60,22 @@ const timeline: ScenarioStep[] = [
     { at: 4300, event: t('data', 'done', 1, '3 840 rekordów') },
     { at: 4700, event: t('analysis', 'running', 0.7) },
     { at: 5400, event: t('analysis', 'done', 1, 'trend + sezonowość') },
-    { at: 5600, event: say('Gotowe. Przechodzę do wyników.') },
+    { at: 5600, event: say('Gotowe. Rozkładam wyniki na stole.') },
 
-    // Komponenty trafiają na canvas przed danymi — dane dochodzą sekundę później (streaming).
-    { at: 6500, event: create('back-canvas') },
-    { at: 6500, event: components('back-canvas', [
-        { id: 'root', component: 'Stack', children: ['chart', 'cards', 'next'] },
-        { id: 'chart', component: 'Chart', kind: 'line', title: 'Zapytania o rezerwacje online · Warszawa (dane demo)', series: { path: '/chart/series' } },
-        { id: 'cards', component: 'InsightCards', items: { path: '/insights' } },
-        { id: 'next', component: 'ActionBar', actions: NEXT_ACTIONS },
+    // Stół roboczy: komponenty przed danymi (szkielety), dane dochodzą później (streaming).
+    { at: 6500, event: create('workspace') },
+    { at: 6500, event: components('workspace', [
+        { id: 'root', component: 'Workspace', children: ['chart-q', 'kpis', 'districts'] },
+        { ...CHART, presentation: 'card' }, KPIS, DISTRICTS,
     ]) },
     { at: 6500, event: { stage: { focus: 'back', drawer: 'closed' } } },
-    { at: 7500, event: data('back-canvas', '/chart/series', [
-        { label: '2026', points: [{ x: 'Q1', y: 1240 }, { x: 'Q2', y: 1510 }, { x: 'Q3', y: 1980 }, { x: 'Q4', y: 2260 }] },
-        { label: '2025', points: [{ x: 'Q1', y: 980 }, { x: 'Q2', y: 1105 }, { x: 'Q3', y: 1290 }, { x: 'Q4', y: 1410 }] },
-    ]) },
-    { at: 7500, event: data('back-canvas', '/insights', [
+    { at: 7300, event: data('workspace', '/items/chart-q', { kind: 'line', series: [SERIES_2026, SERIES_2025] }) },
+    { at: 7600, event: data('workspace', '/items/kpis', { items: [
         { title: 'Wzrost r/r', value: '+60%', delta: 'up', note: 'Q4 2026 vs Q4 2025' },
         { title: 'Najsilniejszy kwartał', value: 'Q3', delta: 'up', note: '+31% kwartał do kwartału' },
         { title: 'Bez odpowiedzi po godzinach', value: '42%', note: 'utracone rezerwacje' },
-    ]) },
-    { at: 8200, event: say('Zapytania o rezerwacje online rosły przez cały rok, najmocniej w trzecim kwartale: o 31 procent kwartał do kwartału.') },
-    { at: 11800, event: say('Największy potencjał jest po godzinach pracy: 42 procent zapytań zostaje bez odpowiedzi. Co robimy dalej?') },
-];
-
-const deepen: ScenarioStep[] = [
-    { at: 0, event: say('Rozbijam wynik na dzielnice.') },
-    { at: 0, event: data('back-canvas', '/table', {
+    ] }) },
+    { at: 8200, event: data('workspace', '/items/districts', {
         columns: ['Dzielnica', 'Zapytania Q4', 'Bez odpowiedzi', 'Zmiana r/r'],
         rows: [
             ['Śródmieście', 640, '38%', '+72%'],
@@ -84,47 +85,45 @@ const deepen: ScenarioStep[] = [
             ['Ursynów', 320, '39%', '+51%'],
         ],
     }) },
-    { at: 0, event: data('back-canvas', '/map', [
+    { at: 8600, event: say('Na stole masz wykres, wskaźniki i tabelę dzielnic. Wykres pokażę na ekranie.') },
+
+    // Hint agenta: wykres na ekran (P3 — kamera wraca na Front, jeśli użytkownik nie obraca ręcznie).
+    { at: 10500, event: components('workspace', [{ ...CHART, presentation: 'screen' }]) },
+    { at: 10800, event: say('Zapytania rosły przez cały rok, najmocniej w trzecim kwartale: o 31 procent kwartał do kwartału.') },
+    // Aktualizacja danych elementu, który jest na ekranie (C6): dochodzi linia planu.
+    { at: 14000, event: data('workspace', '/items/chart-q/series', [SERIES_2026, SERIES_2025, SERIES_PLAN]) },
+    { at: 14200, event: say('Dorzucam linię planu: trzeci i czwarty kwartał są powyżej planu.') },
+    { at: 17500, event: say('Możesz przesuwać karty na stole, wysłać dowolną na ekran albo poprosić o pogłębienie tabeli.') },
+
+    // HUD: prośba o decyzję.
+    { at: 19500, event: create('hud') },
+    { at: 19500, event: components('hud', [{ id: 'root', component: 'Approval', title: 'Pilotaż asystenta 24/7',
+        summary: 'Wdrożenie FlowAssist na 30 dni w dwóch dzielnicach z najwyższym odsetkiem nieobsłużonych zapytań.',
+        items: ['Zakres: Mokotów, Praga-Płd.', 'Czas: 30 dni', 'Miernik sukcesu: −50% nieobsłużonych zapytań po godzinach'] }]) },
+    { at: 19600, event: say('Kiedy będziesz gotowy, zatwierdź albo odrzuć pilotaż.') },
+];
+
+const deepen: ScenarioStep[] = [
+    { at: 0, event: say('Dokładam mapę dzielnic.') },
+    { at: 0, event: data('workspace', '/items/district-map', { points: [
         { label: 'Śródmieście', x: 0.5, y: 0.45 },
         { label: 'Mokotów', x: 0.5, y: 0.66 },
         { label: 'Wola', x: 0.36, y: 0.42 },
         { label: 'Praga-Płd.', x: 0.66, y: 0.52 },
         { label: 'Ursynów', x: 0.47, y: 0.86 },
-    ]) },
-    { at: 400, event: components('back-canvas', [
-        { id: 'root', component: 'Stack', children: ['table', 'map', 'next-deep'] },
-        { id: 'table', component: 'DataTable', columns: { path: '/table/columns' }, rows: { path: '/table/rows' } },
-        { id: 'map', component: 'MapView', title: 'Warszawa · zapytania Q4 (schemat)', points: { path: '/map' } },
-        { id: 'next-deep', component: 'ActionBar', actions: NEXT_ACTIONS.filter((a) => a.name !== 'deepen') },
+    ] }) },
+    { at: 300, event: components('workspace', [
+        { id: 'root', component: 'Workspace', children: ['chart-q', 'kpis', 'districts', 'district-map'] },
+        MAP,
+        // Zmiana hintu KPI — jeśli użytkownik ukrył KPI, zostanie zignorowana (P5).
+        { ...KPIS, presentation: 'focus' },
     ]) },
     { at: 1200, event: say('Najwięcej nieobsłużonych zapytań jest na Pradze-Południe i na Mokotowie.') },
 ];
 
-const openPresentation: ScenarioStep[] = [
-    { at: 0, event: data('back-canvas', '/slides', [
-        { title: 'Popyt rośnie', bullets: ['+60% zapytań r/r (Q4)', 'Najmocniejszy Q3: +31% q/q', 'Dane demonstracyjne'] },
-        { title: 'Gdzie tracimy klientów', bullets: ['42% zapytań po godzinach bez odpowiedzi', 'Najwięcej: Praga-Płd. (47%) i Mokotów (44%)'] },
-        { title: 'Rekomendacja', bullets: ['Asystent głosowy 24/7 do rezerwacji', 'Pilotaż: Mokotów i Praga-Płd.', 'Miernik: odsetek obsłużonych zapytań'] },
-    ]) },
-    { at: 300, event: components('back-canvas', [
-        { id: 'root', component: 'Stack', children: ['deck', 'next-deck'] },
-        { id: 'deck', component: 'Presentation', slides: { path: '/slides' } },
-        { id: 'next-deck', component: 'ActionBar', actions: NEXT_ACTIONS.filter((a) => a.name === 'open_approval' || a.name === 'back') },
-    ]) },
-    { at: 300, event: say('Przygotowałam trzy slajdy z najważniejszymi wnioskami.') },
-];
-
-const openApproval: ScenarioStep[] = [
-    { at: 300, event: components('back-canvas', [
-        { id: 'root', component: 'Approval', title: 'Pilotaż asystenta 24/7',
-          summary: 'Wdrożenie FlowAssist na 30 dni w dwóch dzielnicach z najwyższym odsetkiem nieobsłużonych zapytań.',
-          items: ['Zakres: Mokotów, Praga-Płd.', 'Czas: 30 dni', 'Miernik sukcesu: −50% nieobsłużonych zapytań po godzinach'] },
-    ]) },
-    { at: 300, event: say('Podsumowanie czeka na Twoją decyzję.') },
-];
-
 const finish = (text: string): ScenarioStep[] => [
     { at: 0, event: say(text) },
+    { at: 0, event: remove('hud') },
     { at: 1600, event: { stage: { focus: 'front' } } },
 ];
 
@@ -133,10 +132,7 @@ export const researchDemo: ScenarioScript = {
     timeline,
     responses: {
         deepen: { steps: deepen },
-        open_presentation: { steps: openPresentation },
-        open_approval: { steps: openApproval },
         approve: { terminal: true, steps: finish('Zatwierdzone. Zapisuję decyzję i wracam do rozmowy.') },
         reject: { terminal: true, steps: finish('Rozumiem, odrzucone. Mogę przygotować inny wariant, kiedy zechcesz.') },
-        back: { terminal: true, steps: finish('Wracam do rozmowy.') },
     },
 };

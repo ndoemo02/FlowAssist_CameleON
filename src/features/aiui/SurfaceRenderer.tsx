@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useMemo, useRef } from 'react';
 import type { SurfaceId } from './contract';
-import { REGISTRY } from './registry';
+import { TREE_VIEWS } from './registry';
 import { collectFallbacks, resolveTree, type ResolvedNode } from './resolveTree';
 import { useAiUi } from './store';
 import { FallbackCard, PendingCard } from './components/FallbackCard';
@@ -31,7 +31,8 @@ export default memo(function SurfaceRenderer({ surfaceId }: { surfaceId: Surface
     const render = (node: ResolvedNode): JSX.Element => {
         if (node.kind === 'pending') return <PendingCard key={node.id} type={node.type} />;
         if (node.kind === 'fallback') return <FallbackCard key={node.id} type={node.type} reason={node.reason} path={node.path} />;
-        const View = REGISTRY[node.type];
+        const View = TREE_VIEWS[node.type];
+        if (!View) return <FallbackCard key={node.id} type={node.type} reason="komponent niedostępny w tym slocie" />;
         return (
             <View key={node.id} {...node.props} onAction={(name: string, context?: Record<string, unknown>) => sendAction(name, surfaceId, node.id, context)}>
                 {node.children.map(render)}

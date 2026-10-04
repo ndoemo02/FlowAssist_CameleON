@@ -1,9 +1,13 @@
-// Store warstwy AI-to-UI (zustand). Jedyne wejście zdarzeń: dispatch → parseEvent → reducer → efekty.
-// Kąt kamery jest tu, ale czyta go tylko CameraSetup (getState w useFrame) i OrbitSlider (selektor).
+// Store warstwy AI-to-UI (zustand) — koordynator (plan v1.2.1, E12/P8).
+// Zdarzenie agenta: parseEvent → reduce (surface'y) → reconcileLayout → JEDEN zapis → efekty.
+// Komenda użytkownika: presentationReducer → jeden zapis → efekty.
+// Kąt kamery czyta tylko CameraSetup (getState w useFrame) i OrbitSlider (selektor).
 
 import { create } from 'zustand';
 import { buildAction, buildError, parseEvent, type ClientError, type DrawerState, type SurfaceId } from './contract';
 import { initialCoreState, reduce, type CoreState, type Effect } from './reducer';
+import { isScreenOccupied, layoutSnapshot, presentationReducer, reconcileLayout, type Layout, type LayoutCommand } from './layout';
+import { workspaceMeta } from './workspace';
 import { FOCUS_ANGLE, normalizeAngle, shortestDelta, smoothstep01 } from './slots';
 import { speak, stopSpeaking } from './tts';
 import type { AgentTransport, RunStatus } from './transport/types';
@@ -11,6 +15,12 @@ import { MockTransport } from './transport/mockTransport';
 import { SCENARIOS } from './scenarios';
 
 export const TWEEN_SECONDS = 1.6;
+/** P3: hint agenta 'screen' nie rusza kamery, jeśli użytkownik obracał ręcznie w tym oknie czasu. */
+export const MANUAL_GRACE_MS = 2000;
+let lastManualAt = -Infinity;
+const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+/** Testy: zapomnij ostatni ręczny obrót (stan modułu współdzielony między testami). */
+export const resetManualInteraction = () => { lastManualAt = -Infinity; };
 
 export type ScenarioStatus = 'idle' | RunStatus;
 
@@ -25,8 +35,10 @@ export interface AiUiState extends CoreState {
     camera: CameraState;
     scenario: { status: ScenarioStatus; id: string | null; runId: number; error?: string };
     ui: { orbitPanel: boolean };
+    layout: Layout;
 
     dispatch(raw: unknown, runId?: number): void;
+    layoutCommand(cmd: LayoutCommand): void;
     receiveStatus(runId: number, status: RunStatus, error?: string): void;
     setAngle(angle: number, source: 'manual'): void;
     tickCamera(deltaSeconds: number): void;
@@ -70,6 +82,7 @@ const initialState = () => ({
     camera: { angle: 0, source: 'manual', tween: null } as CameraState,
     scenario: { status: 'idle' as ScenarioStatus, id: null, runId: 0 },
     ui: { orbitPanel: false },
+    layout: {} as Layout,
 });
 
 export const useAiUi = create<AiUiState>()((set, get) => {
@@ -104,12 +117,25 @@ export const useAiUi = create<AiUiState>()((set, get) => {
                 console.warn('[aiui] odrzucony komunikat (niezgodny z kontraktem):', raw);
                 return;
             }
-            const { surfaces, stage, narration } = get();
+            const { surfaces, stage, narration, layout } = get();
             const { state, effects } = reduce({ surfaces, stage, narration }, event);
-            if (state.surfaces !== surfaces || state.stage !== stage || state.narration !== narration) {
-                set({ surfaces: state.surfaces, stage: state.stage, narration: state.narration });
+            // P8: uzgodnienie układu tylko, gdy zmienił się surface 'workspace' (w tym deleteSurface → reset, P7)
+            const r = state.surfaces.workspace !== surfaces.workspace
+                ? reconcileLayout(layout, workspaceMeta(state.surfaces.workspace))
+                : { layout, screenHint: false };
+            if (state.surfaces !== surfaces || state.stage !== stage || state.narration !== narration || r.layout !== layout) {
+                set({ surfaces: state.surfaces, stage: state.stage, narration: state.narration, layout: r.layout });
             }
             runEffects(effects);
+            // P3: hint agenta 'screen' przenosi kamerę, o ile użytkownik nie obraca właśnie ręcznie
+            if (r.screenHint && now() - lastManualAt > MANUAL_GRACE_MS) tweenTo(FOCUS_ANGLE.front);
+        },
+
+        layoutCommand(cmd) {
+            const r = presentationReducer(get().layout, cmd);
+            if (r.changed) set({ layout: r.layout });
+            // P3: jawna komenda użytkownika „na ekran” zawsze przenosi kamerę
+            if (r.cameraFront) tweenTo(FOCUS_ANGLE.front);
         },
 
         receiveStatus(runId, status, error) {
@@ -118,6 +144,7 @@ export const useAiUi = create<AiUiState>()((set, get) => {
         },
 
         setAngle(angle) {
+            lastManualAt = now();
             set({ camera: { angle, source: 'manual', tween: null } });
         },
 
@@ -147,7 +174,8 @@ export const useAiUi = create<AiUiState>()((set, get) => {
                 console.warn(`[aiui] akcja "${name}" zignorowana — brak aktywnego przebiegu (${status}).`);
                 return;
             }
-            getTransport().send(buildAction(name, surfaceId, sourceComponentId, context));
+            // II.4: migawka układu (bez współrzędnych) przy każdej akcji semantycznej
+            getTransport().send(buildAction(name, surfaceId, sourceComponentId, { ...context, workspace: layoutSnapshot(get().layout) }));
         },
 
         reportClientError(error) {
@@ -166,7 +194,7 @@ export const useAiUi = create<AiUiState>()((set, get) => {
             t.stop();
             stopSpeaking();
             const runId = get().scenario.runId + 1;
-            set({ ...initialCoreState(), scenario: { status: 'running', id, runId } });
+            set({ ...initialCoreState(), layout: {}, scenario: { status: 'running', id, runId } }); // P7
             tweenTo(FOCUS_ANGLE.front);
             t.start(runId, { scenario: id, prompt });
             return true;
@@ -175,11 +203,15 @@ export const useAiUi = create<AiUiState>()((set, get) => {
         stopScenario() {
             transport?.stop();
             stopSpeaking();
-            set({ ...initialCoreState(), scenario: { status: 'idle', id: null, runId: get().scenario.runId + 1 } });
+            set({ ...initialCoreState(), layout: {}, scenario: { status: 'idle', id: null, runId: get().scenario.runId + 1 } }); // P7
             tweenTo(FOCUS_ANGLE.front);
         },
     };
 });
+
+/** E7: ekran sceny zajęty (element na ekranie) lub trwa przebieg → wyciszenie i przyciemnienie wideo. */
+export const selectScreenBusy = (s: AiUiState) =>
+    isScreenOccupied(s.layout) || s.scenario.status === 'running' || s.scenario.status === 'awaiting_action';
 
 // Dev: sterowanie z konsoli, np. __aiui.getState().dispatch({ stage: { focus: 'back' } })
 if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {

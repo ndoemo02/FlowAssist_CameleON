@@ -11,12 +11,12 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import TacticalMapVector from './components/TacticalMapVector';
 import IntroOverlay from '@/components/IntroOverlay';
 import SceneErrorBoundary from '@/components/SceneErrorBoundary';
-import { useAiUi } from '@/features/aiui/store';
+import { selectScreenBusy, useAiUi } from '@/features/aiui/store';
 import AiUiOverlay from '@/features/aiui/overlay/AiUiOverlay';
 import OrbitSlider from '@/features/aiui/overlay/OrbitSlider';
 import ScreenAnchor from '@/features/aiui/scene/ScreenAnchor';
 import ScreenAnchorProbe from '@/features/aiui/scene/ScreenAnchorProbe';
-import { onScreenMeshes, registerScreenMeshes } from '@/features/aiui/scene/anchorRegistry';
+import { getScreenMeshes, onScreenMeshes, registerScreenMeshes } from '@/features/aiui/scene/anchorRegistry';
 import { dollyAlongView, focusDistance, frontDollyFactor } from '@/features/aiui/scene/frontFit';
 import { screenCenter } from '@/features/aiui/scene/screenGeometry';
 import { devToolsEnabled } from '@/lib/devTools';
@@ -128,6 +128,31 @@ function StudioModel({ onCamSetup }: { onCamSetup: (data: CamSetupData) => void 
             window.removeEventListener('click', handleInteraction);
             window.removeEventListener('touchstart', handleInteraction);
         };
+    }, [videoTex]);
+
+    // E7 (v1.2.1): element na ekranie lub trwający przebieg → wideo wyciszone i przyciemnione (bez re-renderów)
+    useEffect(() => {
+        let mutedByUs = false;
+        const apply = (busy: boolean) => {
+            const vid = videoTex.image as HTMLVideoElement | undefined;
+            if (vid) {
+                if (busy && !vid.muted) { vid.muted = true; mutedByUs = true; }
+                else if (!busy && mutedByUs) { vid.muted = false; mutedByUs = false; }
+            }
+            for (const m of getScreenMeshes().meshes) {
+                const mat = m.material as THREE.MeshBasicMaterial;
+                // kolor jest liniowy (ColorManagement): 0.07 ≈ 30% jasności po konwersji do sRGB
+                if (mat?.color) mat.color.setScalar(busy ? 0.07 : 1);
+            }
+        };
+        // Także przy (re)rejestracji meshy ekranu: materiały powstają w efekcie traverse, który może
+        // wykonać się po starcie przebiegu (model ładuje się dłużej niż intro).
+        const offMeshes = onScreenMeshes(() => apply(selectScreenBusy(useAiUi.getState())));
+        const offStore = useAiUi.subscribe((s, prev) => {
+            const busy = selectScreenBusy(s);
+            if (busy !== selectScreenBusy(prev)) apply(busy);
+        });
+        return () => { offMeshes(); offStore(); };
     }, [videoTex]);
 
     // Hardcoded camera setup from calibration

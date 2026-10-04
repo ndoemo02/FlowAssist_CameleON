@@ -50,3 +50,8 @@ export function publishAnchor(s: AnchorState) {
 }
 
 export const getAnchorState = () => current;
+
+// Dev: diagnostyka z konsoli (meshe ekranu, stan pomiaru)
+if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
+    (window as unknown as { __anchorRegistry: unknown }).__anchorRegistry = { getScreenMeshes, getAnchorState };
+}

@@ -10,6 +10,16 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 // SWITCH TO VECTOR MAP (Yellow/Golden Theme)
 import TacticalMapVector from './components/TacticalMapVector';
 import IntroOverlay from '@/components/IntroOverlay';
+import SceneErrorBoundary from '@/components/SceneErrorBoundary';
+import { useAiUi } from '@/features/aiui/store';
+import AiUiOverlay from '@/features/aiui/overlay/AiUiOverlay';
+import OrbitSlider from '@/features/aiui/overlay/OrbitSlider';
+import ScreenAnchor from '@/features/aiui/scene/ScreenAnchor';
+import ScreenAnchorProbe from '@/features/aiui/scene/ScreenAnchorProbe';
+import { onScreenMeshes, registerScreenMeshes } from '@/features/aiui/scene/anchorRegistry';
+import { dollyAlongView, focusDistance, frontDollyFactor } from '@/features/aiui/scene/frontFit';
+import { screenCenter } from '@/features/aiui/scene/screenGeometry';
+import { devToolsEnabled } from '@/lib/devTools';
 
 // --- CONFIG ---
 const CONFIG = {
@@ -45,6 +55,12 @@ type CameraCue = {
     fov: number;
 };
 
+// Kadr Front (ekran + avatar) — kalibracja właściciela 2026-10-04 (Leva "logPos")
+const FRONT_POSITION: [number, number, number] = [4.403, 0.993, 26.098];
+const FRONT_TARGET: [number, number, number] = [8.894, -0.180, 24.238];
+const towards = (from: [number, number, number], to: [number, number, number], t: number) =>
+    from.map((v, i) => v + (to[i] - v) * t) as [number, number, number];
+
 const CAMERA_CUES: Record<'intro' | 'wide' | 'close', CameraCue> = {
     intro: {
         position: [1.75, 1.35, 34.8],
@@ -52,13 +68,14 @@ const CAMERA_CUES: Record<'intro' | 'wide' | 'close', CameraCue> = {
         fov: 64
     },
     wide: {
-        position: [2.35, 0.98, 31.75],
-        target: CONFIG.camTarget,
+        position: FRONT_POSITION,
+        target: FRONT_TARGET,
         fov: 60
     },
     close: {
-        position: [4.38, 0.85, 27.4],
-        target: CONFIG.camTarget,
+        // scroll push-in: 15% drogi od kadru Front do celu (wyliczone, bez nowych twardych liczb)
+        position: towards(FRONT_POSITION, FRONT_TARGET, 0.15),
+        target: FRONT_TARGET,
         fov: 55
     }
 };
@@ -122,6 +139,7 @@ function StudioModel({ onCamSetup }: { onCamSetup: (data: CamSetupData) => void 
     }, [onCamSetup]);
 
     useEffect(() => {
+        const screenMeshes: THREE.Mesh[] = [];
         scene.traverse((child) => {
             if ((child as THREE.Mesh).isMesh) {
                 child.castShadow = true;
@@ -145,6 +163,7 @@ function StudioModel({ onCamSetup }: { onCamSetup: (data: CamSetupData) => void 
                 if (isScreenName) {
                     child.visible = true;
                     const mesh = child as THREE.Mesh;
+                    screenMeshes.push(mesh);
 
                     // Fix for artifacts:
                     videoTex.wrapS = THREE.ClampToEdgeWrapping;
@@ -227,6 +246,8 @@ function StudioModel({ onCamSetup }: { onCamSetup: (data: CamSetupData) => void 
                 child.castShadow = true;
             }
         });
+        // Adapter sceny ScreenAnchor: unia wszystkich widocznych meshy ekranu
+        registerScreenMeshes(screenMeshes);
     }, [scene, onCamSetup, videoTex]);
 
     return (
@@ -488,7 +509,7 @@ function TreeLogoModel() {
 // Added TransformControls & PivotControls for manual adjustment
 
 function StarField() {
-    const { scene } = useGLTF('/models/Flowassist3d/scene.gltf');
+    const { scene } = useGLTF('/models/galaxy/scene.gltf');
     const galaxy = useMemo(() => {
         const cloned = scene.clone();
         cloned.traverse((child) => {
@@ -696,7 +717,7 @@ function Avatar() {
         smoothness,
         visible
     } = useControls('Digital Avatar', {
-        visible: false,
+        visible: true,
         pos: { value: [6.0, 0.4, 23.5], step: 0.1 }, // Updated from Screenshot
         scale: { value: 1.25, min: 0.1, max: 5 }, // Updated from Screenshot
         aspectRatio: { value: 0.95, min: 0.5, max: 3, step: 0.01, label: 'Aspect Ratio' }, // To fix stretching
@@ -769,13 +790,13 @@ function Avatar() {
     );
 }
 
-function CameraSetup({ setupData, controlsRef, orbitAngle, introActive }: {
+function CameraSetup({ setupData, controlsRef, introActive }: {
     setupData: CamSetupData | null;
     controlsRef: MutableRefObject<OrbitControlsImpl | null>;
-    orbitAngle: number;
     introActive: boolean;
 }) {
-    const { camera } = useThree();
+    const { camera, size } = useThree();
+    const devTools = useMemo(() => devToolsEnabled(), []);
     const initializedRef = useRef(false);
     const initialCamPosRef = useRef(new THREE.Vector3());
     const entryStartRef = useRef<number | null>(null);
@@ -872,7 +893,24 @@ function CameraSetup({ setupData, controlsRef, orbitAngle, introActive }: {
 
     // === RESPONSIVE CAMERA CONFIG ===
     const camConfig = useMemo(() => getCameraConfig(), []);
-    const cueSet = useMemo(() => camConfig.isMobile ? MOBILE_CAMERA_CUES : CAMERA_CUES, [camConfig.isMobile]);
+    // Responsywny Front: dla węższych proporcji niż kalibracja kamera cofa się wzdłuż osi widzenia,
+    // tak by odległość do ekranu (środek z meshy sceny) urosła refAspect/aspect razy — ekran zachowuje
+    // poziomy zasięg kalibracji, perspektywa bez zmian. Mobile (portrait) — osobne cue.
+    const aspect = Math.round((size.width / Math.max(1, size.height)) * 100) / 100;
+    const [screenFocus, setScreenFocus] = useState<[number, number, number] | null>(null);
+    useEffect(() => onScreenMeshes((meshes) => setScreenFocus(screenCenter(meshes))), []);
+    const cueSet = useMemo(() => {
+        if (camConfig.isMobile) return MOBILE_CAMERA_CUES;
+        const k = frontDollyFactor(aspect);
+        if (k === 1 || !screenFocus) return CAMERA_CUES;
+        const base = CAMERA_CUES.wide;
+        const dist = focusDistance(base.position, base.target, screenFocus);
+        const wide = { ...base, position: dollyAlongView(base.position, base.target, dist, k) };
+        return { ...CAMERA_CUES, wide, close: { ...CAMERA_CUES.close, position: towards(wide.position, wide.target, 0.15) } };
+    }, [camConfig.isMobile, aspect, screenFocus]);
+    useEffect(() => {
+        if (initializedRef.current) initialCamPosRef.current.set(...cueSet.wide.position);
+    }, [cueSet]);
     const SCENE_CENTER = useMemo(() => new THREE.Vector3(...cueSet.wide.target), [cueSet]);
 
     useEffect(() => {
@@ -925,6 +963,10 @@ function CameraSetup({ setupData, controlsRef, orbitAngle, introActive }: {
 
     // === MAIN FRAME LOOP ===
     useFrame((_, delta) => {
+        // Kąt orbity z warstwy AI-to-UI (suwak 360° lub director); odczyt bez subskrypcji Reacta.
+        useAiUi.getState().tickCamera(delta);
+        const orbitAngle = useAiUi.getState().camera.angle;
+
         // ─── FREE CAMERA MODE ───
         if (freeCamera) {
             const speed = (precision ? moveSpeed * 0.15 : moveSpeed) * delta;
@@ -986,9 +1028,10 @@ function CameraSetup({ setupData, controlsRef, orbitAngle, introActive }: {
             const initialPos = initialCamPosRef.current;
             const initialViewDir = new THREE.Vector3().subVectors(SCENE_CENTER, initialPos);
             const rotatedViewDir = initialViewDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -orbitAngle);
-            const newTarget = new THREE.Vector3().addVectors(initialPos, rotatedViewDir);
 
-            camera.position.copy(initialPos);
+            // Tłumiony dojazd zamiast skoku (np. gdy kamera była w cue "close" po scrollu).
+            camera.position.lerp(initialPos, 1 - Math.exp(-delta * 4.8));
+            const newTarget = new THREE.Vector3().addVectors(camera.position, rotatedViewDir);
             controlsRef.current.target.copy(newTarget);
             camera.lookAt(newTarget);
             controlsRef.current.update();
@@ -999,7 +1042,7 @@ function CameraSetup({ setupData, controlsRef, orbitAngle, introActive }: {
         debugRef.current.rot.copy(camera.rotation);
         if (controlsRef.current) debugRef.current.target.copy(controlsRef.current.target);
 
-        setDebug({
+        if (devTools) setDebug({
             posX: parseFloat(camera.position.x.toFixed(3)),
             posY: parseFloat(camera.position.y.toFixed(3)),
             posZ: parseFloat(camera.position.z.toFixed(3)),
@@ -1047,9 +1090,9 @@ export default function HomePage() {
     const [camSetup, setCamSetup] = useState<CamSetupData | null>(null);
     const controlsRef = useRef<OrbitControlsImpl | null>(null);
 
-    // 360° View - Scene rotation control
-    const [show360, setShow360] = useState(false);
-    const [sceneRotation, setSceneRotation] = useState(0);
+    // Panel Leva tylko w trybie dev (lub z ?dev); ustalane po montażu, żeby nie psuć hydracji SSR
+    const [devTools, setDevTools] = useState(false);
+    useEffect(() => setDevTools(devToolsEnabled()), []);
 
     // Zapobiegamy kolizji z iframe reklamowymi
     useEffect(() => {
@@ -1061,43 +1104,18 @@ export default function HomePage() {
 
     return (
         <main className="relative w-full min-h-screen bg-[#020617] text-white overflow-x-hidden selection:bg-purple-500/30">
-            <Leva collapsed />
-            {introActive && <IntroOverlay onComplete={() => setIntroActive(false)} />}
-
-            {/* 360° VIEW TOGGLE */}
-            <div className="fixed top-4 right-4 z-[9999]">
-                <button
-                    onClick={() => setShow360(!show360)}
-                    className="bg-black/60 backdrop-blur-md px-3 py-2 rounded-full text-xs hover:bg-black/80 transition-colors border border-white/10 flex items-center gap-2"
-                >
-                    <span className="text-purple-400">360°</span>
-                    <span className="text-white/60">View</span>
-                </button>
-            </div>
-
-            {/* 360° ROTATION SLIDER */}
-            {show360 && (
-                <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[9999] bg-black/70 backdrop-blur-md px-6 py-4 rounded-2xl border border-white/10 shadow-2xl">
-                    <div className="flex items-center gap-4">
-                        <span className="text-xs text-white/40 w-12 text-right">Front</span>
-                        <div className="relative w-64">
-                            <input
-                                type="range"
-                                min="0"
-                                max={Math.PI * 2}
-                                step="0.01"
-                                value={sceneRotation}
-                                onChange={(e) => setSceneRotation(parseFloat(e.target.value))}
-                                className="w-full h-2 bg-gradient-to-r from-purple-500/30 via-cyan-500/30 to-purple-500/30 rounded-full cursor-pointer appearance-none [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:shadow-lg"
-                            />
-                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 text-xs text-purple-400 font-mono">
-                                {Math.round((sceneRotation * 180) / Math.PI)}°
-                            </div>
-                        </div>
-                        <span className="text-xs text-white/40 w-12">Back</span>
-                    </div>
-                </div>
+            <Leva collapsed hidden={!devTools} />
+            {introActive && (
+                <IntroOverlay
+                    onComplete={() => {
+                        setIntroActive(false);
+                        useAiUi.getState().setSceneReady();
+                    }}
+                />
             )}
+
+            {/* 360° VIEW TOGGLE + SLIDER (stan kąta w store AI-to-UI) */}
+            <OrbitSlider />
 
             {/* 1. SECTION: INTRO (3D SCENE) */}
             <section className="relative w-full h-screen z-0">
@@ -1112,12 +1130,13 @@ export default function HomePage() {
                         <LightingReveal />
                         <Suspense fallback={null}>
                             {/* Scene stays fixed, camera orbits around it */}
-                            <StarField />
-                            <Avatar />
-                            <StudioModel onCamSetup={setCamSetup} />
+                            <SceneErrorBoundary name="StarField"><StarField /></SceneErrorBoundary>
+                            <SceneErrorBoundary name="Avatar"><Avatar /></SceneErrorBoundary>
+                            <SceneErrorBoundary name="StudioModel"><StudioModel onCamSetup={setCamSetup} /></SceneErrorBoundary>
                             <Environment preset="night" blur={0.8} background={false} />
                         </Suspense>
-                        <CameraSetup setupData={camSetup} controlsRef={controlsRef} orbitAngle={sceneRotation} introActive={introActive} />
+                        <CameraSetup setupData={camSetup} controlsRef={controlsRef} introActive={introActive} />
+                        <ScreenAnchor />
                         <OrbitControls
                             ref={controlsRef}
                             enablePan={true}
@@ -1140,6 +1159,11 @@ export default function HomePage() {
                 <div className="absolute bottom-10 left-0 right-0 z-10 flex justify-center animate-bounce pointer-events-none">
                     <span className="text-xs tracking-widest text-white/30 uppercase">Scroll to Explore</span>
                 </div>
+
+                {/* AI-TO-UI OVERLAY (Back canvas, Tasks, narracja) */}
+                <AiUiOverlay />
+                {/* SPIKE v1.2.1 krok 1: panel testowy ScreenAnchor (tylko ?anchor=probe) */}
+                <ScreenAnchorProbe />
 
                 {/* BOARDER OVERLAY */}
                 <div className="pointer-events-none absolute inset-0 z-50 border-[20px] border-[#000000] rounded-[30px] md:border-[0px]" />

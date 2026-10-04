@@ -300,19 +300,23 @@ Po każdym kroku: opis tego, co widać, PASS lub FAIL, a przy FAIL dokładny opi
 
 ## Aktualne priorytety
 
-Przed v1.3:
+v1.3 — wydanie utwardzające i adapterowe. Kernel CameleONa (inwarianty I1–I10) bez zmian.
+Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
 
-- szeroki audit istniejących wzorców AI-to-UI
-- audit bibliotek i skills
-- REUSE / ADAPT / CUSTOM / AVOID
-- analiza agent workspaces
-- adaptive / generative UI
-- spatial / infinite canvas
-- multimodal comparison UI
-- mobile interaction patterns
-- DOM-over-3D / R3F patterns
+- **P0 (hardening, start od razu):**
+  - Playwright + axe (tylko Chromium);
+  - korpus fixture'ów z replay (stan, efekty, komunikaty wychodzące);
+  - JSON Schema jako warstwowy test konformacji (Ajv tylko w testach);
+  - taksonomia stanów elementu;
+  - dostępność natywnym HTML (regiony ogłoszeń, Escape, fokus);
+  - reduced motion;
+  - ADR-y.
+- **P1 (obowiązkowo):** handshake możliwości → jeden adapter AG-UI (dowód wymienności mocka na prawdziwy transport).
+- **P1 (warunkowo):** Radix albo React Aria, tylko jeśli po P0 natywna mechanika menu i fokusu okaże się krucha.
+- **Poza v1.3:** spike'i gestów, wykresów i tabel. Eksperymenty P2 (MCP Apps, Drei Html, graph2d, Vega-Lite, MapLibre) w v1.4.
 
-Dopiero potem plan v1.3.
+Szeroki zewnętrzny audit wzorców i bibliotek został wykonany (`C:\Develop\Flow Assist\Sonnet Perplexity Reserach.md`).
+Od teraz research robimy tylko dla konkretnej zależności, tuż przed jej spike'iem.
 
 ## Odłożone
 

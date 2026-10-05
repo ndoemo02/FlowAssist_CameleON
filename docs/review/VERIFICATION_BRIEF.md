@@ -77,6 +77,22 @@ odzyskanie po remoncie — 1 ISSUE (udany render innej instancji zamykał trwaj�
 Weryfikacja rundy 4: vitest 226/226; pełny tsc: 1 znany błąd (Lanyard); E2E celowane `surfaces` + `gestures`
 (oba projekty) na `84096ff`: 13 passed / 9 skipped / 0 failed.
 
+## Runda 5: poprawka po weryfikacji rundy 4 (2026-10-06)
+
+Weryfikacja rundy 4: wspólne wystąpienie per wariant — OK; 1 ISSUE na poziomie komponentu (zmiana gęstości w zamontowanym
+`ItemBody`). Zakres rundy 5: `c8138db..88e7af4` (kod) + commit dokumentacji po nim.
+
+| # | Commit | Co zmieniono | Test błędu | Pytanie do weryfikacji |
+|---|---|---|---|---|
+| V4-R#5 MEDIUM | `88e7af4` | `ItemBody`: `resetKeys={[view.content, density]}` — zmiana wariantu ponawia render. `RenderGuard`: zatwierdzony udany render po zmianie `resetKeys` (nowe dane albo nowy wariant) zgłasza odzyskanie wyłącznie BIEŻĄCEGO wariantu; inne warianty, wspólne wystąpienie i deduplikacja bez zmian | jedna instancja: card zawodzi → screen → poprawne dane → card z udanym renderem → złe → 2 raporty; strażnik: card zawodzi → zdrowy screen → card nigdy poprawnie → wystąpienie card otwarte (1 raport) | Czy jakakolwiek ścieżka traktuje samą zmianę wariantu jako odzyskanie poprzedniego wariantu? |
+
+Założenie granulacji (decyzja właściciela): dla jednego elementu najwyżej jedna aktywna instancja danego wariantu
+(card, screen, slot); dwie instancje tej samej gęstości wymagałyby identyfikatora miejsca montowania w kluczu wariantu.
+Definicja główna: nagłówek `src/features/aiui/validationReporting.ts`; ADR 0003 tylko odsyła.
+
+Weryfikacja rundy 5: vitest 228/228; pełny tsc: 1 znany błąd (Lanyard); E2E celowane `surfaces` + `gestures`
+(oba projekty) na `88e7af4`: 13 passed / 9 skipped / 0 failed.
+
 ## Prompt startowy
 
 > Verify the review fixes on `feat/aiui-prototype` as a read-only reviewer. Start with `docs/review/VERIFICATION_BRIEF.md`.

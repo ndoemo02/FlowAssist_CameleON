@@ -10,6 +10,10 @@
 //     wystąpieniu problemu: pierwszy zawodzący wariant raportuje, kolejne tylko dołączają; udany render jednego
 //     wariantu nie zamyka błędu innego. Wystąpienie kończy się, gdy żaden wariant już nie zawodzi.
 //   Zniknięcie węzła (lub nowy przebieg) też kończy wystąpienie. Po odzyskaniu nawrót = nowy raport.
+// - ZAŁOŻENIE granulacji wariantu (definicja główna; ADR 0003 tylko odsyła): dla jednego elementu istnieje
+//   najwyżej jedna aktywna instancja danego wariantu renderowania (card, screen, slot) — dziś: WorkspaceCard
+//   (card), ScreenPanel (screen), węzeł SurfaceRenderer (slot). Jeśli kiedyś dopuścimy dwie instancje tej samej
+//   gęstości, klucz wariantu musi dostać identyfikator miejsca montowania (mount/location identity).
 // - Każdy raport niesie przebieg, w którym powstał; store wysyła go tylko w tym samym, aktywnym przebiegu.
 // Instaluje go warstwa UI (AiUiOverlay) — koordynator (store.dispatch) nie raportuje fallbacków.
 

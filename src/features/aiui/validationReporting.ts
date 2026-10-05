@@ -13,6 +13,7 @@ import { SURFACE_IDS, type ClientError, type SurfaceId } from './contract';
 import { collectFallbacks, resolveTree } from './resolveTree';
 import { resolveItem, workspaceChildren } from './workspace';
 import { useAiUi, type AiUiState } from './store';
+import { sameSignature } from './viewProps';
 
 export interface Problem { surfaceId: SurfaceId; nodeId: string; path: string; message: string }
 
@@ -42,7 +43,7 @@ export function surfaceProblems(surfaces: AiUiState['surfaces']): Problem[] {
 // Stan modułu (jeden overlay na stronę; restart efektu w StrictMode nie zgłasza ponownie).
 let trackedRun: number | null = null;
 let active = new Set<string>();               // trwające wystąpienia problemów walidacji
-const rendered = new Map<string, unknown>();  // surface|węzeł|komunikat → dane, na których render się wywrócił
+const rendered = new Map<string, readonly unknown[]>(); // surface|węzeł|komunikat → podpis danych, na których render się wywrócił
 
 function trackRun(runId: number) {
     if (runId === trackedRun) return;
@@ -68,15 +69,16 @@ export function startValidationReporting(): () => void {
 }
 
 /**
- * Błąd renderu z lokalnego boundary. `data` = tożsamość danych, na których widok się wywrócił
- * (ta sama referencja / ten sam klucz = to samo wystąpienie); `runId` = przebieg z chwili renderu.
+ * Błąd renderu z lokalnego boundary. `data` = podpis danych, na których widok się wywrócił
+ * (płytko równy podpis = to samo wystąpienie); `runId` = przebieg z chwili renderu.
  */
-export function reportRenderProblem(p: Problem, data: unknown, runId: number) {
+export function reportRenderProblem(p: Problem, data: readonly unknown[], runId: number) {
     const state = useAiUi.getState();
     if (runId === state.scenario.runId) {
         trackRun(runId);
         const k = `${p.surfaceId}|${p.nodeId}|${p.message}`;
-        if (rendered.has(k) && rendered.get(k) === data) return;
+        const prev = rendered.get(k);
+        if (prev && sameSignature(prev, data)) return;
         rendered.set(k, data);
     }
     state.reportClientError(toError(p), { runId }); // inny przebieg: store odrzuci (jawne pochodzenie)

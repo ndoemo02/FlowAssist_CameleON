@@ -1,13 +1,14 @@
 'use client';
 
-import { memo, useMemo } from 'react';
+import { memo, useMemo, type ReactNode } from 'react';
 import type { SurfaceId } from './contract';
 import { TREE_VIEWS } from './registry';
 import { resolveTree, type ResolvedNode } from './resolveTree';
 import { useAiUi } from './store';
 import { FallbackCard, PendingCard } from './components/FallbackCard';
 import RenderGuard from './components/RenderGuard';
-import { viewProps } from './viewProps';
+import { propsSignature, viewProps } from './viewProps';
+import type { ActionHandler } from './components/types';
 import { reportRenderProblem } from './validationReporting';
 
 // Cienki render: całą logikę (bindingi, walidacja, cykle) robi czysty resolveTree.
@@ -27,22 +28,29 @@ export default memo(function SurfaceRenderer({ surfaceId }: { surfaceId: Surface
         const View = TREE_VIEWS[node.type];
         if (!View) return <FallbackCard key={node.id} type={node.type} reason="komponent niedostępny w tym slocie" />;
         const path = `/components/${node.id}`;
-        // błąd węzła na danych agenta = fallback tego węzła. Klucz = treść propsów (resolveTree tworzy nowe
-        // obiekty przy każdej zmianie surface'u): render ponawiany i raportowany tylko przy zmianie propsów.
-        const dataKey = JSON.stringify(node.props);
+        // błąd węzła na danych agenta = fallback tego węzła. Podpis propsów (płytki, bez serializacji):
+        // render ponawiany i raportowany tylko przy zmianie propsów, nie przy niezwiązanej zmianie surface'u.
+        const signature = propsSignature(node.props);
         return (
             <RenderGuard
                 key={node.id}
-                resetKey={dataKey}
+                resetKeys={signature}
                 fallback={(error) => <FallbackCard type={node.type} reason={`błąd renderowania: ${error.message}`} path={path} />}
-                onError={(error) => reportRenderProblem({ surfaceId, nodeId: node.id, path, message: `błąd renderowania: ${error.message}` }, dataKey, runId)}
+                onError={(error) => reportRenderProblem({ surfaceId, nodeId: node.id, path, message: `błąd renderowania: ${error.message}` }, signature, runId)}
             >
-                <View {...viewProps(node.props)} onAction={(name: string, context?: Record<string, unknown>) => sendAction(name, surfaceId, node.id, context)}>
+                <TreeNodeView View={View} props={node.props} onAction={(name, context) => sendAction(name, surfaceId, node.id, context)}>
                     {node.children.map(render)}
-                </View>
+                </TreeNodeView>
             </RenderGuard>
         );
     };
 
     return render(tree);
 });
+
+type TreeView = NonNullable<(typeof TREE_VIEWS)[keyof typeof TREE_VIEWS]>;
+
+/** Przygotowanie widoku węzła (propsy agenta → JSX) wewnątrz lokalnego boundary, nie przed nim. */
+function TreeNodeView({ View, props, onAction, children }: { View: TreeView; props: Record<string, unknown>; onAction: ActionHandler; children: ReactNode }) {
+    return <View {...viewProps(props)} onAction={onAction}>{children}</View>;
+}

@@ -87,6 +87,20 @@ describe('wrogie dane w drzewie slotu (SurfaceRenderer)', () => {
     });
 });
 
+describe('wrogie dane: głęboko zagnieżdżony prop (weryfikacja Astry R#1)', () => {
+    it('Approval z dodatkowym polem o głębokości 12 000 (JSON.parse je przyjmuje) nie wywraca renderu', () => {
+        const depth = 12_000;
+        const deep = JSON.parse('{"x":'.repeat(depth) + '1' + '}'.repeat(depth)); // jak z prawdziwego transportu
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        agent({ version: V, updateComponents: { surfaceId: 'hud', components: [
+            { id: 'root', component: 'Approval', title: 'Pilotaż', summary: 'Opis', extra: deep },
+        ] } });
+        const r = mount(<SurfaceRenderer surfaceId="hud" />);
+        expect(r.escaped).toEqual([]);
+        expect(r.container.textContent).toContain('Pilotaż');
+    });
+});
+
 describe('wrogie dane szuflady tasków (licznik w AiUiOverlay)', () => {
     const tasksSurface = () => {
         agent({ version: V, createSurface: { surfaceId: 'tasks-drawer', catalogId: 'flowassist/v2' } });

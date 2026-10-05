@@ -29,9 +29,9 @@ export const ItemBody = memo(function ItemBody({ view, density = 'screen' }: { v
     // błąd widoku na danych agenta = fallback tej karty; nowa treść (resetKey) ponawia render
     return (
         <RenderGuard
-            resetKey={view.content}
+            resetKeys={[view.content]}
             fallback={(error) => <FallbackCard type={view.title} reason={`błąd renderowania: ${error.message}`} path={path} />}
-            onError={(error) => reportRenderProblem({ surfaceId: 'workspace', nodeId: view.id, path, message: `błąd renderowania: ${error.message}` }, view.content, runId)}
+            onError={(error) => reportRenderProblem({ surfaceId: 'workspace', nodeId: view.id, path, message: `błąd renderowania: ${error.message}` }, [view.content], runId)}
         >
             <RepresentationView representation={view.representation} content={view.content} density={density} />
         </RenderGuard>

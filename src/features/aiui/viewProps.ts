@@ -9,3 +9,15 @@ export function viewProps(props: Record<string, unknown>): Record<string, unknow
     for (const [k, v] of Object.entries(props)) if (!RESERVED.has(k)) out[k] = v;
     return out;
 }
+
+/**
+ * Płaski podpis propsów `[klucz, wartość, …]` porównywany płytko (Object.is) — tożsamość danych węzła bez
+ * schodzenia w głąb (JSON.stringify głęboko zagnieżdżonych danych agenta przepełnia stos). Dzięki structural
+ * sharing niezwiązana zmiana surface'u daje ten sam podpis.
+ */
+export function propsSignature(props: Record<string, unknown>): unknown[] {
+    return Object.entries(props).flat();
+}
+
+export const sameSignature = (a: readonly unknown[], b: readonly unknown[]) =>
+    a.length === b.length && a.every((v, i) => Object.is(v, b[i]));

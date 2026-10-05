@@ -1,13 +1,14 @@
 'use client';
 
 import { Component, type ReactNode } from 'react';
+import { sameSignature } from '../viewProps';
 
 // Lokalne boundary jednego widoku z danymi agenta (I10): błąd renderu daje fallback tej karty / węzła,
-// a nie odmontowanie całej strony. Zmiana `resetKey` (nowe dane od agenta) ponawia render — widok wraca
-// sam, gdy agent poprawi dane.
+// a nie odmontowanie całej strony. Zmiana `resetKeys` (nowe dane od agenta; porównanie płytkie) ponawia
+// render — widok wraca sam, gdy agent poprawi dane.
 
 interface Props {
-    resetKey: unknown;
+    resetKeys: readonly unknown[];
     fallback: (error: Error) => ReactNode;
     onError: (error: Error) => void;
     children: ReactNode;
@@ -25,7 +26,7 @@ export default class RenderGuard extends Component<Props, { error: Error | null 
     }
 
     componentDidUpdate(prev: Props) {
-        if (this.state.error && prev.resetKey !== this.props.resetKey) this.setState({ error: null });
+        if (this.state.error && !sameSignature(prev.resetKeys, this.props.resetKeys)) this.setState({ error: null });
     }
 
     render() {

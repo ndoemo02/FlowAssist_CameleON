@@ -244,6 +244,33 @@ describe('błąd renderu: odzyskanie per wariant renderowania', () => {
         expect(errorsSent()).toHaveLength(1);
     }));
 
+    // Weryfikacja Astry, runda 4: zmiana gęstości w tej samej zamontowanej instancji ItemBody.
+    it('jedna instancja: card zawodzi → screen → poprawne dane → card z udanym renderem → złe → 2 raporty', () =>
+        throwingIn((d, label) => d === 'card' && label === 'zły', () => {
+            workspaceItem();
+            set('zły');
+            const r = mount(<ViewOf id="m" density="card" />);    // 1. card zawodzi → raport
+            r.rerender(<ViewOf id="m" density="screen" />);        // 2. ten sam stan, wariant screen
+            expect(r.container.textContent).toContain('zły');      //    screen renderuje się poprawnie
+            act(() => set('dobry'));                               // 3. poprawne dane
+            r.rerender(<ViewOf id="m" density="card" />);          // 4. powrót do card: udany render = odzyskanie card
+            expect(r.container.textContent).toContain('dobry');
+            act(() => set('zły'));                                 // 5. nawrót
+            expect(errorsSent()).toHaveLength(2);
+        }));
+
+    // Strażnik (właściciel): sama zmiana wariantu nie jest odzyskaniem starego wariantu.
+    it('card zawodzi → screen zdrowy → card nigdy nie wyrenderowana poprawnie → wystąpienie card otwarte (1 raport)', () =>
+        throwingIn((d, label) => d === 'card' && label === 'zły', () => {
+            workspaceItem();
+            set('zły');
+            const r = mount(<ViewOf id="m" density="card" />);
+            r.rerender(<ViewOf id="m" density="screen" />);        // zdrowy screen nie zamyka błędu card
+            r.rerender(<ViewOf id="m" density="card" />);          // card nadal zawodzi
+            expect(r.container.textContent).toContain('Nie mogę wyświetlić');
+            expect(errorsSent()).toHaveLength(1);
+        }));
+
     it('strażnik: karta i ekran zawodzą → poprawne dane (oba warianty odzyskane) → znowu złe → 2 raporty', () => throwingIn((_, label) => label === 'zły', () => {
         workspaceItem();
         set('zły');

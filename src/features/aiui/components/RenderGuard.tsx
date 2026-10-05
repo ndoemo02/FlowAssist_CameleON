@@ -35,9 +35,11 @@ export default class RenderGuard extends Component<Props, { error: Error | null 
     }
 
     componentDidUpdate(prev: Props, prevState: { error: Error | null }) {
-        // zatwierdzony render bez błędu po stanie błędu = ponowienie się udało
-        if (prevState.error && !this.state.error) this.props.onRecover?.();
-        if (this.state.error && !sameSignature(prev.resetKeys, this.props.resetKeys)) this.setState({ error: null });
+        const keysChanged = !sameSignature(prev.resetKeys, this.props.resetKeys);
+        // zatwierdzony render bez błędu po stanie błędu albo po zmianie resetKeys (nowe dane / wariant) = udany render
+        // BIEŻĄCEGO wariantu; o innych wariantach decyduje rejestr (validationReporting), nie ten boundary
+        if (!this.state.error && (prevState.error || keysChanged)) this.props.onRecover?.();
+        if (this.state.error && keysChanged) this.setState({ error: null });
     }
 
     render() {

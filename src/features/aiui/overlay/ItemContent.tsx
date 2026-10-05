@@ -26,10 +26,10 @@ export const ItemBody = memo(function ItemBody({ view, density = 'screen' }: { v
     if (view.status === 'pending') return <PendingCard type={view.title ?? 'element'} />;
     if (view.status === 'fallback') return <FallbackCard type={view.title ?? view.id} reason={view.reason} path={view.path} />;
     const path = `/components/${view.id}/content`;
-    // błąd widoku na danych agenta = fallback tej karty; nowa treść (resetKey) ponawia render
+    // błąd widoku na danych agenta = fallback tej karty; nowa treść albo zmiana wariantu (gęstości) ponawia render
     return (
         <RenderGuard
-            resetKeys={[view.content]}
+            resetKeys={[view.content, density]}
             fallback={(error) => <FallbackCard type={view.title} reason={`błąd renderowania: ${error.message}`} path={path} />}
             onError={(error) => reportRenderProblem({ surfaceId: 'workspace', nodeId: view.id, path, message: `błąd renderowania: ${error.message}` }, density, runId)}
             onRecover={() => resolveRenderProblem('workspace', view.id, density, runId)}

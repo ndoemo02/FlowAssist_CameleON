@@ -11,7 +11,10 @@ interface Props {
     resetKeys: readonly unknown[];
     fallback: (error: Error) => ReactNode;
     onError: (error: Error) => void;
-    /** Udany render po ponowieniu (po błędzie) — koniec wystąpienia błędu renderu. */
+    /**
+     * Zatwierdzony udany render: pierwszy render nowej instancji (np. remount panelu) albo render po ponowieniu
+     * po błędzie — koniec wystąpienia błędu renderu tego widoku. Samo odmontowanie nim nie jest.
+     */
     onRecover?: () => void;
     children: ReactNode;
 }
@@ -21,6 +24,10 @@ export default class RenderGuard extends Component<Props, { error: Error | null 
 
     static getDerivedStateFromError(error: unknown) {
         return { error: error instanceof Error ? error : new Error(String(error)) };
+    }
+
+    componentDidMount() {
+        if (!this.state.error) this.props.onRecover?.(); // pierwszy render bez błędu
     }
 
     componentDidCatch(error: unknown) {

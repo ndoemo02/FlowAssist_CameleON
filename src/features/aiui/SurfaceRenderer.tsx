@@ -37,7 +37,7 @@ export default memo(function SurfaceRenderer({ surfaceId }: { surfaceId: Surface
                 resetKeys={signature}
                 fallback={(error) => <FallbackCard type={node.type} reason={`błąd renderowania: ${error.message}`} path={path} />}
                 onError={(error) => reportRenderProblem({ surfaceId, nodeId: node.id, path, message: `błąd renderowania: ${error.message}` }, runId)}
-                onRecover={() => resolveRenderProblem(surfaceId, node.id)}
+                onRecover={() => resolveRenderProblem(surfaceId, node.id, runId)}
             >
                 <TreeNodeView View={View} props={node.props} onAction={(name, context) => sendAction(name, surfaceId, node.id, context)}>
                     {node.children.map(render)}

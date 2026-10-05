@@ -162,6 +162,28 @@ describe('błąd renderu: wystąpienie kończy się dopiero udanym renderem po p
         expect(errorsSent()).toHaveLength(2);
     }));
 
+    // Weryfikacja Astry, runda 2: odzyskanie widzi też NOWA instancja boundary (remount panelu).
+    it('złe → zwinięcie HUD → poprawne dane → rozwinięcie z udanym renderem → znowu złe → 2 raporty', () => withThrowingApproval(() => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        hudApproval('zły');
+        mount(<SurfaceRenderer surfaceId="hud" />).unmount();   // zwinięcie panelu z błędem
+        hudApproval('dobry');                                   // poprawka danych, nikt nie renderuje
+        const r = mount(<SurfaceRenderer surfaceId="hud" />);   // rozwinięcie: udany render nowej instancji
+        expect(r.container.textContent).toContain('dobry');
+        hudApproval('zły');
+        r.rerender(<SurfaceRenderer surfaceId="hud" />);
+        expect(errorsSent()).toHaveLength(2);
+    }));
+
+    it('samo odmontowanie i zmiana danych bez udanego renderu nie kończą wystąpienia', () => withThrowingApproval(() => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        hudApproval('zły', 'S1');
+        mount(<SurfaceRenderer surfaceId="hud" />).unmount();
+        hudApproval('zły', 'S2');                               // dane zmienione, nadal złe, nikt nie renderuje
+        mount(<SurfaceRenderer surfaceId="hud" />);             // remount: ten sam błąd
+        expect(errorsSent()).toHaveLength(1);
+    }));
+
     it('złe → poprawne → te same złe dane → 2 raporty (karta)', () => {
         const original = REPRESENTATION_VIEWS.map2d;
         REPRESENTATION_VIEWS.map2d = ({ points }: { points: { label: string }[] }) => {

@@ -4,8 +4,8 @@
 //   karta i panel ekranu, remount, zamknięty HUD czy szuflada nie zmieniają liczby raportów.
 // - Wystąpienie trwa do ODZYSKANIA (decyzja właściciela po weryfikacji Astry):
 //   - problem walidacji: węzeł wraca do `ready` (pending to jeszcze nie odzyskanie);
-//   - błąd renderu (RenderGuard): udany render po ponowieniu. Sama zmiana danych węzła, który dalej się
-//     wywraca, odzyskaniem nie jest — ten sam błąd nie jest zgłaszany ponownie.
+//   - błąd renderu (RenderGuard): zatwierdzony udany render — po ponowieniu albo pierwszy render nowej instancji
+//     (remount panelu). Sama zmiana danych ani samo odmontowanie odzyskaniem nie są.
 //   Zniknięcie węzła (lub nowy przebieg) też kończy wystąpienie. Po odzyskaniu nawrót = nowy raport.
 // - Każdy raport niesie przebieg, w którym powstał; store wysyła go tylko w tym samym, aktywnym przebiegu.
 // Instaluje go warstwa UI (AiUiOverlay) — koordynator (store.dispatch) nie raportuje fallbacków.
@@ -96,8 +96,12 @@ export function reportRenderProblem(p: Problem, runId: number) {
     state.reportClientError(toError(p), { runId }); // inny przebieg: store odrzuci (jawne pochodzenie)
 }
 
-/** Udany render węzła po ponowieniu (RenderGuard) — koniec wystąpień błędu renderu tego węzła. */
-export function resolveRenderProblem(surfaceId: SurfaceId, nodeId: string) {
+/**
+ * Zatwierdzony udany render węzła (RenderGuard: po montażu albo po ponowieniu) — koniec wystąpień błędu renderu
+ * tego węzła. `runId` = przebieg z chwili renderu: render z innego przebiegu niczego nie zamyka.
+ */
+export function resolveRenderProblem(surfaceId: SurfaceId, nodeId: string, runId: number) {
+    if (runId !== useAiUi.getState().scenario.runId) return;
     const node = nodeKey(surfaceId, nodeId);
     renderActive.forEach((n, k) => { if (n === node) renderActive.delete(k); });
 }

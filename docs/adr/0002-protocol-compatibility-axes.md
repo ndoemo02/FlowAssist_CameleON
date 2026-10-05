@@ -55,8 +55,24 @@ Pochodna specyfikacja osi 1 i 2: `src/features/aiui/schemas/flowassist-v2/` (kop
 komponentów po rozwiązaniu bindingów, treść reprezentacji). Parytet z guardami runtime pilnuje `__tests__/schema.test.ts`
 (korpus + mutacje). Schematy nie są używane w runtime; zmiana guardów pod schemat to jawna zmiana kontraktu.
 
+## Ścieżki `updateDataModel` (JSON Pointer)
+
+**Decyzja (review #4, 2026-10-05, właściciel):** ścieżka to RFC 6901 z jednym zaostrzeniem dla tablic.
+
+- Segment adresujący tablicę musi być **kanonicznym indeksem**: `0` albo cyfra 1–9 i dalsze cyfry.
+- `-`, indeksy ujemne i niekanoniczne (`01`, `1.5`, `foo`, `length`, …) są **odrzucane**: dokument zostaje bez zmian
+  (`setAt` zwraca tę samą referencję). Dotyczy to też segmentów pośrednich.
+- **Bez semantyki append** dla `-` (JSON Patch jej używa, A2UI tego nie wymaga).
+- Klucze obiektów nie podlegają tej regule (`-` czy `01` w obiekcie to zwykłe klucze).
+- Odczyt (bindingi) widzi tylko własne właściwości; klucz `__proto__` jest zapisywany jako zwykła własna właściwość.
+
+Odrzucenie jest dziś ciche (bez `VALIDATION_FAILED`): raport wymagałby zmiany reducera (kernel).
+Schematy nie wyrażają tej reguły (zależy od kształtu danych), więc kontrakt pilnuje `__tests__/dataModelContract.test.ts`.
+
 ## Otwarte
 
 1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie.
 2. **Mechanizm handshake'u** w specyfikacji A2UI v0.9.1 (metadane / inicjalizacja): sprawdzić w specyfikacji przed P1.7.
 3. **Które zdarzenia AG-UI niosą sygnały lifecycle:** research przed P1.6. `RUN_FINISHED` dotyczy pojedynczego wywołania backendu, nie przebiegu CameleON.
+4. **Indeks tablicy ≥ długości:** kanoniczny indeks równy długości tablicy dziś ją wydłuża, a większy tworzy dziury
+   (`[ , , x]`). Nieobjęte decyzją z review #4 — do rozstrzygnięcia (odrzucać czy dopuszczać).

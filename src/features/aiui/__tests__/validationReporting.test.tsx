@@ -208,6 +208,37 @@ describe('błąd renderu: wystąpienie kończy się dopiero udanym renderem po p
     });
 });
 
+// Weryfikacja Astry, runda 2: obecność węzła = członkostwo w grafie definicji (root → children),
+// nie rozwiązane drzewo. Potomek rodzica w pending jest chwilowo niedostępny, a nie usunięty.
+describe('walidacja: pending rodzica to nie usunięcie dziecka', () => {
+    /** HUD: root (kontener z bindingiem /n — bez danych = pending) z dzieckiem `a` (Approval bez summary = fallback). */
+    function hudParentChild(children: string[]) {
+        agent({ version: V, updateComponents: { surfaceId: 'hud', components: [
+            { id: 'root', component: 'Workspace', children, note: { path: '/n' } },
+            { id: 'a', component: 'Approval', title: 'Decyzja' },
+        ] } });
+    }
+    const n = (value?: number) => agent({ version: V, updateDataModel: { surfaceId: 'hud', path: '/n', ...(value === undefined ? {} : { value }) } });
+
+    it('dziecko w fallbacku → rodzic pending → rodzic znów gotowy, dziecko nadal złe → 1 raport', () => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        n(1);
+        hudParentChild(['a']);
+        n();   // usunięcie danych bindingu → rodzic pending
+        n(2);  // rodzic gotowy, dziecko nadal bez summary
+        expect(errorsSent()).toEqual([expect.objectContaining({ surfaceId: 'hud', path: '/components/a/summary' })]);
+    });
+
+    it('strażnik: dziecko faktycznie usunięte z children i dodane ponownie, nadal złe → 2 raporty', () => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        n(1);
+        hudParentChild(['a']);
+        hudParentChild([]);     // usunięcie członkostwa
+        hudParentChild(['a']);  // ponowne dodanie
+        expect(errorsSent()).toHaveLength(2);
+    });
+});
+
 describe('walidacja: odzyskanie dopiero po powrocie do ready', () => {
     it('fallback → pending (dane usunięte) → ten sam fallback → 1 raport', () => {
         workspaceItem();

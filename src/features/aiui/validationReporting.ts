@@ -16,11 +16,28 @@ import { resolveItem, workspaceChildren } from './workspace';
 import { useAiUi, type AiUiState } from './store';
 
 export interface Problem { surfaceId: SurfaceId; nodeId: string; path: string; message: string }
-type NodeStatus = 'ready' | 'pending' | 'fallback';
+// 'unavailable' = członek drzewa, którego rozwiązanie się nie odbyło (np. pod rodzicem w pending) — ani odzyskany, ani usunięty
+type NodeStatus = 'ready' | 'pending' | 'fallback' | 'unavailable';
 
 const toError = (p: Problem): ClientError => ({ code: 'VALIDATION_FAILED', surfaceId: p.surfaceId, path: p.path, message: p.message });
 // klucze z płytkiej tablicy napisów — id od agenta mogą zawierać dowolne znaki
 const nodeKey = (surfaceId: SurfaceId, nodeId: string) => JSON.stringify([surfaceId, nodeId]);
+
+/**
+ * Członkostwo drzewa slotu z grafu definicji (root → children), a nie z rozwiązanego drzewa: potomek rodzica
+ * w pending nadal jest członkiem. Iteracyjnie — definicje od agenta mogą być dowolnie głębokie / cykliczne.
+ */
+function treeMembers(components: Record<string, { children?: string[] }>): Set<string> {
+    const members = new Set<string>();
+    const stack = ['root'];
+    while (stack.length) {
+        const id = stack.pop()!;
+        if (members.has(id) || !Object.prototype.hasOwnProperty.call(components, id)) continue;
+        members.add(id);
+        for (const child of components[id].children ?? []) stack.push(child);
+    }
+    return members;
+}
 
 /** Stan walidacji każdego obecnego węzła i problemy (fallbacki) — z samego stanu surface'ów. */
 export function scanSurfaces(surfaces: AiUiState['surfaces']) {
@@ -36,6 +53,7 @@ export function scanSurfaces(surfaces: AiUiState['surfaces']) {
                 if (view.status === 'fallback') problems.push({ surfaceId, nodeId: id, path: view.path, message: view.reason });
             }
         } else {
+            treeMembers(surface.components).forEach((id) => nodes.set(nodeKey(surfaceId, id), 'unavailable'));
             const visit = (n: ResolvedNode) => {
                 nodes.set(nodeKey(surfaceId, n.id), n.kind === 'component' ? 'ready' : n.kind);
                 if (n.kind === 'fallback') problems.push({ surfaceId, nodeId: n.id, path: n.path ?? `/components/${n.id}`, message: n.reason });
@@ -65,7 +83,8 @@ function sync(state: AiUiState) {
     const runId = state.scenario.runId;
     trackRun(runId);
     const { problems, nodes } = scanSurfaces(state.surfaces);
-    // koniec wystąpień: walidacja wróciła do ready albo węzła już nie ma (błąd renderu — tylko brak węzła)
+    // koniec wystąpień: walidacja wróciła do ready albo węzeł nie jest już członkiem (błąd renderu — tylko to drugie);
+    // 'unavailable' (np. pod rodzicem w pending) i 'pending' nie kończą wystąpienia
     active.forEach((node, k) => { const s = nodes.get(node); if (s === undefined || s === 'ready') active.delete(k); });
     renderActive.forEach((node, k) => { if (!nodes.has(node)) renderActive.delete(k); });
     for (const p of problems) {

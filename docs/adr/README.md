@@ -1,0 +1,17 @@
+# Architecture Decision Records — CameleON
+
+Decyzje architektoniczne warstwy AI-to-UI (`src/features/aiui/`). Każdy spike i każda zmiana
+zależności w v1.3+ jest oceniana względem tych dokumentów.
+
+| ADR | Tytuł | Status |
+|-----|-------|--------|
+| [0001](0001-kernel-invariants.md) | Inwarianty kernela CameleON (I1–I10) | Zaakceptowany (v1.3) |
+| [0002](0002-protocol-compatibility-axes.md) | Trzy osie zgodności protokołu | Zaakceptowany; polityka wersji koperty otwarta |
+| [0003](0003-local-vs-semantic-actions.md) | Akcje lokalne vs semantyczne | Zaakceptowany (v1.3) |
+| [0004](0004-library-adapter-rules.md) | Reguły adapterów bibliotek | Zaakceptowany (v1.3) |
+## Zasady
+
+- Stan opisany na kodzie z `6e96223` (kernel bez zmian od tego commita).
+- Każde twierdzenie wskazuje plik i symbol oraz test, który go pilnuje. Brak testu jest zapisany jawnie.
+- Zmiana inwariantu wymaga nowego ADR (status „zastępuje 000N”) i decyzji właściciela. Zielone testy nie wystarczą.
+- Źródło decyzji: `PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo), review Astry (`Astra1.md`).

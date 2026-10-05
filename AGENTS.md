@@ -220,7 +220,9 @@ przez spóźnioną odpowiedź transportu.
 
 `npm test` — vitest dla czystej logiki (`contract`, `reducer`, `layout`, `workspace`,
 `gestureLogic`, `measureScreen`, `jsonPointer`, `resolveTree`, `loop`, `scenario`).
-Bez testów renderowania 3D.
+Bez testów renderowania 3D. Testy renderowania DOM (`*.test.tsx`) działają w jsdom
+(komentarz `@vitest-environment jsdom`, harness `__tests__/fixtures/render.tsx`), np. `hostileRender`
+— wrogie dane agenta nie mogą wyjść poza kartę / węzeł.
 
 Od v1.3 (P0.2, P0.3) dochodzą:
 

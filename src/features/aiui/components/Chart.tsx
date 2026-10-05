@@ -19,16 +19,27 @@ function niceStep(raw: number) {
     return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * 10 ** exp;
 }
 
+/** Oś Y: maksimum, krok i podziałki (czysta funkcja — dane agenta, więc musi znieść każdą skończoną liczbę). */
+export function chartAxis(series: Series[]) {
+    // pętla zamiast Math.max(...): spread ponad ~125 tys. argumentów przepełnia stos
+    let rawMax = 1;
+    for (const s of series) for (const p of s.points) if (p.y > rawMax) rawMax = p.y;
+    const step = niceStep(rawMax / 4);
+    // y bliskie Number.MAX_VALUE: zaokrąglenie w górę przepełnia się do Infinity → oś kończy się na rawMax
+    const rounded = Math.ceil((rawMax * 1.05) / step) * step;
+    const maxY = Number.isFinite(rounded) ? rounded : rawMax;
+    // filtr odcina podziałkę przepełnioną do Infinity (zwykle ostatnia podziałka === maxY, więc zostaje)
+    const ticks = Array.from({ length: Math.round(maxY / step) + 1 }, (_, i) => i * step).filter((v) => v <= maxY);
+    return { maxY, step, ticks };
+}
+
 export default function Chart({ kind, title, series, density = 'screen' }: ViewProps<{ kind: 'line' | 'bar'; title?: string; series: Series[] }>) {
     const { W, H, PAD, font } = GEOM[density];
     const xs = series[0].points.map((p) => String(p.x));
-    const rawMax = Math.max(...series.flatMap((s) => s.points.map((p) => p.y)), 1);
-    const step = niceStep(rawMax / 4);
-    const maxY = Math.ceil((rawMax * 1.05) / step) * step;
+    const { maxY, ticks } = chartAxis(series);
     const innerW = W - PAD.l - PAD.r, innerH = H - PAD.t - PAD.b;
     const xAt = (i: number) => PAD.l + (xs.length === 1 ? innerW / 2 : (i / (xs.length - 1)) * innerW);
     const yAt = (v: number) => PAD.t + innerH - (v / maxY) * innerH;
-    const ticks = Array.from({ length: Math.round(maxY / step) + 1 }, (_, i) => i * step);
     const slot = innerW / xs.length, barW = (slot * 0.7) / series.length;
 
     return (

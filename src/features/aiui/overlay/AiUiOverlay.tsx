@@ -1,8 +1,10 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import SurfaceRenderer from '../SurfaceRenderer';
+import type { Surface } from '../reducer';
+import { resolveTree, type ResolvedNode } from '../resolveTree';
 import { FOCUS_ANGLE, slotVisibility } from '../slots';
 import { useAiUi, type ScenarioStatus } from '../store';
 import HudLayer from './HudLayer';
@@ -71,21 +73,38 @@ function AgentStatus({ compact }: { compact: boolean }) {
     );
 }
 
+/** Licznik zadań ze ZWALIDOWANEGO drzewa (resolveTree), nigdy z surowych danych agenta. */
+function countTasks(surface: Surface) {
+    let done = 0, all = 0;
+    const visit = (node: ResolvedNode) => {
+        if (node.kind !== 'component') return;
+        if (node.type === 'TaskList') {
+            const tasks = Object.values(node.props.tasks as Record<string, { status: string }>);
+            all += tasks.length;
+            done += tasks.filter((t) => t.status === 'done').length;
+        }
+        node.children.forEach(visit);
+    };
+    const tree = resolveTree(surface);
+    if (tree) visit(tree);
+    return { done, all };
+}
+
 function TasksDrawer({ compact }: { compact: boolean }) {
     const tasks = useAiUi((s) => s.surfaces['tasks-drawer']);
     const open = useAiUi((s) => s.stage.drawer === 'open');
     const setDrawer = useAiUi((s) => s.setDrawer);
     const reserve = useZones(compact);
-    if (!tasks) return null;
+    const counts = useMemo(() => (tasks ? countTasks(tasks) : null), [tasks]);
+    if (!tasks || !counts) return null;
 
-    const all = Object.values((tasks.data.tasks ?? {}) as Record<string, { status: string }>);
-    const done = all.filter((t) => t.status === 'done').length;
+    const { done, all } = counts;
     const tab = (
         <button
             onClick={() => setDrawer(open ? 'closed' : 'open')}
             className="pointer-events-auto rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] text-white/70 hover:text-white"
         >
-            {open ? 'Ukryj taski' : `Taski ${done}/${all.length}`}
+            {open ? 'Ukryj taski' : `Taski ${done}/${all}`}
         </button>
     );
 

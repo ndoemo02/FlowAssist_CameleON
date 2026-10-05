@@ -127,14 +127,26 @@ export const useAiUi = create<AiUiState>()((set, get) => {
                 return;
             }
             const { surfaces, stage, narration, layout } = get();
-            const { state, effects } = reduce({ surfaces, stage, narration }, event);
+            const reduced = reduce({ surfaces, stage, narration }, event);
+            const { state } = reduced;
+            let { effects } = reduced;
+            const manualGrace = now() - lastManualAt <= MANUAL_GRACE_MS;
+            // P3 (ADR 0005, OBS-2): w okresie łaski po ręcznym obrocie stage.focus agenta nie przejmuje kamery
+            // ani nie zmienia stage.focus (jak hint 'screen'); drawer z tego samego komunikatu stosowany normalnie.
+            let agentStage = state.stage;
+            if (manualGrace && 'stage' in event && event.stage.focus) {
+                effects = effects.filter((e) => e.type !== 'focus');
+                if (state.stage.focus !== stage.focus) {
+                    agentStage = state.stage.drawer === stage.drawer ? stage : { ...state.stage, focus: stage.focus };
+                }
+            }
             // P8: uzgodnienie układu tylko, gdy zmienił się surface 'workspace' (w tym deleteSurface → reset, P7)
             const r = state.surfaces.workspace !== surfaces.workspace
                 ? reconcileLayout(layout, workspaceMeta(state.surfaces.workspace))
                 : { layout, screenHint: false };
             // P3: hint agenta 'screen' przenosi kamerę (i semantyczny cel), o ile użytkownik nie obraca ręcznie
-            const cameraToScreen = r.screenHint && now() - lastManualAt > MANUAL_GRACE_MS;
-            const nextStage = cameraToScreen && state.stage.focus !== 'front' ? { ...state.stage, focus: 'front' as const } : state.stage;
+            const cameraToScreen = r.screenHint && !manualGrace;
+            const nextStage = cameraToScreen && agentStage.focus !== 'front' ? { ...agentStage, focus: 'front' as const } : agentStage;
             if (state.surfaces !== surfaces || nextStage !== stage || state.narration !== narration || r.layout !== layout) {
                 set({ surfaces: state.surfaces, stage: nextStage, narration: state.narration, layout: r.layout });
             }

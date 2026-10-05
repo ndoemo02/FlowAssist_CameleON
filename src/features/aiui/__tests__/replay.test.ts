@@ -114,11 +114,11 @@ describe('korpus: udokumentowane zachowanie', () => {
         expect(point('08-duplicates', 'duplicate-narration').effects.speak).toEqual(['Witaj']);
     });
 
-    it('08 OBS-2: stage.focus agenta przerywa ręczny obrót bez okresu łaski — także gdy nie zmienia stage', () => {
+    it('08 OBS-2 (naprawione): stage.focus agenta w okresie łaski nie przerywa ręcznego obrotu', () => {
         const c = point('08-duplicates', 'stage-back-after-manual-orbit');
-        expect(c.s.stage.focus).toBe('back'); // stan bez zmiany (już było 'back')…
-        expect(c.effects.tweens).toEqual([{ to: 3.1416 }]); // …ale efekt kamery uruchomiony mimo ręcznego obrotu
-        expect(c.s.camera.source).toBe('director');
+        expect(c.s.stage.focus).toBe('back'); // było 'back' przed obrotem — bez zmiany
+        expect(c.effects.tweens).toEqual([]); // brak przejęcia kamery w okresie łaski
+        expect(c.s.camera).toMatchObject({ angle: 1, source: 'manual', tween: null });
     });
 
     it('09/10 I6: stary przebieg i ruch po done są ignorowane', () => {

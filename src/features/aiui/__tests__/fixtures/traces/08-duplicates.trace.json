@@ -347,10 +347,8 @@
     },
     "camera": {
      "angle": 1,
-     "source": "director",
-     "tween": {
-      "to": 3.1416
-     }
+     "source": "manual",
+     "tween": null
     },
     "surfaces": {
      "workspace": {
@@ -384,11 +382,7 @@
     "layout": {}
    },
    "effects": {
-    "tweens": [
-     {
-      "to": 3.1416
-     }
-    ],
+    "tweens": [],
     "speak": [],
     "outgoing": [],
     "warnings": []
@@ -412,10 +406,8 @@
     },
     "camera": {
      "angle": 1,
-     "source": "director",
-     "tween": {
-      "to": 3.1416
-     }
+     "source": "manual",
+     "tween": null
     },
     "surfaces": {
      "workspace": {
@@ -475,10 +467,8 @@
     },
     "camera": {
      "angle": 1,
-     "source": "director",
-     "tween": {
-      "to": 3.1416
-     }
+     "source": "manual",
+     "tween": null
     },
     "surfaces": {
      "workspace": {

@@ -5,7 +5,7 @@
 | # | Decyzja | Realizacja |
 |---|---|---|
 | OBS-1 | **(b)** raport `VALIDATION_FAILED` w adapterze | w P1.6 (adapter AG-UI), kernel bez zmian |
-| OBS-2 | **(b)** okres łaski 2 s także dla `stage.focus` agenta | osobny, jawny commit „kernel bugfix” **po** zapisaniu baseline; zmiana śladu fixture 08 jest częścią tego commita |
+| OBS-2 | **(b)** okres łaski 2 s także dla `stage.focus` agenta | **zrealizowane** commitem „fix(aiui): respect manual camera grace for stage focus” (kernel: `store.ts: dispatch`). W okresie łaski `stage.focus` agenta nie przejmuje kamery i nie zmienia `stage.focus` (jak hint `screen`); `drawer` z tego samego komunikatu stosowany normalnie. Po okresie łaski bez zmian: efekt kamery także dla niezmienionej wartości. Zmieniony ślad fixture 08; 4 testy przypadków w `loop.test.ts` |
 | OBS-3 | **(a)** utrzymujemy `v0.9` + `v0.9.1` na wejściu | do czasu handshake'u i utwardzania wersji (P1.7, ADR 0002) |
 | OBS-4 | **(b)** mieszane koperty odrzucane | **zrealizowane** commitem „fix(aiui): reject mixed protocol envelopes” (po P0.3): `parseEvent` wymaga dokładnie jednego klucza payloadu; zmieniony ślad fixture 12 (drawer zostaje `closed`, ostrzeżenie o odrzuceniu) |
 - **Kontekst:** korpus (`src/features/aiui/__tests__/fixtures/`) odtwarza zdarzenia przez koordynator aplikacji. Zapisuje stan, efekty (kamera, TTS) i komunikaty wychodzące.
@@ -28,6 +28,8 @@
 - **Rekomendacja:** (b). Najwęższa warstwa, kernel nietknięty; mock jest skryptowany, więc problem dotyczy dopiero prawdziwego agenta.
 
 ### OBS-2: `stage.focus` agenta przerywa ręczny obrót bez okresu łaski (fixture 08)
+
+> **Zrealizowane (b).** Opis poniżej dotyczy stanu baseline sprzed poprawki.
 - **Obserwacja:**
   - `reducer.ts` emituje efekt `focus` przy każdym `stage.focus`, także gdy stan się nie zmienia;
   - `store.ts: runEffects` wykonuje `tweenTo` bez sprawdzenia `MANUAL_GRACE_MS`;

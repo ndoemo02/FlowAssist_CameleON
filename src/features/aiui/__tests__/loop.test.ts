@@ -190,6 +190,59 @@ describe('stage.focus spójny z kamerą (Astra #3)', () => {
     });
 });
 
+describe('OBS-2: stage.focus agenta respektuje okres łaski ręcznego obrotu (P3, ADR 0005)', () => {
+    beforeEach(() => {
+        // okres łaski liczony z performance.now — sterujemy nim zegarem testowym
+        // (najpierw useRealTimers: ponowne useFakeTimers nie przeinstalowuje zegara z beforeEach pliku)
+        vi.useRealTimers();
+        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance'] });
+        resetManualInteraction();
+    });
+    const angleAbs = () => Math.abs(st().camera.angle);
+
+    it('w ciągu 2 s po ręcznym obrocie: nie przejmuje kamery ani stage.focus; drawer stosowany', () => {
+        st().setAngle(1, 'manual');
+        vi.advanceTimersByTime(1500);
+        st().dispatch({ stage: { focus: 'back', drawer: 'open' } });
+        expect(st().camera).toMatchObject({ angle: 1, source: 'manual', tween: null });
+        expect(st().stage).toEqual({ focus: 'front', drawer: 'open' });
+    });
+
+    it('po okresie łaski: przejmuje kamerę i ustawia stage.focus', () => {
+        st().setAngle(1, 'manual');
+        vi.advanceTimersByTime(2500);
+        st().dispatch({ stage: { focus: 'back' } });
+        expect(st().stage.focus).toBe('back');
+        expect(st().camera.source).toBe('director');
+        settle();
+        expect(angleAbs()).toBeCloseTo(Math.PI, 5);
+    });
+
+    it('powtórzony ten sam stage.focus po okresie łaski nadal może ponownie skierować kamerę', () => {
+        st().dispatch({ stage: { focus: 'back' } });
+        settle();
+        expect(angleAbs()).toBeCloseTo(Math.PI, 5);
+        st().setAngle(1, 'manual');
+        vi.advanceTimersByTime(2500);
+        st().dispatch({ stage: { focus: 'back' } }); // stage.focus już 'back' — efekt kamery mimo to
+        expect(st().camera.source).toBe('director');
+        settle();
+        expect(angleAbs()).toBeCloseTo(Math.PI, 5);
+    });
+
+    it('stage.focus zignorowany w okresie łaski nie blokuje poprawnego przejęcia po nim', () => {
+        st().setAngle(1, 'manual');
+        vi.advanceTimersByTime(500);
+        st().dispatch({ stage: { focus: 'back' } });
+        expect(st().stage.focus).toBe('front');
+        vi.advanceTimersByTime(2000); // razem 2,5 s od ręcznego obrotu
+        st().dispatch({ stage: { focus: 'back' } });
+        expect(st().stage.focus).toBe('back');
+        settle();
+        expect(angleAbs()).toBeCloseTo(Math.PI, 5);
+    });
+});
+
 describe('koordynator: ekran i kamera (P3)', () => {
     it('hint agenta "screen" przenosi kamerę na Front', () => {
         st().startScenario('test');

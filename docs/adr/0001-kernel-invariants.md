@@ -83,7 +83,7 @@ Gest zapamiętuje `instance` i `rev` wpisu przy starcie. `rev` rośnie przy każ
 - **Testy:** `gestureLogic.test.ts`: „tożsamość gestu”; `layout.test.ts`: „move: zapis tylko przy niezmienionym rev”.
 
 ### I8: arbitraż kamery i polityka ScreenAnchor
-- **P3:** komenda użytkownika „na ekran” zawsze przenosi kamerę. Hint agenta `screen` przenosi ją tylko bez ręcznego obrotu w ostatnich `MANUAL_GRACE_MS` = 2000 ms. `stage.focus` zmienia się razem z ruchem kamery.
+- **P3:** komenda użytkownika „na ekran” zawsze przenosi kamerę. Auto-polecenia agenta (hint `screen` i, od OBS-2, `stage.focus`) przenoszą ją tylko bez ręcznego obrotu w ostatnich `MANUAL_GRACE_MS` = 2000 ms; w okresie łaski nie zmieniają też `stage.focus`. `stage.focus` zmienia się razem z ruchem kamery.
 - **ScreenAnchor:**
   - unia meshy ekranu bez rekwizytu `Object003`;
   - histereza pokrycia 0,82 / 0,75;

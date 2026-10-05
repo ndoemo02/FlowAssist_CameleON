@@ -1,0 +1,92 @@
+{
+ "id": "02-data-before-component",
+ "description": "Dane przed komponentem, a id w children przed komponentem: rezerwacja miejsca (niedostarczony), potem element.",
+ "steps": [
+  {
+   "start": "fixture"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "createSurface": {
+     "surfaceId": "workspace",
+     "catalogId": "flowassist/v2"
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateDataModel": {
+     "surfaceId": "workspace",
+     "path": "/items/a",
+     "value": {
+      "kind": "line",
+      "series": [
+       {
+        "label": "2026",
+        "points": [
+         {
+          "x": "Q1",
+          "y": 1
+         },
+         {
+          "x": "Q2",
+          "y": 2
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "root",
+       "component": "Workspace",
+       "children": [
+        "a"
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "checkpoint": "child-not-delivered"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "a",
+       "component": "WorkspaceItem",
+       "kind": "chart",
+       "title": "A",
+       "content": {
+        "path": "/items/a"
+       },
+       "representations": [
+        "chart2d"
+       ],
+       "priority": 1,
+       "presentation": "focus"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "checkpoint": "delivered"
+  }
+ ]
+}

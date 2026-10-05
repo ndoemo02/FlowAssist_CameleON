@@ -1,0 +1,204 @@
+{
+ "id": "10-after-terminal",
+ "description": "Po done: zdarzenia, statusy i akcje tego przebiegu są ignorowane (I6).",
+ "trace": [
+  {
+   "label": "done",
+   "state": {
+    "scenario": {
+     "status": "done",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "a"
+        ]
+       },
+       "a": {
+        "id": "a",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "A",
+        "content": {
+         "path": "/items/a"
+        },
+        "representations": [
+         "chart2d"
+        ],
+        "priority": 1,
+        "presentation": "card"
+       }
+      },
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {
+     "a": {
+      "status": "ready",
+      "representation": "chart2d"
+     }
+    },
+    "layout": {
+     "a": {
+      "presentation": "card",
+      "x": 0.5,
+      "y": 0.5,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "card",
+      "instance": "#1",
+      "rev": 0,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "late-traffic",
+   "state": {
+    "scenario": {
+     "status": "done",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "a"
+        ]
+       },
+       "a": {
+        "id": "a",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "A",
+        "content": {
+         "path": "/items/a"
+        },
+        "representations": [
+         "chart2d"
+        ],
+        "priority": 1,
+        "presentation": "card"
+       }
+      },
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {
+     "a": {
+      "status": "ready",
+      "representation": "chart2d"
+     }
+    },
+    "layout": {
+     "a": {
+      "presentation": "card",
+      "x": 0.5,
+      "y": 0.5,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "card",
+      "instance": "#1",
+      "rev": 0,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": [
+     "[aiui] akcja \"deepen\" zignorowana — brak aktywnego przebiegu (done)."
+    ]
+   }
+  }
+ ]
+}

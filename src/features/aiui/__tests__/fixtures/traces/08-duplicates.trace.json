@@ -1,0 +1,524 @@
+{
+ "id": "08-duplicates",
+ "description": "Duplikaty legalnych zdarzeń bez identyfikatorów: createSurface (odrzucony + SURFACE_EXISTS), updateDataModel (idempotentny stan), stage.focus (efekt kamery ponownie), narration+speak (TTS ponownie). Dodatkowo: stage.focus agenta po ręcznym obrocie.",
+ "trace": [
+  {
+   "label": "first-create",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {}
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "duplicate-create",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {}
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [
+     {
+      "version": "v0.9.1",
+      "error": {
+       "code": "SURFACE_EXISTS",
+       "surfaceId": "workspace",
+       "message": "Surface \"workspace\" już istnieje — wyślij najpierw deleteSurface."
+      }
+     }
+    ],
+    "warnings": [
+     "[aiui] błąd kontraktu:"
+    ]
+   }
+  },
+  {
+   "label": "first-data",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "duplicate-data",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "first-stage-back",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "back",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 3.1416,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [
+     {
+      "to": 3.1416
+     }
+    ],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "duplicate-stage-back",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "back",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 3.1416,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "stage-back-after-manual-orbit",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "back",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 1,
+     "source": "director",
+     "tween": {
+      "to": 3.1416
+     }
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [
+     {
+      "to": 3.1416
+     }
+    ],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "first-narration",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "back",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": "Witaj",
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 1,
+     "source": "director",
+     "tween": {
+      "to": 3.1416
+     }
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [
+     "Witaj"
+    ],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "duplicate-narration",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "back",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": "Witaj",
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 1,
+     "source": "director",
+     "tween": {
+      "to": 3.1416
+     }
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {},
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [
+     "Witaj"
+    ],
+    "outgoing": [],
+    "warnings": []
+   }
+  }
+ ]
+}

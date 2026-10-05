@@ -1,0 +1,55 @@
+{
+ "id": "03-unknown-catalog",
+ "description": "createSurface z obcym katalogiem: parseEvent odrzuca; store tylko ostrzega w konsoli, agent nie dostaje błędu.",
+ "steps": [
+  {
+   "start": "fixture"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "createSurface": {
+     "surfaceId": "workspace",
+     "catalogId": "other/v1"
+    }
+   }
+  },
+  {
+   "checkpoint": "foreign-catalog"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "root",
+       "component": "Workspace",
+       "children": [
+        "a"
+       ]
+      },
+      {
+       "id": "a",
+       "component": "WorkspaceItem",
+       "kind": "chart",
+       "title": "A",
+       "content": {
+        "path": "/items/a"
+       },
+       "representations": [
+        "chart2d"
+       ],
+       "priority": 1,
+       "presentation": "card"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "checkpoint": "update-without-surface"
+  }
+ ]
+}

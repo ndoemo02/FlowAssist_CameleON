@@ -1,0 +1,83 @@
+{
+ "id": "03-unknown-catalog",
+ "description": "createSurface z obcym katalogiem: parseEvent odrzuca; store tylko ostrzega w konsoli, agent nie dostaje błędu.",
+ "trace": [
+  {
+   "label": "foreign-catalog",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {},
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": [
+     "[aiui] odrzucony komunikat (niezgodny z kontraktem):"
+    ]
+   }
+  },
+  {
+   "label": "update-without-surface",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {},
+    "views": {},
+    "layout": {}
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [
+     {
+      "version": "v0.9.1",
+      "error": {
+       "code": "SURFACE_NOT_FOUND",
+       "surfaceId": "workspace",
+       "message": "Brak surface \"workspace\"."
+      }
+     }
+    ],
+    "warnings": [
+     "[aiui] błąd kontraktu:"
+    ]
+   }
+  }
+ ]
+}

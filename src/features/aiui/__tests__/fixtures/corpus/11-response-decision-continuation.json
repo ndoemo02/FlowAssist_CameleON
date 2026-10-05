@@ -1,0 +1,188 @@
+{
+ "id": "11-response-decision-continuation",
+ "description": "Cykl odpowiedź → decyzja → kontynuacja → zakończenie: akcja niesie itemId i migawkę układu; done dopiero po decyzji terminalnej.",
+ "steps": [
+  {
+   "start": "fixture"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "createSurface": {
+     "surfaceId": "workspace",
+     "catalogId": "flowassist/v2"
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "root",
+       "component": "Workspace",
+       "children": [
+        "a"
+       ]
+      },
+      {
+       "id": "a",
+       "component": "WorkspaceItem",
+       "kind": "chart",
+       "title": "A",
+       "content": {
+        "path": "/items/a"
+       },
+       "representations": [
+        "chart2d"
+       ],
+       "priority": 1,
+       "presentation": "card",
+       "actions": [
+        {
+         "name": "deepen",
+         "label": "Pogłęb"
+        }
+       ]
+      }
+     ]
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateDataModel": {
+     "surfaceId": "workspace",
+     "path": "/items/a",
+     "value": {
+      "kind": "line",
+      "series": [
+       {
+        "label": "2026",
+        "points": [
+         {
+          "x": "Q1",
+          "y": 1
+         },
+         {
+          "x": "Q2",
+          "y": 2
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "status": "awaiting_action"
+  },
+  {
+   "checkpoint": "awaiting-1"
+  },
+  {
+   "command": {
+    "type": "toScreen",
+    "id": "a"
+   }
+  },
+  {
+   "action": {
+    "name": "deepen",
+    "surfaceId": "workspace",
+    "source": "a",
+    "context": {
+     "itemId": "a"
+    }
+   }
+  },
+  {
+   "checkpoint": "deepen-sent"
+  },
+  {
+   "status": "running"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "root",
+       "component": "Workspace",
+       "children": [
+        "a",
+        "b"
+       ]
+      },
+      {
+       "id": "b",
+       "component": "WorkspaceItem",
+       "kind": "kpi",
+       "title": "B",
+       "content": {
+        "path": "/items/b"
+       },
+       "representations": [
+        "cards2d"
+       ],
+       "priority": 2,
+       "presentation": "card"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateDataModel": {
+     "surfaceId": "workspace",
+     "path": "/items/b",
+     "value": {
+      "items": [
+       {
+        "title": "Wzrost",
+        "value": "+18%"
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "status": "awaiting_action"
+  },
+  {
+   "checkpoint": "continued"
+  },
+  {
+   "action": {
+    "name": "approve",
+    "surfaceId": "hud",
+    "source": "root"
+   }
+  },
+  {
+   "status": "running"
+  },
+  {
+   "event": {
+    "narration": {
+     "text": "Zatwierdzone"
+    }
+   }
+  },
+  {
+   "status": "done"
+  },
+  {
+   "checkpoint": "completed"
+  }
+ ]
+}

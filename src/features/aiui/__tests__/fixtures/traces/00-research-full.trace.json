@@ -1,0 +1,1167 @@
+{
+ "id": "00-research-full",
+ "description": "Pełny scenariusz research: oś czasu → awaiting_action → „Pogłęb” na tabeli dzielnic → awaiting_action → „Zatwierdź” → done.",
+ "trace": [
+  {
+   "label": "timeline-done",
+   "state": {
+    "scenario": {
+     "status": "awaiting_action",
+     "id": "research",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": "Kiedy będziesz gotowy, zatwierdź albo odrzuć pilotaż.",
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "tasks-drawer": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "TaskList",
+        "title": "Research: rezerwacje online",
+        "tasks": {
+         "path": "/tasks"
+        }
+       }
+      },
+      "data": {
+       "tasks": {
+        "web": {
+         "title": "Skan źródeł rynkowych",
+         "agent": "Scout",
+         "order": 1,
+         "status": "done",
+         "progress": 1,
+         "note": "31 źródeł"
+        },
+        "data": {
+         "title": "Ekstrakcja i czyszczenie danych",
+         "agent": "Parser",
+         "order": 2,
+         "status": "done",
+         "progress": 1,
+         "note": "3 840 rekordów"
+        },
+        "analysis": {
+         "title": "Analiza trendów i sezonowości",
+         "agent": "Analyst",
+         "order": 3,
+         "status": "done",
+         "progress": 1,
+         "note": "trend + sezonowość"
+        }
+       }
+      }
+     },
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "chart-q",
+         "kpis",
+         "districts"
+        ]
+       },
+       "chart-q": {
+        "id": "chart-q",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "Zapytania o rezerwacje online · Warszawa (dane demo)",
+        "content": {
+         "path": "/items/chart-q"
+        },
+        "representations": [
+         "chart2d",
+         "ribbon3d"
+        ],
+        "priority": 1,
+        "presentation": "screen"
+       },
+       "kpis": {
+        "id": "kpis",
+        "component": "WorkspaceItem",
+        "kind": "kpi",
+        "title": "Najważniejsze wskaźniki",
+        "content": {
+         "path": "/items/kpis"
+        },
+        "representations": [
+         "cards2d",
+         "kpi3d"
+        ],
+        "presentation": "card",
+        "priority": 2
+       },
+       "districts": {
+        "id": "districts",
+        "component": "WorkspaceItem",
+        "kind": "table",
+        "title": "Dzielnice · Q4",
+        "content": {
+         "path": "/items/districts"
+        },
+        "representations": [
+         "table2d"
+        ],
+        "presentation": "card",
+        "priority": 3,
+        "actions": [
+         {
+          "name": "deepen",
+          "label": "Pogłęb analizę",
+          "variant": "primary"
+         }
+        ]
+       }
+      },
+      "data": {
+       "items": {
+        "chart-q": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1240
+            },
+            {
+             "x": "Q2",
+             "y": 1510
+            },
+            {
+             "x": "Q3",
+             "y": 1980
+            },
+            {
+             "x": "Q4",
+             "y": 2260
+            }
+           ]
+          },
+          {
+           "label": "2025",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 980
+            },
+            {
+             "x": "Q2",
+             "y": 1105
+            },
+            {
+             "x": "Q3",
+             "y": 1290
+            },
+            {
+             "x": "Q4",
+             "y": 1410
+            }
+           ]
+          },
+          {
+           "label": "Plan 2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1200
+            },
+            {
+             "x": "Q2",
+             "y": 1500
+            },
+            {
+             "x": "Q3",
+             "y": 1800
+            },
+            {
+             "x": "Q4",
+             "y": 2100
+            }
+           ]
+          }
+         ]
+        },
+        "kpis": {
+         "items": [
+          {
+           "title": "Wzrost r/r",
+           "value": "+60%",
+           "delta": "up",
+           "note": "Q4 2026 vs Q4 2025"
+          },
+          {
+           "title": "Najsilniejszy kwartał",
+           "value": "Q3",
+           "delta": "up",
+           "note": "+31% kwartał do kwartału"
+          },
+          {
+           "title": "Bez odpowiedzi po godzinach",
+           "value": "42%",
+           "note": "utracone rezerwacje"
+          }
+         ]
+        },
+        "districts": {
+         "columns": [
+          "Dzielnica",
+          "Zapytania Q4",
+          "Bez odpowiedzi",
+          "Zmiana r/r"
+         ],
+         "rows": [
+          [
+           "Śródmieście",
+           640,
+           "38%",
+           "+72%"
+          ],
+          [
+           "Mokotów",
+           510,
+           "44%",
+           "+55%"
+          ],
+          [
+           "Wola",
+           430,
+           "41%",
+           "+68%"
+          ],
+          [
+           "Praga-Płd.",
+           360,
+           "47%",
+           "+49%"
+          ],
+          [
+           "Ursynów",
+           320,
+           "39%",
+           "+51%"
+          ]
+         ]
+        }
+       }
+      }
+     },
+     "hud": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Approval",
+        "title": "Pilotaż asystenta 24/7",
+        "summary": "Wdrożenie FlowAssist na 30 dni w dwóch dzielnicach z najwyższym odsetkiem nieobsłużonych zapytań.",
+        "items": [
+         "Zakres: Mokotów, Praga-Płd.",
+         "Czas: 30 dni",
+         "Miernik sukcesu: −50% nieobsłużonych zapytań po godzinach"
+        ]
+       }
+      },
+      "data": {}
+     }
+    },
+    "views": {
+     "chart-q": {
+      "status": "ready",
+      "representation": "chart2d"
+     },
+     "kpis": {
+      "status": "ready",
+      "representation": "cards2d"
+     },
+     "districts": {
+      "status": "ready",
+      "representation": "table2d"
+     }
+    },
+    "layout": {
+     "chart-q": {
+      "presentation": "screen",
+      "x": 0.1667,
+      "y": 0.5,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "screen",
+      "instance": "#1",
+      "rev": 1,
+      "moved": false
+     },
+     "kpis": {
+      "presentation": "card",
+      "x": 0.5,
+      "y": 0.5,
+      "scale": 1,
+      "z": 2,
+      "lastHint": "card",
+      "instance": "#2",
+      "rev": 0,
+      "moved": false
+     },
+     "districts": {
+      "presentation": "card",
+      "x": 0.8333,
+      "y": 0.5,
+      "scale": 1,
+      "z": 3,
+      "lastHint": "card",
+      "instance": "#3",
+      "rev": 0,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [
+     {
+      "to": 3.1416
+     }
+    ],
+    "speak": [
+     "Jasne. Uruchamiam trzech agentów: źródła, dane i analizę trendów.",
+     "Gotowe. Rozkładam wyniki na stole.",
+     "Na stole masz wykres, wskaźniki i tabelę dzielnic. Wykres pokażę na ekranie.",
+     "Zapytania rosły przez cały rok, najmocniej w trzecim kwartale: o 31 procent kwartał do kwartału.",
+     "Dorzucam linię planu: trzeci i czwarty kwartał są powyżej planu.",
+     "Możesz przesuwać karty na stole, wysłać dowolną na ekran albo poprosić o pogłębienie tabeli.",
+     "Kiedy będziesz gotowy, zatwierdź albo odrzuć pilotaż."
+    ],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "deepened",
+   "state": {
+    "scenario": {
+     "status": "awaiting_action",
+     "id": "research",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": "Najwięcej nieobsłużonych zapytań jest na Pradze-Południe i na Mokotowie.",
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "tasks-drawer": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "TaskList",
+        "title": "Research: rezerwacje online",
+        "tasks": {
+         "path": "/tasks"
+        }
+       }
+      },
+      "data": {
+       "tasks": {
+        "web": {
+         "title": "Skan źródeł rynkowych",
+         "agent": "Scout",
+         "order": 1,
+         "status": "done",
+         "progress": 1,
+         "note": "31 źródeł"
+        },
+        "data": {
+         "title": "Ekstrakcja i czyszczenie danych",
+         "agent": "Parser",
+         "order": 2,
+         "status": "done",
+         "progress": 1,
+         "note": "3 840 rekordów"
+        },
+        "analysis": {
+         "title": "Analiza trendów i sezonowości",
+         "agent": "Analyst",
+         "order": 3,
+         "status": "done",
+         "progress": 1,
+         "note": "trend + sezonowość"
+        }
+       }
+      }
+     },
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "chart-q",
+         "kpis",
+         "districts",
+         "district-map"
+        ]
+       },
+       "chart-q": {
+        "id": "chart-q",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "Zapytania o rezerwacje online · Warszawa (dane demo)",
+        "content": {
+         "path": "/items/chart-q"
+        },
+        "representations": [
+         "chart2d",
+         "ribbon3d"
+        ],
+        "priority": 1,
+        "presentation": "screen"
+       },
+       "kpis": {
+        "id": "kpis",
+        "component": "WorkspaceItem",
+        "kind": "kpi",
+        "title": "Najważniejsze wskaźniki",
+        "content": {
+         "path": "/items/kpis"
+        },
+        "representations": [
+         "cards2d",
+         "kpi3d"
+        ],
+        "presentation": "focus",
+        "priority": 2
+       },
+       "districts": {
+        "id": "districts",
+        "component": "WorkspaceItem",
+        "kind": "table",
+        "title": "Dzielnice · Q4",
+        "content": {
+         "path": "/items/districts"
+        },
+        "representations": [
+         "table2d"
+        ],
+        "presentation": "card",
+        "priority": 3,
+        "actions": [
+         {
+          "name": "deepen",
+          "label": "Pogłęb analizę",
+          "variant": "primary"
+         }
+        ]
+       },
+       "district-map": {
+        "id": "district-map",
+        "component": "WorkspaceItem",
+        "kind": "map",
+        "title": "Warszawa · zapytania Q4 (schemat)",
+        "content": {
+         "path": "/items/district-map"
+        },
+        "representations": [
+         "map2d"
+        ],
+        "presentation": "card",
+        "priority": 4
+       }
+      },
+      "data": {
+       "items": {
+        "chart-q": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1240
+            },
+            {
+             "x": "Q2",
+             "y": 1510
+            },
+            {
+             "x": "Q3",
+             "y": 1980
+            },
+            {
+             "x": "Q4",
+             "y": 2260
+            }
+           ]
+          },
+          {
+           "label": "2025",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 980
+            },
+            {
+             "x": "Q2",
+             "y": 1105
+            },
+            {
+             "x": "Q3",
+             "y": 1290
+            },
+            {
+             "x": "Q4",
+             "y": 1410
+            }
+           ]
+          },
+          {
+           "label": "Plan 2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1200
+            },
+            {
+             "x": "Q2",
+             "y": 1500
+            },
+            {
+             "x": "Q3",
+             "y": 1800
+            },
+            {
+             "x": "Q4",
+             "y": 2100
+            }
+           ]
+          }
+         ]
+        },
+        "kpis": {
+         "items": [
+          {
+           "title": "Wzrost r/r",
+           "value": "+60%",
+           "delta": "up",
+           "note": "Q4 2026 vs Q4 2025"
+          },
+          {
+           "title": "Najsilniejszy kwartał",
+           "value": "Q3",
+           "delta": "up",
+           "note": "+31% kwartał do kwartału"
+          },
+          {
+           "title": "Bez odpowiedzi po godzinach",
+           "value": "42%",
+           "note": "utracone rezerwacje"
+          }
+         ]
+        },
+        "districts": {
+         "columns": [
+          "Dzielnica",
+          "Zapytania Q4",
+          "Bez odpowiedzi",
+          "Zmiana r/r"
+         ],
+         "rows": [
+          [
+           "Śródmieście",
+           640,
+           "38%",
+           "+72%"
+          ],
+          [
+           "Mokotów",
+           510,
+           "44%",
+           "+55%"
+          ],
+          [
+           "Wola",
+           430,
+           "41%",
+           "+68%"
+          ],
+          [
+           "Praga-Płd.",
+           360,
+           "47%",
+           "+49%"
+          ],
+          [
+           "Ursynów",
+           320,
+           "39%",
+           "+51%"
+          ]
+         ]
+        },
+        "district-map": {
+         "points": [
+          {
+           "label": "Śródmieście",
+           "x": 0.5,
+           "y": 0.45
+          },
+          {
+           "label": "Mokotów",
+           "x": 0.5,
+           "y": 0.66
+          },
+          {
+           "label": "Wola",
+           "x": 0.36,
+           "y": 0.42
+          },
+          {
+           "label": "Praga-Płd.",
+           "x": 0.66,
+           "y": 0.52
+          },
+          {
+           "label": "Ursynów",
+           "x": 0.47,
+           "y": 0.86
+          }
+         ]
+        }
+       }
+      }
+     },
+     "hud": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Approval",
+        "title": "Pilotaż asystenta 24/7",
+        "summary": "Wdrożenie FlowAssist na 30 dni w dwóch dzielnicach z najwyższym odsetkiem nieobsłużonych zapytań.",
+        "items": [
+         "Zakres: Mokotów, Praga-Płd.",
+         "Czas: 30 dni",
+         "Miernik sukcesu: −50% nieobsłużonych zapytań po godzinach"
+        ]
+       }
+      },
+      "data": {}
+     }
+    },
+    "views": {
+     "chart-q": {
+      "status": "ready",
+      "representation": "chart2d"
+     },
+     "kpis": {
+      "status": "ready",
+      "representation": "cards2d"
+     },
+     "districts": {
+      "status": "ready",
+      "representation": "table2d"
+     },
+     "district-map": {
+      "status": "ready",
+      "representation": "map2d"
+     }
+    },
+    "layout": {
+     "chart-q": {
+      "presentation": "card",
+      "x": 0.1667,
+      "y": 0.25,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "screen",
+      "instance": "#1",
+      "rev": 3,
+      "moved": false
+     },
+     "kpis": {
+      "presentation": "focus",
+      "x": 0.5,
+      "y": 0.25,
+      "scale": 1,
+      "z": 2,
+      "lastHint": "focus",
+      "instance": "#2",
+      "rev": 2,
+      "moved": false
+     },
+     "districts": {
+      "presentation": "screen",
+      "x": 0.8333,
+      "y": 0.25,
+      "scale": 1,
+      "z": 3,
+      "lastHint": "card",
+      "instance": "#3",
+      "rev": 1,
+      "moved": false
+     },
+     "district-map": {
+      "presentation": "card",
+      "x": 0.1667,
+      "y": 0.75,
+      "scale": 1,
+      "z": 7,
+      "lastHint": "card",
+      "instance": "#4",
+      "rev": 0,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [
+     "Dokładam mapę dzielnic.",
+     "Najwięcej nieobsłużonych zapytań jest na Pradze-Południe i na Mokotowie."
+    ],
+    "outgoing": [
+     {
+      "version": "v0.9.1",
+      "action": {
+       "name": "deepen",
+       "surfaceId": "workspace",
+       "sourceComponentId": "districts",
+       "timestamp": "<ts>",
+       "context": {
+        "itemId": "districts",
+        "workspace": {
+         "screen": "districts",
+         "focus": null,
+         "dismissed": []
+        }
+       }
+      }
+     }
+    ],
+    "warnings": []
+   }
+  },
+  {
+   "label": "approved",
+   "state": {
+    "scenario": {
+     "status": "done",
+     "id": "research",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": "Zatwierdzone. Zapisuję decyzję i wracam do rozmowy.",
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 0,
+     "source": "director",
+     "tween": null
+    },
+    "surfaces": {
+     "tasks-drawer": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "TaskList",
+        "title": "Research: rezerwacje online",
+        "tasks": {
+         "path": "/tasks"
+        }
+       }
+      },
+      "data": {
+       "tasks": {
+        "web": {
+         "title": "Skan źródeł rynkowych",
+         "agent": "Scout",
+         "order": 1,
+         "status": "done",
+         "progress": 1,
+         "note": "31 źródeł"
+        },
+        "data": {
+         "title": "Ekstrakcja i czyszczenie danych",
+         "agent": "Parser",
+         "order": 2,
+         "status": "done",
+         "progress": 1,
+         "note": "3 840 rekordów"
+        },
+        "analysis": {
+         "title": "Analiza trendów i sezonowości",
+         "agent": "Analyst",
+         "order": 3,
+         "status": "done",
+         "progress": 1,
+         "note": "trend + sezonowość"
+        }
+       }
+      }
+     },
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "chart-q",
+         "kpis",
+         "districts",
+         "district-map"
+        ]
+       },
+       "chart-q": {
+        "id": "chart-q",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "Zapytania o rezerwacje online · Warszawa (dane demo)",
+        "content": {
+         "path": "/items/chart-q"
+        },
+        "representations": [
+         "chart2d",
+         "ribbon3d"
+        ],
+        "priority": 1,
+        "presentation": "screen"
+       },
+       "kpis": {
+        "id": "kpis",
+        "component": "WorkspaceItem",
+        "kind": "kpi",
+        "title": "Najważniejsze wskaźniki",
+        "content": {
+         "path": "/items/kpis"
+        },
+        "representations": [
+         "cards2d",
+         "kpi3d"
+        ],
+        "presentation": "focus",
+        "priority": 2
+       },
+       "districts": {
+        "id": "districts",
+        "component": "WorkspaceItem",
+        "kind": "table",
+        "title": "Dzielnice · Q4",
+        "content": {
+         "path": "/items/districts"
+        },
+        "representations": [
+         "table2d"
+        ],
+        "presentation": "card",
+        "priority": 3,
+        "actions": [
+         {
+          "name": "deepen",
+          "label": "Pogłęb analizę",
+          "variant": "primary"
+         }
+        ]
+       },
+       "district-map": {
+        "id": "district-map",
+        "component": "WorkspaceItem",
+        "kind": "map",
+        "title": "Warszawa · zapytania Q4 (schemat)",
+        "content": {
+         "path": "/items/district-map"
+        },
+        "representations": [
+         "map2d"
+        ],
+        "presentation": "card",
+        "priority": 4
+       }
+      },
+      "data": {
+       "items": {
+        "chart-q": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1240
+            },
+            {
+             "x": "Q2",
+             "y": 1510
+            },
+            {
+             "x": "Q3",
+             "y": 1980
+            },
+            {
+             "x": "Q4",
+             "y": 2260
+            }
+           ]
+          },
+          {
+           "label": "2025",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 980
+            },
+            {
+             "x": "Q2",
+             "y": 1105
+            },
+            {
+             "x": "Q3",
+             "y": 1290
+            },
+            {
+             "x": "Q4",
+             "y": 1410
+            }
+           ]
+          },
+          {
+           "label": "Plan 2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1200
+            },
+            {
+             "x": "Q2",
+             "y": 1500
+            },
+            {
+             "x": "Q3",
+             "y": 1800
+            },
+            {
+             "x": "Q4",
+             "y": 2100
+            }
+           ]
+          }
+         ]
+        },
+        "kpis": {
+         "items": [
+          {
+           "title": "Wzrost r/r",
+           "value": "+60%",
+           "delta": "up",
+           "note": "Q4 2026 vs Q4 2025"
+          },
+          {
+           "title": "Najsilniejszy kwartał",
+           "value": "Q3",
+           "delta": "up",
+           "note": "+31% kwartał do kwartału"
+          },
+          {
+           "title": "Bez odpowiedzi po godzinach",
+           "value": "42%",
+           "note": "utracone rezerwacje"
+          }
+         ]
+        },
+        "districts": {
+         "columns": [
+          "Dzielnica",
+          "Zapytania Q4",
+          "Bez odpowiedzi",
+          "Zmiana r/r"
+         ],
+         "rows": [
+          [
+           "Śródmieście",
+           640,
+           "38%",
+           "+72%"
+          ],
+          [
+           "Mokotów",
+           510,
+           "44%",
+           "+55%"
+          ],
+          [
+           "Wola",
+           430,
+           "41%",
+           "+68%"
+          ],
+          [
+           "Praga-Płd.",
+           360,
+           "47%",
+           "+49%"
+          ],
+          [
+           "Ursynów",
+           320,
+           "39%",
+           "+51%"
+          ]
+         ]
+        },
+        "district-map": {
+         "points": [
+          {
+           "label": "Śródmieście",
+           "x": 0.5,
+           "y": 0.45
+          },
+          {
+           "label": "Mokotów",
+           "x": 0.5,
+           "y": 0.66
+          },
+          {
+           "label": "Wola",
+           "x": 0.36,
+           "y": 0.42
+          },
+          {
+           "label": "Praga-Płd.",
+           "x": 0.66,
+           "y": 0.52
+          },
+          {
+           "label": "Ursynów",
+           "x": 0.47,
+           "y": 0.86
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {
+     "chart-q": {
+      "status": "ready",
+      "representation": "chart2d"
+     },
+     "kpis": {
+      "status": "ready",
+      "representation": "cards2d"
+     },
+     "districts": {
+      "status": "ready",
+      "representation": "table2d"
+     },
+     "district-map": {
+      "status": "ready",
+      "representation": "map2d"
+     }
+    },
+    "layout": {
+     "chart-q": {
+      "presentation": "card",
+      "x": 0.1667,
+      "y": 0.25,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "screen",
+      "instance": "#1",
+      "rev": 3,
+      "moved": false
+     },
+     "kpis": {
+      "presentation": "focus",
+      "x": 0.5,
+      "y": 0.25,
+      "scale": 1,
+      "z": 2,
+      "lastHint": "focus",
+      "instance": "#2",
+      "rev": 2,
+      "moved": false
+     },
+     "districts": {
+      "presentation": "screen",
+      "x": 0.8333,
+      "y": 0.25,
+      "scale": 1,
+      "z": 3,
+      "lastHint": "card",
+      "instance": "#3",
+      "rev": 1,
+      "moved": false
+     },
+     "district-map": {
+      "presentation": "card",
+      "x": 0.1667,
+      "y": 0.75,
+      "scale": 1,
+      "z": 7,
+      "lastHint": "card",
+      "instance": "#4",
+      "rev": 0,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [
+     "Zatwierdzone. Zapisuję decyzję i wracam do rozmowy."
+    ],
+    "outgoing": [
+     {
+      "version": "v0.9.1",
+      "action": {
+       "name": "approve",
+       "surfaceId": "hud",
+       "sourceComponentId": "root",
+       "timestamp": "<ts>",
+       "context": {
+        "workspace": {
+         "screen": "districts",
+         "focus": "kpis",
+         "dismissed": []
+        }
+       }
+      }
+     }
+    ],
+    "warnings": []
+   }
+  }
+ ]
+}

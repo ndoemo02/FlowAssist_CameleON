@@ -1,0 +1,420 @@
+{
+ "id": "07-manual-orbit-vs-screen-hint",
+ "description": "Ręczny obrót, potem hint screen: element na ekranie bez ruchu kamery (P3). Po upływie okresu łaski kolejny hint screen (inna wartość wcześniej) rusza kamerę.",
+ "trace": [
+  {
+   "label": "manual-orbit",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 2,
+     "source": "manual",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "a",
+         "b"
+        ]
+       },
+       "a": {
+        "id": "a",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "A",
+        "content": {
+         "path": "/items/a"
+        },
+        "representations": [
+         "chart2d"
+        ],
+        "priority": 1,
+        "presentation": "card"
+       },
+       "b": {
+        "id": "b",
+        "component": "WorkspaceItem",
+        "kind": "kpi",
+        "title": "B",
+        "content": {
+         "path": "/items/b"
+        },
+        "representations": [
+         "cards2d"
+        ],
+        "priority": 2,
+        "presentation": "card"
+       }
+      },
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        },
+        "b": {
+         "items": [
+          {
+           "title": "Wzrost",
+           "value": "+18%"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {
+     "a": {
+      "status": "ready",
+      "representation": "chart2d"
+     },
+     "b": {
+      "status": "ready",
+      "representation": "cards2d"
+     }
+    },
+    "layout": {
+     "a": {
+      "presentation": "card",
+      "x": 0.25,
+      "y": 0.5,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "card",
+      "instance": "#1",
+      "rev": 0,
+      "moved": false
+     },
+     "b": {
+      "presentation": "card",
+      "x": 0.75,
+      "y": 0.5,
+      "scale": 1,
+      "z": 2,
+      "lastHint": "card",
+      "instance": "#2",
+      "rev": 0,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "screen-hint-during-grace",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 2,
+     "source": "manual",
+     "tween": null
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "a",
+         "b"
+        ]
+       },
+       "a": {
+        "id": "a",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "A",
+        "content": {
+         "path": "/items/a"
+        },
+        "representations": [
+         "chart2d"
+        ],
+        "priority": 1,
+        "presentation": "screen"
+       },
+       "b": {
+        "id": "b",
+        "component": "WorkspaceItem",
+        "kind": "kpi",
+        "title": "B",
+        "content": {
+         "path": "/items/b"
+        },
+        "representations": [
+         "cards2d"
+        ],
+        "priority": 2,
+        "presentation": "card"
+       }
+      },
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        },
+        "b": {
+         "items": [
+          {
+           "title": "Wzrost",
+           "value": "+18%"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {
+     "a": {
+      "status": "ready",
+      "representation": "chart2d"
+     },
+     "b": {
+      "status": "ready",
+      "representation": "cards2d"
+     }
+    },
+    "layout": {
+     "a": {
+      "presentation": "screen",
+      "x": 0.25,
+      "y": 0.5,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "screen",
+      "instance": "#1",
+      "rev": 1,
+      "moved": false
+     },
+     "b": {
+      "presentation": "card",
+      "x": 0.75,
+      "y": 0.5,
+      "scale": 1,
+      "z": 2,
+      "lastHint": "card",
+      "instance": "#2",
+      "rev": 0,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  },
+  {
+   "label": "screen-hint-after-grace",
+   "state": {
+    "scenario": {
+     "status": "running",
+     "id": "fixture",
+     "run": 1
+    },
+    "stage": {
+     "focus": "front",
+     "drawer": "closed"
+    },
+    "narration": {
+     "text": null,
+     "speaker": "amber"
+    },
+    "camera": {
+     "angle": 2,
+     "source": "director",
+     "tween": {
+      "to": 0
+     }
+    },
+    "surfaces": {
+     "workspace": {
+      "catalogId": "flowassist/v2",
+      "components": {
+       "root": {
+        "id": "root",
+        "component": "Workspace",
+        "children": [
+         "a",
+         "b"
+        ]
+       },
+       "a": {
+        "id": "a",
+        "component": "WorkspaceItem",
+        "kind": "chart",
+        "title": "A",
+        "content": {
+         "path": "/items/a"
+        },
+        "representations": [
+         "chart2d"
+        ],
+        "priority": 1,
+        "presentation": "screen"
+       },
+       "b": {
+        "id": "b",
+        "component": "WorkspaceItem",
+        "kind": "kpi",
+        "title": "B",
+        "content": {
+         "path": "/items/b"
+        },
+        "representations": [
+         "cards2d"
+        ],
+        "priority": 2,
+        "presentation": "screen"
+       }
+      },
+      "data": {
+       "items": {
+        "a": {
+         "kind": "line",
+         "series": [
+          {
+           "label": "2026",
+           "points": [
+            {
+             "x": "Q1",
+             "y": 1
+            },
+            {
+             "x": "Q2",
+             "y": 2
+            }
+           ]
+          }
+         ]
+        },
+        "b": {
+         "items": [
+          {
+           "title": "Wzrost",
+           "value": "+18%"
+          }
+         ]
+        }
+       }
+      }
+     }
+    },
+    "views": {
+     "a": {
+      "status": "ready",
+      "representation": "chart2d"
+     },
+     "b": {
+      "status": "ready",
+      "representation": "cards2d"
+     }
+    },
+    "layout": {
+     "a": {
+      "presentation": "card",
+      "x": 0.25,
+      "y": 0.5,
+      "scale": 1,
+      "z": 1,
+      "lastHint": "screen",
+      "instance": "#1",
+      "rev": 2,
+      "moved": false
+     },
+     "b": {
+      "presentation": "screen",
+      "x": 0.75,
+      "y": 0.5,
+      "scale": 1,
+      "z": 2,
+      "lastHint": "screen",
+      "instance": "#2",
+      "rev": 1,
+      "moved": false
+     }
+    }
+   },
+   "effects": {
+    "tweens": [
+     {
+      "to": 0
+     }
+    ],
+    "speak": [],
+    "outgoing": [],
+    "warnings": []
+   }
+  }
+ ]
+}

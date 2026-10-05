@@ -1,0 +1,75 @@
+{
+ "id": "09-old-run",
+ "description": "Zdarzenia i statusy z poprzedniego przebiegu są odrzucane po restarcie (I6, P7).",
+ "steps": [
+  {
+   "start": "fixture"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "createSurface": {
+     "surfaceId": "workspace",
+     "catalogId": "flowassist/v2"
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "root",
+       "component": "Workspace",
+       "children": [
+        "a"
+       ]
+      },
+      {
+       "id": "a",
+       "component": "WorkspaceItem",
+       "kind": "chart",
+       "title": "A",
+       "content": {
+        "path": "/items/a"
+       },
+       "representations": [
+        "chart2d"
+       ],
+       "priority": 1,
+       "presentation": "card"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "checkpoint": "run-1"
+  },
+  {
+   "start": "fixture"
+  },
+  {
+   "checkpoint": "run-2-started"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "createSurface": {
+     "surfaceId": "hud",
+     "catalogId": "flowassist/v2"
+    }
+   },
+   "run": "previous"
+  },
+  {
+   "status": "done",
+   "run": "previous"
+  },
+  {
+   "checkpoint": "old-run-traffic"
+  }
+ ]
+}

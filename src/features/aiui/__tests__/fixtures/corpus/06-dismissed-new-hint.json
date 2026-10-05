@@ -1,0 +1,121 @@
+{
+ "id": "06-dismissed-new-hint",
+ "description": "Ukryty przez użytkownika element dostaje nowy hint agenta: zostaje ukryty, hint zapamiętany w lastHint (P5).",
+ "steps": [
+  {
+   "start": "fixture"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "createSurface": {
+     "surfaceId": "workspace",
+     "catalogId": "flowassist/v2"
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "root",
+       "component": "Workspace",
+       "children": [
+        "a"
+       ]
+      },
+      {
+       "id": "a",
+       "component": "WorkspaceItem",
+       "kind": "chart",
+       "title": "A",
+       "content": {
+        "path": "/items/a"
+       },
+       "representations": [
+        "chart2d"
+       ],
+       "priority": 1,
+       "presentation": "card"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateDataModel": {
+     "surfaceId": "workspace",
+     "path": "/items/a",
+     "value": {
+      "kind": "line",
+      "series": [
+       {
+        "label": "2026",
+        "points": [
+         {
+          "x": "Q1",
+          "y": 1
+         },
+         {
+          "x": "Q2",
+          "y": 2
+         }
+        ]
+       }
+      ]
+     }
+    }
+   }
+  },
+  {
+   "command": {
+    "type": "dismiss",
+    "id": "a"
+   }
+  },
+  {
+   "checkpoint": "dismissed"
+  },
+  {
+   "event": {
+    "version": "v0.9.1",
+    "updateComponents": {
+     "surfaceId": "workspace",
+     "components": [
+      {
+       "id": "a",
+       "component": "WorkspaceItem",
+       "kind": "chart",
+       "title": "A",
+       "content": {
+        "path": "/items/a"
+       },
+       "representations": [
+        "chart2d"
+       ],
+       "priority": 1,
+       "presentation": "screen"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "checkpoint": "hint-while-dismissed"
+  },
+  {
+   "command": {
+    "type": "restore",
+    "id": "a"
+   }
+  },
+  {
+   "checkpoint": "restored"
+  }
+ ]
+}

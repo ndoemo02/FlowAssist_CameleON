@@ -346,7 +346,9 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
   - **FU-3:** `jsonPointer.ts: setAt` jest rekurencyjne po segmentach ścieżki — `updateDataModel` z ekstremalnie
     długą ścieżką (sonda: ~10 tys. segmentów, 1 tys. jeszcze OK) przepełnia stos w `dispatch`. Wyjątek leci w callbacku
     transportu (nie w renderze, strona zostaje), stan bez zmian; tak samo przed R#4. Ograniczyć długość ścieżki
-    w kontrakcie (adapter / `parseEvent`) albo przepisać `setAt` iteracyjnie.
+    w kontrakcie (adapter / `parseEvent`) albo przepisać `setAt` iteracyjnie. **Kryterium akceptacji** (weryfikacja
+    Astry, runda 2): przed podłączeniem niezaufanego transportu test, że ekstremalna ścieżka jest odrzucana
+    bez zmiany stanu i bez przerwania obsługi następnych zdarzeń.
 - **P1 (warunkowo):** Radix albo React Aria, tylko jeśli po P0 natywna mechanika menu i fokusu okaże się krucha.
 - **Poza v1.3:** spike'i gestów, wykresów i tabel. Eksperymenty P2 (MCP Apps, Drei Html, graph2d, Vega-Lite, MapLibre) w v1.4.
 

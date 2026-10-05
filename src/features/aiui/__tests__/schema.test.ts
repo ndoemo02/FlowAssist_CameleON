@@ -58,7 +58,11 @@ const ENVELOPE_EDGES: unknown[] = [
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '' } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: null } },
     { version: 'v0.9.1', deleteSurface: { surfaceId: 'nieznany' } },
-    { stage: { drawer: 'open' }, version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } }, // OBS-4 (dziś: stage)
+    // OBS-4: mieszane koperty odrzucane w całości
+    { stage: { drawer: 'open' }, version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } },
+    { narration: { text: 'a' }, version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/x', value: 1 } },
+    { stage: { focus: 'back' }, narration: { text: 'a' } },
+    { stage: { focus: 'back' }, version: 'v0.9.1' }, // pole niebędące payloadem — przyjęte
 ];
 
 // ── mutacje (deterministyczne) ────────────────────────────────────
@@ -150,9 +154,12 @@ describe('P0.3 warstwa 1: koperta agent → klient (parseEvent)', () => {
     const all = [...samples, ...samples.filter((s) => s && typeof s === 'object').flatMap((s) => mutations(s, 3))];
 
     it('korpus i scenariusz research są przyjmowane przez schemat i parseEvent', () => {
-        // 03: obcy katalog — odrzucany przez oba (oczekiwane); reszta korpusu musi przejść
+        // 03: obcy katalog i 12: mieszana koperta (OBS-4) — odrzucane przez oba (oczekiwane); reszta korpusu musi przejść
         const rejected = [...corpusEvents, ...researchEvents].filter((e) => parseEvent(e) === null);
-        expect(rejected).toEqual([{ version: 'v0.9.1', createSurface: { surfaceId: 'workspace', catalogId: 'other/v1' } }]);
+        expect(rejected).toEqual([
+            { version: 'v0.9.1', createSurface: { surfaceId: 'workspace', catalogId: 'other/v1' } },
+            { stage: { drawer: 'open' }, version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } },
+        ]);
     });
 
     it(`parytet przyjęcia/odrzucenia na ${all.length} próbkach (korpus + brzegi + mutacje)`, () => {
@@ -222,7 +229,9 @@ describe('P0.3 warstwa 4: sekwencje — przyjęta koperta może legalnie dać pe
 
     it('12: presentation "dismissed" od agenta → fallback elementu mimo poprawnej koperty', () => {
         expect(viewsAt('12-envelope-edges', 'agent-layout-fields').b.status).toBe('fallback');
-        expect(eventsOf('12-envelope-edges').every((e) => agentEnvelope(e))).toBe(true);
+        // jedyna odrzucona koperta fixture'u to celowo mieszana (OBS-4); koperta elementu b jest poprawna
+        const rejected = eventsOf('12-envelope-edges').filter((e) => !agentEnvelope(e));
+        expect(rejected).toEqual([expect.objectContaining({ stage: { drawer: 'open' }, createSurface: expect.anything() })]);
     });
 
     it('Workspace.children może wskazywać niedostarczony komponent (P6) — schemat tego nie zabrania', () => {

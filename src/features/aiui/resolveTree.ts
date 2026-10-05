@@ -26,7 +26,7 @@ function resolveNode(surface: Surface, id: string, ancestors: Set<string>, depth
 
     if (ancestors.has(id)) return { kind: 'fallback', id, type, reason: `cykl w drzewie komponentów (${id})` };
     if (depth >= MAX_DEPTH) return { kind: 'fallback', id, type, reason: `przekroczona głębokość drzewa (${MAX_DEPTH})` };
-    if (!isCatalogName(type)) return { kind: 'fallback', id, type, reason: `komponent spoza katalogu flowassist/v1` };
+    if (!isCatalogName(type)) return { kind: 'fallback', id, type, reason: `komponent spoza katalogu flowassist/v2` };
 
     const props: Record<string, unknown> = {};
     let pending = false;

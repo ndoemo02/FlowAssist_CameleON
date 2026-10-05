@@ -7,7 +7,7 @@
 | OBS-1 | **(b)** raport `VALIDATION_FAILED` w adapterze | w P1.6 (adapter AG-UI), kernel bez zmian |
 | OBS-2 | **(b)** okres łaski 2 s także dla `stage.focus` agenta | osobny, jawny commit „kernel bugfix” **po** zapisaniu baseline; zmiana śladu fixture 08 jest częścią tego commita |
 | OBS-3 | **(a)** utrzymujemy `v0.9` + `v0.9.1` na wejściu | do czasu handshake'u i utwardzania wersji (P1.7, ADR 0002) |
-| OBS-4 | **(b)** mieszane koperty odrzucane | osobny commit „protocol hardening” **po** P0.3; zmiana śladu fixture 12 jest częścią tego commita |
+| OBS-4 | **(b)** mieszane koperty odrzucane | **zrealizowane** commitem „fix(aiui): reject mixed protocol envelopes” (po P0.3): `parseEvent` wymaga dokładnie jednego klucza payloadu; zmieniony ślad fixture 12 (drawer zostaje `closed`, ostrzeżenie o odrzuceniu) |
 - **Kontekst:** korpus (`src/features/aiui/__tests__/fixtures/`) odtwarza zdarzenia przez koordynator aplikacji. Zapisuje stan, efekty (kamera, TTS) i komunikaty wychodzące.
   - Ślady są w `fixtures/traces/*.trace.json`.
   - Jawne asercje są w `__tests__/replay.test.ts`; poniższe zachowania są tam przypięte jako **obecne**.
@@ -50,6 +50,8 @@
 - **Rekomendacja:** decyzja w ramach protocol hardening. Brak przesłanek pilności, bo mock wysyła `v0.9.1`.
 
 ### OBS-4: komunikat z kluczem `stage` i kluczem A2UI traktowany jako samo `stage` (fixture 12)
+
+> **Zrealizowane (b).** Opis poniżej dotyczy stanu baseline sprzed poprawki.
 - **Obserwacja:** `{ stage, version, createSurface }`: `parseEvent` sprawdza `stage` jako pierwsze i zwraca tylko je. `createSurface` **znika bez ostrzeżenia** i bez błędu do agenta. To samo dotyczy `narration`.
 - **Właściciel:** powierzchnia protokołu, `contract.ts: parseEvent`. Nie kernel.
 - **Opcje:**

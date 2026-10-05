@@ -141,11 +141,12 @@ describe('korpus: udokumentowane zachowanie', () => {
         expect(point('12-envelope-edges', 'v0.9-create').s.surfaces).toHaveProperty('workspace');
     });
 
-    it('12 OBS-4: komunikat ze stage i createSurface = tylko stage; createSurface znika bez ostrzeżenia', () => {
+    it('12 OBS-4 (naprawione): mieszana koperta stage + createSurface odrzucona w całości', () => {
         const c = point('12-envelope-edges', 'mixed-stage-and-create');
-        expect(c.s.stage.drawer).toBe('open');
+        expect(c.s.stage.drawer).toBe('closed'); // stage NIE został częściowo skonsumowany
         expect(c.s.surfaces).not.toHaveProperty('hud');
-        expect([c.effects.outgoing, c.effects.warnings]).toEqual([[], []]);
+        expect(c.effects.outgoing).toEqual([]);
+        expect(c.effects.warnings).toEqual(['[aiui] odrzucony komunikat (niezgodny z kontraktem):']);
     });
 
     it('12 I3 / OBS-6: pola układu od agenta ignorowane; presentation "dismissed" od agenta = fallback elementu', () => {

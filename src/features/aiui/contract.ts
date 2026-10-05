@@ -93,10 +93,14 @@ const isComponent = (v: unknown): v is A2Component =>
     (v.children === undefined || (Array.isArray(v.children) && v.children.every((c) => typeof c === 'string')));
 
 const A2UI_KEYS = ['createSurface', 'updateComponents', 'updateDataModel', 'deleteSurface'] as const;
+const PAYLOAD_KEYS = ['stage', 'narration', ...A2UI_KEYS] as const;
 
 /** Waliduje surowy komunikat od agenta. Zwraca null dla wszystkiego, czego renderer nie obsłuży. */
 export function parseEvent(raw: unknown): AiUiEvent | null {
     if (!isObj(raw)) return null;
+    // Dokładnie jeden payload: mieszana koperta (np. stage + createSurface) jest odrzucana w całości,
+    // a nie częściowo konsumowana (ADR 0005, OBS-4).
+    if (PAYLOAD_KEYS.filter((k) => k in raw).length !== 1) return null;
 
     if ('stage' in raw) {
         const s = raw.stage;

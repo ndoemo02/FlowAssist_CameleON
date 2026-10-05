@@ -2,8 +2,40 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://flowassist.local/schemas/flowassist-v2/envelope.agent-to-client.schema.json",
   "title": "flowassist/v2 — komunikat agent → klient",
-  "description": "Pochodna specyfikacja (plan v1.3.2, P0.3). Autorytet runtime: contract.ts: parseEvent. Zmiana guardów pod schemat = jawna zmiana kontraktu. Pierwszeństwo: stage, potem narration, potem koperta A2UI. Pozostałe klucze komunikatu ze stage/narration są dziś ignorowane (OBS-4: do odrzucenia w osobnym commicie).",
+  "description": "Pochodna specyfikacja (plan v1.3.2, P0.3). Autorytet runtime: contract.ts: parseEvent. Zmiana guardów pod schemat = jawna zmiana kontraktu. Dokładnie jeden klucz payloadu (stage | narration | createSurface | updateComponents | updateDataModel | deleteSurface); mieszana koperta jest odrzucana w całości (OBS-4). Pola niebędące payloadem (np. version przy rozszerzeniu) są ignorowane.",
   "type": "object",
+  "oneOf": [
+    {
+      "required": [
+        "stage"
+      ]
+    },
+    {
+      "required": [
+        "narration"
+      ]
+    },
+    {
+      "required": [
+        "createSurface"
+      ]
+    },
+    {
+      "required": [
+        "updateComponents"
+      ]
+    },
+    {
+      "required": [
+        "updateDataModel"
+      ]
+    },
+    {
+      "required": [
+        "deleteSurface"
+      ]
+    }
+  ],
   "if": {
     "required": [
       "stage"

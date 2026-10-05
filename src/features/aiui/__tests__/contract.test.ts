@@ -57,6 +57,15 @@ describe('parseEvent: rozszerzenia FlowAssist', () => {
     it('odrzuca śmieci', () => {
         for (const raw of [null, 1, 'x', [], {}, { foo: 1 }]) expect(parseEvent(raw)).toBeNull();
     });
+
+    it('OBS-4: mieszana koperta jest odrzucana w całości, a nie częściowo konsumowana', () => {
+        const create = { surfaceId: 'hud', catalogId: 'flowassist/v2' };
+        expect(parseEvent({ stage: { drawer: 'open' }, version: V, createSurface: create })).toBeNull();
+        expect(parseEvent({ narration: { text: 'a' }, version: V, updateDataModel: { surfaceId: 'hud', path: '/x', value: 1 } })).toBeNull();
+        expect(parseEvent({ stage: { focus: 'back' }, narration: { text: 'a' } })).toBeNull();
+        // pola niebędące payloadem (np. version przy rozszerzeniu) nadal nie przeszkadzają
+        expect(parseEvent({ stage: { focus: 'back' }, version: V })).not.toBeNull();
+    });
 });
 
 describe('koperty klient → agent (A2UI v0.9.1)', () => {

@@ -12,7 +12,7 @@
 **Stan faktyczny (`contract.ts`):**
 - **przychodzące:** `parseEvent` przyjmuje `version` ze zbioru `ACCEPTED_VERSIONS = {'v0.9', 'v0.9.1'}`. Tolerancja `v0.9` jest więc szersza, niż deklaruje dokumentacja (A2UI v0.9.1);
 - **wychodzące:** `buildAction` i `buildError` zawsze wysyłają `A2UI_VERSION = 'v0.9.1'`;
-- komunikat musi mieć dokładnie jeden klucz typu (`createSurface` | `updateComponents` | `updateDataModel` | `deleteSurface`).
+- komunikat musi mieć **dokładnie jeden klucz payloadu**: `stage` | `narration` | `createSurface` | `updateComponents` | `updateDataModel` | `deleteSurface`. Mieszana koperta (np. `stage` + `createSurface`) jest odrzucana w całości (OBS-4, ADR 0005); pola niebędące payloadem (np. `version` przy rozszerzeniu) są ignorowane.
 
 **Zasada:** oś śledzi wersję specyfikacji A2UI; nie numerujemy jej sami.
 

@@ -57,6 +57,12 @@ const ENVELOPE_EDGES: unknown[] = [
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: 'bez-slasha' } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '' } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: null } },
+    // FU-3: limity ścieżki (32 segmenty, 512 znaków) — dokładnie na progu i próg + 1
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a'.repeat(32), value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a'.repeat(33), value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + 'x'.repeat(511), value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + 'x'.repeat(512), value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a'.repeat(10_000), value: 1 } },
     { version: 'v0.9.1', deleteSurface: { surfaceId: 'nieznany' } },
     // OBS-4: mieszane koperty odrzucane w całości
     { stage: { drawer: 'open' }, version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } },

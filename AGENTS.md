@@ -342,7 +342,9 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
     niebędący `Workspace`) raportuje `validationReporting.ts` ze stanu, tym samym cyklem wystąpienia;
   - **FU-2 (#6, odłożone):** `store.dispatch(raw)` bez `runId` omija izolację I6. Oddzielić wejście
     developerskie od transportowego razem z adapterem (zmiana kernela).
-  - **FU-3:** `jsonPointer.ts: setAt` jest rekurencyjne po segmentach ścieżki — `updateDataModel` z ekstremalnie
+  - ~~**FU-3**~~ — zrealizowane: limity ścieżki `updateDataModel` (≤ 512 znaków, ≤ 32 segmenty) w `contract.ts:
+    PROTOCOL_LIMITS`, sprawdzane w `parseEvent` przed reducerem (ADR 0002). Opis pierwotny:
+    `jsonPointer.ts: setAt` jest rekurencyjne po segmentach ścieżki — `updateDataModel` z ekstremalnie
     długą ścieżką (sonda: ~10 tys. segmentów, 1 tys. jeszcze OK) przepełnia stos w `dispatch`. Wyjątek leci w callbacku
     transportu (nie w renderze, strona zostaje), stan bez zmian; tak samo przed R#4. Ograniczyć długość ścieżki
     w kontrakcie (adapter / `parseEvent`) albo przepisać `setAt` iteracyjnie. **Kryterium akceptacji** (weryfikacja

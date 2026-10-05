@@ -4,9 +4,21 @@
 // Agent nigdy nie podaje współrzędnych — tylko semantyczny fokus, zamknięte surfaceId
 // i semantyczny hint prezentacji elementu (card / focus / screen).
 
+import { parsePointer } from './jsonPointer';
+
 export const A2UI_VERSION = 'v0.9.1' as const;
 export const CATALOG_ID = 'flowassist/v2' as const;
 const ACCEPTED_VERSIONS = new Set(['v0.9', 'v0.9.1']);
+
+/**
+ * Limity zasobów protokołu (FU-3, ADR 0002): niezaufane zdarzenie musi mieć rozsądny rozmiar, ZANIM dotknie stanu.
+ * Scenariusz research używa 2–3 segmentów i ścieżek < 40 znaków; limit zostawia duży zapas, a odcina ścieżki,
+ * które przepełniały stos w rekurencyjnym setAt (~10 tys. segmentów).
+ */
+export const PROTOCOL_LIMITS = {
+    dataModelPathMaxLength: 512,
+    dataModelPathMaxSegments: 32,
+} as const;
 
 export const SURFACE_IDS = ['workspace', 'tasks-drawer', 'hud'] as const;
 export type SurfaceId = (typeof SURFACE_IDS)[number];
@@ -86,6 +98,11 @@ export const isBinding = (v: unknown): v is Binding =>
 
 const isPointer = (v: unknown) => typeof v === 'string' && (v === '' || v.startsWith('/'));
 
+/** Ścieżka data modelu w limitach: najpierw długość (O(1)), dopiero potem liczenie segmentów krótkiego napisu. */
+const isBoundedPointer = (v: unknown): v is string =>
+    isPointer(v) && (v as string).length <= PROTOCOL_LIMITS.dataModelPathMaxLength
+    && parsePointer(v as string).length <= PROTOCOL_LIMITS.dataModelPathMaxSegments;
+
 const isComponent = (v: unknown): v is A2Component =>
     isObj(v) &&
     typeof v.id === 'string' && v.id.length > 0 &&
@@ -133,7 +150,7 @@ export function parseEvent(raw: unknown): AiUiEvent | null {
         case 'updateComponents':
             return Array.isArray(body.components) && body.components.every(isComponent) ? (raw as UpdateComponentsMsg) : null;
         case 'updateDataModel':
-            return body.path === undefined || isPointer(body.path) ? (raw as UpdateDataModelMsg) : null;
+            return body.path === undefined || isBoundedPointer(body.path) ? (raw as UpdateDataModelMsg) : null;
         case 'deleteSurface':
             return raw as DeleteSurfaceMsg;
     }

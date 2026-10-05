@@ -69,6 +69,24 @@ komponentów po rozwiązaniu bindingów, treść reprezentacji). Parytet z guard
 Odrzucenie jest dziś ciche (bez `VALIDATION_FAILED`): raport wymagałby zmiany reducera (kernel).
 Schematy nie wyrażają tej reguły (zależy od kształtu danych), więc kontrakt pilnuje `__tests__/dataModelContract.test.ts`.
 
+## Limity zasobów protokołu (FU-3)
+
+**Decyzja (2026-10-06, właściciel):** niezaufane zdarzenie ma limit rozmiaru, zanim dotknie stanu. Limity są w jednym
+miejscu: `contract.ts: PROTOCOL_LIMITS`, sprawdzane w `parseEvent` (przed reducerem, dla każdej ścieżki wejścia).
+
+| Limit | Wartość | Uzasadnienie |
+|---|---|---|
+| `updateDataModel.path` — długość | ≤ 512 znaków | scenariusz research: < 40 znaków |
+| `updateDataModel.path` — segmenty | ≤ 32 | scenariusz research: 2–3; ~10 tys. segmentów przepełniało stos w rekurencyjnym `setAt` |
+
+- Długość sprawdzana najpierw (O(1)); segmenty liczone dopiero dla krótkiego napisu.
+- Zdarzenie ponad limitem jest odrzucane w całości: brak (częściowej) zmiany stanu, brak wyjątku, kolejne zdarzenia
+  obsługiwane normalnie (`__tests__/dataModelLimits.test.ts`, także próg i próg + 1).
+- JSON Schema: `maxLength: 512` i `pattern: ^(/[^/]*){0,32}$`; parytet z guardem w `schema.test.ts`.
+- **Odrzucenie jest dziś ciche** (ostrzeżenie w konsoli), tak jak każda niezgodna koperta: odpowiedź `VALIDATION_FAILED`
+  na odrzuconą kopertę należy do adaptera P1.6 (OBS-1, ADR 0005). Wysłanie jej już teraz tylko dla limitów
+  (most `setTransport`) byłoby niespójne z resztą odrzuceń — do osobnej decyzji.
+
 ## Otwarte
 
 1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie.

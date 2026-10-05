@@ -55,7 +55,9 @@ export default function WorkspaceLayer({ compact }: { compact: boolean }) {
                 </div>
             ) : (
                 <div className="absolute inset-0" style={{ perspective: 1400 }} onClick={blurOnBackground}>
-                    <div ref={container} className="absolute inset-x-6 inset-y-2" style={{ transform: 'rotateX(6deg)', transformStyle: 'preserve-3d' }} onClick={blurOnBackground}>
+                    {/* Bez `preserve-3d`: karty są współpłaszczyznowe z kontenerem, a we wspólnym kontekście 3D
+                        hit-test Chromium trafiał w kontener zamiast w kartę (E2E-1, ADR 0006). Obraz bez zmian. */}
+                    <div ref={container} className="absolute inset-x-6 inset-y-2" style={{ transform: 'rotateX(6deg)' }} onClick={blurOnBackground}>
                         {ids.map((id) => <WorkspaceCard key={id} id={id} compact={false} containerRef={container} />)}
                     </div>
                 </div>

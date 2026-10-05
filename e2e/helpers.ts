@@ -43,7 +43,7 @@ export async function anchorState(page: Page) {
 
 /**
  * Punkt w karcie, w którym hit-test faktycznie trafia w kartę (elementFromPoint). Testy LOGIKI gestów nie mogą
- * zależeć od znanego problemu trafień w kontenerze 3D stołu (E2E-1, test w a11y-hit.spec).
+ * zależeć od geometrii trafień w karcie (historycznie E2E-1, ADR 0006: kontener stołu z `preserve-3d`).
  */
 export async function hittablePoint(page: Page, cardName: string) {
     const card = page.getByRole('article', { name: cardName });

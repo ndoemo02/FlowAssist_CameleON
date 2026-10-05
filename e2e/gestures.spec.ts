@@ -1,14 +1,9 @@
 // Gesty kart na stole (desktop): zapisy tylko na końcu gestu, anulowanie przy zmianie od agenta (ADR 0001, I7).
-//
-// ZABLOKOWANE przez E2E-1 (docs/adr/0005): w Chromium pointerdown w karcie trafia w kontener stołu
-// z `transform-style: preserve-3d` (współpłaszczyznowe karty), więc gest w ogóle nie startuje — także w punkcie,
-// który elementFromPoint wskazuje jako kartę. Testy są gotowe i zostaną włączone po decyzji właściciela w sprawie E2E-1.
+// Regresja E2E-1 (docs/adr/0006): kontener stołu bez `preserve-3d`, więc pointerdown trafia w kartę.
 import { expect, test } from '@playwright/test';
 import { BACK, countLayoutWrites, dispatch, hittablePoint, item, layout, openApp, seedWorkspace, setAngle } from './helpers';
 
 test.describe('gesty kart (desktop)', () => {
-    test.fixme(true, 'E2E-1: hit-testing kart w kontenerze preserve-3d — czeka na decyzję właściciela');
-
     test.beforeEach(async ({ page }, info) => {
         test.skip(info.project.name !== 'desktop', 'swobodne gesty tylko na desktopie (compact: przyciski)');
         await openApp(page);
@@ -48,6 +43,7 @@ test.describe('gesty kart (desktop)', () => {
     });
 
     test('pointercancel w trakcie drag nie zapisuje geometrii', async ({ page }) => {
+        test.fixme(true, 'E2E-2 (ADR 0006): @use-gesture traktuje pointercancel jak pointerup, więc drag zapisuje geometrię — czeka na decyzję właściciela');
         const p = await hittablePoint(page, 'Element table');
         const before = (await layout(page)).table;
         await page.mouse.move(p.x, p.y);

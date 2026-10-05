@@ -1,6 +1,6 @@
 # ADR 0006: Ustalenia harnessu przeglądarkowego (P0.1)
 
-- **Status:** zaakceptowany 2026-10-05. **E2E-1:** decyzja właściciela — opcja (a), realizacja w osobnym commicie. **FLAKE-1: OPEN** (bramka 9/10). A11Y-1..3 przechodzą do P0.5.
+- **Status:** zaakceptowany 2026-10-05. **E2E-1:** zrealizowane — opcja (a). **E2E-2: OPEN** (czeka na decyzję). **FLAKE-1: OPEN** (bramka 9/10). A11Y-1..3 przechodzą do P0.5.
 - **Kontekst:** P0.1 wprowadził Playwright + axe-core (devDependencies, tylko Chromium) z testami w `e2e/`.
   - Stan aplikacji ustawiamy przez dev-hook `window.__aiui`, bez osi czasu mocka.
   - WebGL w headless jest programowy (SwiftShader), więc testy nie mierzą FPS ani renderów.
@@ -21,7 +21,21 @@
   - (a) usunąć `transformStyle: 'preserve-3d'` z kontenera. Karty nie mają `translateZ`, więc obraz powinien być identyczny (do potwierdzenia zrzutem przed/po);
   - (b) zostawić `preserve-3d`, a karty odsunąć od płaszczyzny kontenera (`translateZ(1px)`);
   - (c) zostawić.
-- **Rekomendacja:** (a) w osobnym commicie „fix(aiui)”, ze zrzutem przed/po i z włączeniem `e2e/gestures.spec.ts`. Testy gestów są gotowe i dziś oznaczone `fixme` z odwołaniem do E2E-1.
+- **Rekomendacja:** (a) w osobnym commicie „fix(aiui)”, ze zrzutem przed/po i z włączeniem `e2e/gestures.spec.ts`.
+- **Realizacja (2026-10-05, decyzja właściciela: a):** `transformStyle: 'preserve-3d'` usunięte z kontenera stołu.
+  - Zrzut Back (desktop 1440×900, canvas i wideo zamaskowane) przed/po: 0 różnych pikseli; baseline powtarzalny (2 przebiegi, 0 różnic).
+  - `gestures.spec`: drag (raise + jeden commit), anulowanie przez zmianę od agenta i podwójny tap przechodzą. Test `pointercancel` ujawnił E2E-2.
+  - Regresja desktop: smoke, anchor, compact, lifecycle, surfaces, a11y zielone. Dwa wcześniejsze przekroczenia czasu a11y (oczekiwanie na meshe ekranu 81 s) wynikały z pamięci maszyny zajętej w ponad 80%: przebieg kontrolny z `preserve-3d` i przebieg z poprawką po zwolnieniu pamięci przeszły.
+
+## E2E-2 (OPEN): `pointercancel` w trakcie przeciągania zapisuje geometrię
+
+- **Obserwacja:** po `pointercancel` (pointerId zgodny z gestem) pozycja karty jest zapisana już przed `pointerup` — sonda w przeglądarce: `x 0,8333 → 0,8671` w chwili anulowania.
+- **Przyczyna:** `@use-gesture` 10.3.1 podpina `pointercancel` pod ten sam handler co `pointerup` (`DragEngine.pointerUp`), więc `onDrag` dostaje zwykły koniec gestu (`last`). `useCardGestures.onDrag` i `useResizeHandle` w `overlay/gestures.ts` przy `last` nie sprawdzają `event.type` i wysyłają `move` / `resize`.
+- **Zasięg:** mysz praktycznie nie generuje `pointercancel`; dotyczy dotyku i pióra (przeglądarka przejmuje gest, utrata kontaktu) w układzie desktop, np. tablet w poziomie. Kontrakt gestów (I7: zapis tylko na końcu gestu, anulowanie bez zapisu) jest naruszony.
+- **Właściciel:** warstwa gestów, `overlay/gestures.ts`. Nie kernel, nie protokół.
+- **Propozycja:** przy `last` z `event.type === 'pointercancel'` przywrócić `transform` i nie wysyłać polecenia (karta i uchwyt rozmiaru); włączyć test `pointercancel` w `gestures.spec`. Osobny commit „fix(aiui)” po decyzji właściciela.
+
+
 
 ## A11Y: baseline axe (WCAG 2.1 A/AA, zakres: overlay CameleON)
 
@@ -49,6 +63,7 @@ Awaria pierwszej próby (`Target crashed`, kod `0xC0000142`) była środowiskowa
 - **Obserwacja:** bramka 10 pełnych przebiegów po restarcie Windows dała **9/10 zielonych**. W przebiegu 2 meshe ekranu nie zarejestrowały się w 90 s, więc model studia się nie zamontował i testy zależne od kotwicy padły na oczekiwaniu.
 - **Hipoteza (niepotwierdzona):** zawieszone żądanie zakresowe `freeflow.mp4` (patrz „Wideo” niżej) blokuje granicę `Suspense` sceny. Artefakty przebiegu przepadły (`test-results/` czyszczony przy następnym uruchomieniu), więc brak trace.
 - **Decyzja właściciela (2026-10-05):** P0.1 commitowany z FLAKE-1 jako znanym problemem. Bez ponowień w konfiguracji (flaki mają być widoczne).
+- **Nowy trop (2026-10-05):** przy pamięci maszyny zajętej w ponad 80% rejestracja meshy ekranu trwała 81 s (ślad a11y, ten sam objaw), a po zwolnieniu pamięci test przeszedł. Brak pamięci jest więc kandydatem na przyczynę, obok hipotezy wideo.
 - **Następny krok:** przy kolejnym wystąpieniu zachować `test-results/` (trace, konsola, żądania sieciowe) przed ponownym uruchomieniem; nie ruszać `freeflow.mp4` ani modelu studia do czasu diagnozy.
 
 ## Udokumentowane (bez decyzji)

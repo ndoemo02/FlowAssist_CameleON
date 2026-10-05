@@ -104,6 +104,21 @@ Weryfikacja rundy 5: vitest 228/228; pełny tsc: 1 znany błąd (Lanyard); E2E c
 Pętla review zamknięta — kolejne rundy tych samych ustaleń nie są planowane.
 Pozostaje przed live transportem: FU-1, FU-2, FU-3 (AGENTS.md) oraz P0.5 dostępność i reduced motion.
 
+## Follow-upy FU-1..3 (2026-10-06)
+
+Zakres: `990efea..6b81b34` (kod) + commit dokumentacji po nim. Każdy follow-up to osobny commit; test odtwarzający lukę
+padał przed poprawką. Bez zmian w adapterze P1.6.
+
+| # | Commit | Co zmieniono | Test luki | Pytanie do weryfikacji |
+|---|---|---|---|---|
+| FU-1 | `6d9ff09` | `scanSurfaces` raportuje błędy struktury ze stanu: komponent katalogu bez widoku w slocie (`registry.tsx: SLOT_UNAVAILABLE_REASON`, wspólne z `SurfaceRenderer`) oraz root `workspace` niebędący `Workspace`; ten sam cykl wystąpienia; brak roota = pending. Format `VALIDATION_FAILED` bez zmian | slot i root: zły → 1, nadal zły → 1, poprawiony → znowu zły → 2; brak roota → 0 | Czy któryś deterministyczny błąd struktury nadal nie trafia do agenta? |
+| FU-3 | `e159f89` | `contract.ts: PROTOCOL_LIMITS` (ścieżka ≤ 512 znaków, ≤ 32 segmenty) w `parseEvent`, przed reducerem (najpierw długość, potem segmenty); schemat: `maxLength` + `^(/[^/]*){0,32}$`; ADR 0002 | 10 000 segmentów przez `transportDispatch`: bez wyjątku, stan bez zmian, następny event obsłużony; próg i próg + 1 dla obu limitów; ścieżki research przechodzą | Czy limity są właściwe; czy ciche odrzucenie (spójne z OBS-1: odpowiedź `VALIDATION_FAILED` w adapterze P1.6) jest akceptowalne? |
+| FU-2 | `6b81b34` | Zmiana API kernela (ADR 0001): `transportDispatch(raw, runId)` — runId wymagany, jedyne wejście transportu; `devDispatch(raw)` — dev-hook / testy / seedowanie e2e, bez izolacji runów, wyłączone w produkcji; wspólny koordynator `apply` | luka: po `done` zdarzenie bez runId zmieniało stan; testy: bieżący / stary / po terminalnym, brak runId (typ + runtime), most `setTransport`, `devDispatch` w produkcji, skan `transport/` | Czy jakakolwiek ścieżka transportu może nadal ominąć `runId` albo dotrzeć do `devDispatch`? |
+
+Weryfikacja: vitest 243/243; pełny tsc: 1 znany błąd (Lanyard); ślady replay bez zmian. E2E: po FU-1 `surfaces`
+(oba projekty) 5 passed / 1 skipped / 0 failed; po FU-2 `lifecycle` + `surfaces` + `gestures` (desktop) 12 passed / 0 failed.
+Pełne E2E i `next build` nie były uruchamiane w tym pakiecie.
+
 ## Prompt startowy
 
 > Verify the review fixes on `feat/aiui-prototype` as a read-only reviewer. Start with `docs/review/VERIFICATION_BRIEF.md`.

@@ -10,6 +10,9 @@ To kontekst, nie dowód poprawności: ADR-y opisują intencję i stan na dzień 
 > runda 4 (1 ISSUE) do `88e7af4`, runda 5: **GO**. Szczegóły: [`VERIFICATION_BRIEF.md`](VERIFICATION_BRIEF.md).
 > **Z review pozostają otwarte wyłącznie FU-1, FU-2, FU-3 (przed P1.6).** Przed live transportem pozostaje też
 > P0.5 dostępność i reduced motion.
+>
+> **Aktualizacja (2026-10-06): FU-1..3 zrealizowane** — `6d9ff09` (FU-1), `e159f89` (FU-3), `6b81b34` (FU-2, kernel API);
+> czeka krótka weryfikacja Astry wyłącznie FU-1..3 ([`VERIFICATION_BRIEF.md`](VERIFICATION_BRIEF.md), sekcja „Follow-upy”).
 
 ## Zakres
 
@@ -75,7 +78,7 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 | R#3 | Zrealizowane `39af130` (kernel, zgoda właściciela) — siatka P9 przy zmianie zbioru id | ADR 0001, `layout.ts` |
 | R#4 | Zrealizowane `0aad0f3` — kanoniczne indeksy tablic w JSON Pointer, odrzucenie bez zmiany dokumentu | ADR 0002, `jsonPointer.ts` |
 | R#5 | Zrealizowane `2f0dfcc` — `VALIDATION_FAILED` raz na wystąpienie, z pochodzeniem przebiegu; reszta = FU-1 | `validationReporting.ts`, AGENTS.md |
-| R#6 | Odłożone do P1.6 (FU-2) — `dispatch(raw)` bez `runId` | AGENTS.md |
+| R#6 | Zrealizowane w FU-2 `6b81b34` — `transportDispatch(raw, runId)` (runId wymagany) i `devDispatch(raw)` | ADR 0001, `store.ts` |
 | R#7 | Zrealizowane `544fb31` — `?anchor=probe` tylko poza produkcją | `scene/ScreenAnchorProbe.tsx` |
 | NEW-1 | Zrealizowane `1f12885` — tap na przycisku karty nie liczy się do podwójnego tapu („+ +” ≠ ekran) | `overlay/gestures.ts` |
 | V-R#1 | Zrealizowane `e20be49` — regresja z `2f0dfcc`: brak głębokiej serializacji propsów przed boundary (płytki podpis, przygotowanie widoku pod boundary) | `SurfaceRenderer.tsx`, `viewProps.ts` |
@@ -85,7 +88,9 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 | V3-R#5 | Zrealizowane `84096ff` — odzyskanie i deduplikacja błędu renderu per wariant renderowania (`card` / `screen` / `slot`) przy wspólnym wystąpieniu; udany render jednego wariantu nie zamyka błędu innego | `validationReporting.ts`, ADR 0003 |
 | V4-R#5 | Zrealizowane `88e7af4` — zmiana gęstości w zamontowanym `ItemBody` ponawia render (`resetKeys` = treść + gęstość); udany render po zmianie `resetKeys` odzyskuje tylko bieżący wariant | `ItemContent.tsx`, `RenderGuard.tsx`, nagłówek `validationReporting.ts` |
 | Weryfikacja | Zamknięta — Astra runda 5: GO (2026-10-06) | `VERIFICATION_BRIEF.md` |
-| FU-1..3 | OPEN — przed P1.6 (FU-3: głęboka ścieżka `updateDataModel` przepełnia stos w `dispatch`; kryterium akceptacji w AGENTS.md) | AGENTS.md |
+| FU-1 | Zrealizowane `6d9ff09` — błędy struktury (komponent niedostępny w slocie, root `workspace` ≠ `Workspace`) raportowane ze stanu | `validationReporting.ts` |
+| FU-2 | Zrealizowane `6b81b34` — rozdzielone wejście transportowe i deweloperskie (zmiana API kernela) | ADR 0001, `store.ts` |
+| FU-3 | Zrealizowane `e159f89` — limity ścieżki `updateDataModel` (≤ 512 znaków, ≤ 32 segmenty) przed reducerem | ADR 0002, `contract.ts: PROTOCOL_LIMITS` |
 
 Świadome luki testów: kierunek agent → klient dla I3 pokrywa korpus replay (P0.2), nie test jednostkowy;
 `raise`/`focus`/`toScreen` celowo bez tokenu gestu (I7). `VALIDATION_FAILED` z warstwy UI pokrywają od R#5 testy jsdom
@@ -93,7 +98,7 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 
 ## Weryfikacja lokalna
 
-- `npm test` — vitest (228 testów na `88e7af4`: kontrakt, reducer, układ, gesty, replay korpusu, parytet schematów,
+- `npm test` — vitest (243 testy na `6b81b34`: kontrakt, reducer, układ, gesty, replay korpusu, parytet schematów,
   render DOM w jsdom — `*.test.tsx`).
 - `npx tsc --noEmit` — oczekiwany dokładnie 1 znany błąd (`safelayer/Lanyard.tsx`); każdy inny to regresja.
 - `npm run test:e2e` — wymaga ~4 GB wolnej pamięci; timeouty przy pamięci zajętej > 80% są środowiskowe.

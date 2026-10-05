@@ -230,9 +230,22 @@ Od v1.3 (P0.2, P0.3) dochodzą:
   `parseEvent` / `validateProps` / `validateContent` na korpusie i jego mutacjach. Ajv tylko w testach;
   autorytetem runtime pozostają guardy.
 
-### Testy przeglądarkowe: agent-browser
+### Testy przeglądarkowe: Playwright + axe (od v1.3, P0.1)
 
-Kontrole runtime wykonuje `agent-browser` — osobna instancja Chrome w trybie headless,
+`npm run test:e2e` — deterministyczna regresja DOM w `e2e/` (autorytatywna; zastępuje dawne skrypty `agent-browser`).
+
+- Tylko Chromium (`npx playwright install chromium`); projekty `desktop` (1440×900) i `compact` (844×390, dotyk).
+- `webServer` używa `next dev` na porcie `E2E_PORT` (domyślnie 3100), z `reuseExistingServer` — dev-hook
+  `window.__aiui` istnieje tylko poza produkcją. Stan ustawiany przez `__aiui` (bez osi czasu mocka).
+- Jeden worker, bez ponowień (flaki mają być widoczne). Trace i zrzut przy błędzie w `test-results/`.
+- axe-core (WCAG 2.1 A/AA) w zakresie overlayu CameleON; baseline w `e2e/__snapshots__/` — nowe naruszenie = czerwony test.
+  Axe nie zastępuje testów fokusu, gestów ani czytnika ekranu.
+- WebGL headless = SwiftShader: logika i hit-testing tak, FPS nie.
+- Ustalenia harnessu (m.in. E2E-1: hit-testing kart w kontenerze 3D; baseline axe): `docs/adr/0006-browser-harness-findings.md`.
+
+### Eksploracja: agent-browser
+
+Do eksploracji i odtwarzania błędów (nie jako wyrocznia regresji) służy `agent-browser` — osobna instancja Chrome w trybie headless,
 w izolowanej sesji (`--session <nazwa>`). Nie koliduje z przeglądarką właściciela
 i nie zatrzymuje się, gdy okno jest zasłonięte.
 

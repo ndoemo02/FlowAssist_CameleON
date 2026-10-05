@@ -11,3 +11,7 @@ freeflow.json
 build_log*.txt
 freeflow.json
 .env.local
+# Playwright (P0.1) — artefakty przebiegów e2e
+/test-results/
+/playwright-report/
+/blob-report/

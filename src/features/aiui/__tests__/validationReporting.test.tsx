@@ -283,11 +283,49 @@ describe('błąd renderu: odzyskanie per wariant renderowania', () => {
     }));
 });
 
+// FU-1: błędy struktury rozpoznawane deterministycznie ze stanu trafiają do agenta niezależnie od tego,
+// czy powierzchnia jest otwarta — ten sam cykl wystąpienia co pozostałe problemy walidacji.
+describe('FU-1: błędy struktury surface\'u', () => {
+    it('komponent niedostępny w slocie (root HUD = Workspace): zły → nadal zły → poprawiony → znowu zły = 2 raporty', () => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        const root = (c: Record<string, unknown>) => agent({ version: V, updateComponents: { surfaceId: 'hud', components: [{ id: 'root', ...c }] } });
+        root({ component: 'Workspace', children: [] });               // poprawny w katalogu, niedozwolony w slocie
+        expect(errorsSent()).toEqual([expect.objectContaining({ code: 'VALIDATION_FAILED', surfaceId: 'hud', path: '/components/root/component' })]);
+        agent({ version: V, updateDataModel: { surfaceId: 'hud', path: '/x', value: 1 } }); // nadal zły
+        expect(errorsSent()).toHaveLength(1);
+        root({ component: 'Approval', title: 'Decyzja', summary: 'S' }); // poprawiony
+        root({ component: 'Workspace', children: [] });               // znowu zły
+        expect(errorsSent()).toHaveLength(2);
+    });
+
+    it('root surface\'u workspace niebędący Workspace: zły → nadal zły → poprawiony → znowu zły = 2 raporty', () => {
+        agent({ version: V, createSurface: { surfaceId: 'workspace', catalogId: 'flowassist/v2' } });
+        const root = (c: Record<string, unknown>) => agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', ...c }] } });
+        root({ component: 'Approval', title: 'Decyzja', summary: 'S' });  // root stołu musi być Workspace
+        expect(errorsSent()).toEqual([expect.objectContaining({ code: 'VALIDATION_FAILED', surfaceId: 'workspace', path: '/components/root/component' })]);
+        agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/x', value: 1 } }); // nadal zły
+        expect(errorsSent()).toHaveLength(1);
+        root({ component: 'Workspace', children: [] });                 // poprawiony
+        root({ component: 'Approval', title: 'Decyzja', summary: 'S' });  // znowu zły
+        expect(errorsSent()).toHaveLength(2);
+    });
+
+    it('brak roota to pending, nie błąd struktury', () => {
+        agent({ version: V, createSurface: { surfaceId: 'workspace', catalogId: 'flowassist/v2' } });
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        agent({ version: V, updateComponents: { surfaceId: 'hud', components: [{ id: 'other', component: 'Approval', title: 'T', summary: 'S' }] } });
+        expect(errorsSent()).toHaveLength(0);
+    });
+});
+
 describe('walidacja: pending rodzica to nie usunięcie dziecka', () => {
-    /** HUD: root (kontener z bindingiem /n — bez danych = pending) z dzieckiem `a` (Approval bez summary = fallback). */
+    /**
+     * HUD: root (kontener z bindingiem /n — bez danych = pending) z dzieckiem `a` (Approval bez summary = fallback).
+     * Kontener to Approval (dozwolony w slocie) — Workspace w HUD byłby osobnym błędem struktury (FU-1).
+     */
     function hudParentChild(children: string[]) {
         agent({ version: V, updateComponents: { surfaceId: 'hud', components: [
-            { id: 'root', component: 'Workspace', children, note: { path: '/n' } },
+            { id: 'root', component: 'Approval', title: 'Kontener', summary: 'S', children, note: { path: '/n' } },
             { id: 'a', component: 'Approval', title: 'Decyzja' },
         ] } });
     }

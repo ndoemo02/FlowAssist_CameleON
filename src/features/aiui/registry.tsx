@@ -19,6 +19,9 @@ import TaskList from './components/TaskList';
 type AnyView = ComponentType<ViewProps<any>>;
 
 /** Workspace/WorkspaceItem rysuje WorkspaceLayer/ScreenLayer — w drzewie slotów są niedozwolone. */
+/** Powód fallbacku i raportu dla komponentu katalogu bez widoku w slocie (SurfaceRenderer, validationReporting). */
+export const SLOT_UNAVAILABLE_REASON = 'komponent niedostępny w tym slocie';
+
 export const TREE_VIEWS: Partial<Record<CatalogName, AnyView>> = {
     TaskList,
     Approval,

@@ -2,7 +2,7 @@
 
 import { memo, useMemo, type ReactNode } from 'react';
 import type { SurfaceId } from './contract';
-import { TREE_VIEWS } from './registry';
+import { SLOT_UNAVAILABLE_REASON, TREE_VIEWS } from './registry';
 import { resolveTree, type ResolvedNode } from './resolveTree';
 import { useAiUi } from './store';
 import { FallbackCard, PendingCard } from './components/FallbackCard';
@@ -26,7 +26,7 @@ export default memo(function SurfaceRenderer({ surfaceId }: { surfaceId: Surface
         if (node.kind === 'pending') return <PendingCard key={node.id} type={node.type} />;
         if (node.kind === 'fallback') return <FallbackCard key={node.id} type={node.type} reason={node.reason} path={node.path} />;
         const View = TREE_VIEWS[node.type];
-        if (!View) return <FallbackCard key={node.id} type={node.type} reason="komponent niedostępny w tym slocie" />;
+        if (!View) return <FallbackCard key={node.id} type={node.type} reason={SLOT_UNAVAILABLE_REASON} />;
         const path = `/components/${node.id}`;
         // błąd węzła na danych agenta = fallback tego węzła. Podpis propsów (płytki, bez serializacji):
         // render ponawiany tylko przy zmianie propsów, nie przy niezwiązanej zmianie surface'u.

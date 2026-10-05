@@ -14,12 +14,15 @@
 //   najwyżej jedna aktywna instancja danego wariantu renderowania (card, screen, slot) — dziś: WorkspaceCard
 //   (card), ScreenPanel (screen), węzeł SurfaceRenderer (slot). Jeśli kiedyś dopuścimy dwie instancje tej samej
 //   gęstości, klucz wariantu musi dostać identyfikator miejsca montowania (mount/location identity).
+// - Błędy struktury (FU-1) też pochodzą ze stanu: komponent katalogu bez widoku w slocie (HUD, szuflada)
+//   oraz root surface'u `workspace`, który nie jest `Workspace`. Brak roota to pending, nie błąd.
 // - Każdy raport niesie przebieg, w którym powstał; store wysyła go tylko w tym samym, aktywnym przebiegu.
 // Instaluje go warstwa UI (AiUiOverlay) — koordynator (store.dispatch) nie raportuje fallbacków.
 
 import { SURFACE_IDS, type ClientError, type SurfaceId } from './contract';
 import { resolveTree, type ResolvedNode } from './resolveTree';
 import { resolveItem, workspaceChildren } from './workspace';
+import { SLOT_UNAVAILABLE_REASON, TREE_VIEWS } from './registry';
 import { useAiUi, type AiUiState } from './store';
 
 export interface Problem { surfaceId: SurfaceId; nodeId: string; path: string; message: string }
@@ -54,6 +57,13 @@ export function scanSurfaces(surfaces: AiUiState['surfaces']) {
         const surface = surfaces[surfaceId];
         if (!surface) continue;
         if (surfaceId === 'workspace') {
+            // FU-1: root stołu musi być Workspace (inny komponent = błąd struktury; brak roota = pending)
+            const root = surface.components.root;
+            if (root) {
+                const rootOk = root.component === 'Workspace';
+                nodes.set(nodeKey(surfaceId, 'root'), rootOk ? 'ready' : 'fallback');
+                if (!rootOk) problems.push({ surfaceId, nodeId: 'root', path: '/components/root/component', message: `oczekiwano Workspace, jest ${root.component}` });
+            }
             for (const id of workspaceChildren(surface) ?? []) {
                 const view = resolveItem(surface, id);
                 nodes.set(nodeKey(surfaceId, id), view.status);
@@ -62,7 +72,10 @@ export function scanSurfaces(surfaces: AiUiState['surfaces']) {
         } else {
             treeMembers(surface.components).forEach((id) => nodes.set(nodeKey(surfaceId, id), 'unavailable'));
             const visit = (n: ResolvedNode) => {
-                nodes.set(nodeKey(surfaceId, n.id), n.kind === 'component' ? 'ready' : n.kind);
+                // FU-1: komponent katalogu bez widoku w slocie = błąd struktury (SurfaceRenderer rysuje fallback)
+                const noSlotView = n.kind === 'component' && !TREE_VIEWS[n.type];
+                nodes.set(nodeKey(surfaceId, n.id), n.kind === 'component' ? (noSlotView ? 'fallback' : 'ready') : n.kind);
+                if (noSlotView) problems.push({ surfaceId, nodeId: n.id, path: `/components/${n.id}/component`, message: SLOT_UNAVAILABLE_REASON });
                 if (n.kind === 'fallback') problems.push({ surfaceId, nodeId: n.id, path: n.path ?? `/components/${n.id}`, message: n.reason });
                 if (n.kind === 'component') n.children.forEach(visit);
             };

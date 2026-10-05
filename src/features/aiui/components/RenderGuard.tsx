@@ -11,6 +11,8 @@ interface Props {
     resetKeys: readonly unknown[];
     fallback: (error: Error) => ReactNode;
     onError: (error: Error) => void;
+    /** Udany render po ponowieniu (po błędzie) — koniec wystąpienia błędu renderu. */
+    onRecover?: () => void;
     children: ReactNode;
 }
 
@@ -25,7 +27,9 @@ export default class RenderGuard extends Component<Props, { error: Error | null 
         this.props.onError(error instanceof Error ? error : new Error(String(error)));
     }
 
-    componentDidUpdate(prev: Props) {
+    componentDidUpdate(prev: Props, prevState: { error: Error | null }) {
+        // zatwierdzony render bez błędu po stanie błędu = ponowienie się udało
+        if (prevState.error && !this.state.error) this.props.onRecover?.();
         if (this.state.error && !sameSignature(prev.resetKeys, this.props.resetKeys)) this.setState({ error: null });
     }
 

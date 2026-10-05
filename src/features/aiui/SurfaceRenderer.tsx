@@ -9,7 +9,7 @@ import { FallbackCard, PendingCard } from './components/FallbackCard';
 import RenderGuard from './components/RenderGuard';
 import { propsSignature, viewProps } from './viewProps';
 import type { ActionHandler } from './components/types';
-import { reportRenderProblem } from './validationReporting';
+import { reportRenderProblem, resolveRenderProblem } from './validationReporting';
 
 // Cienki render: całą logikę (bindingi, walidacja, cykle) robi czysty resolveTree.
 // memo: zmiana widoczności slotu (tween kamery) nie re-renderuje treści surface'u.
@@ -29,14 +29,15 @@ export default memo(function SurfaceRenderer({ surfaceId }: { surfaceId: Surface
         if (!View) return <FallbackCard key={node.id} type={node.type} reason="komponent niedostępny w tym slocie" />;
         const path = `/components/${node.id}`;
         // błąd węzła na danych agenta = fallback tego węzła. Podpis propsów (płytki, bez serializacji):
-        // render ponawiany i raportowany tylko przy zmianie propsów, nie przy niezwiązanej zmianie surface'u.
+        // render ponawiany tylko przy zmianie propsów, nie przy niezwiązanej zmianie surface'u.
         const signature = propsSignature(node.props);
         return (
             <RenderGuard
                 key={node.id}
                 resetKeys={signature}
                 fallback={(error) => <FallbackCard type={node.type} reason={`błąd renderowania: ${error.message}`} path={path} />}
-                onError={(error) => reportRenderProblem({ surfaceId, nodeId: node.id, path, message: `błąd renderowania: ${error.message}` }, signature, runId)}
+                onError={(error) => reportRenderProblem({ surfaceId, nodeId: node.id, path, message: `błąd renderowania: ${error.message}` }, runId)}
+                onRecover={() => resolveRenderProblem(surfaceId, node.id)}
             >
                 <TreeNodeView View={View} props={node.props} onAction={(name, context) => sendAction(name, surfaceId, node.id, context)}>
                     {node.children.map(render)}

@@ -2,62 +2,78 @@
 //
 // - Problemy walidacji liczone są ze stanu (czyste resolveItem / resolveTree), a nie z zamontowanych widoków:
 //   karta i panel ekranu, remount, zamknięty HUD czy szuflada nie zmieniają liczby raportów.
-// - Wystąpienie trwa, dopóki problem jest w stanie; po odzyskaniu poprawności klucz jest zapominany,
-//   więc nawrót tego samego problemu jest zgłaszany ponownie.
-// - Błąd renderu (RenderGuard) to wystąpienie dla konkretnych danych: te same dane na karcie i na ekranie
-//   = jeden raport; nowe dane, które znów wywracają widok = nowe wystąpienie.
+// - Wystąpienie trwa do ODZYSKANIA (decyzja właściciela po weryfikacji Astry):
+//   - problem walidacji: węzeł wraca do `ready` (pending to jeszcze nie odzyskanie);
+//   - błąd renderu (RenderGuard): udany render po ponowieniu. Sama zmiana danych węzła, który dalej się
+//     wywraca, odzyskaniem nie jest — ten sam błąd nie jest zgłaszany ponownie.
+//   Zniknięcie węzła (lub nowy przebieg) też kończy wystąpienie. Po odzyskaniu nawrót = nowy raport.
 // - Każdy raport niesie przebieg, w którym powstał; store wysyła go tylko w tym samym, aktywnym przebiegu.
 // Instaluje go warstwa UI (AiUiOverlay) — koordynator (store.dispatch) nie raportuje fallbacków.
 
 import { SURFACE_IDS, type ClientError, type SurfaceId } from './contract';
-import { collectFallbacks, resolveTree } from './resolveTree';
+import { resolveTree, type ResolvedNode } from './resolveTree';
 import { resolveItem, workspaceChildren } from './workspace';
 import { useAiUi, type AiUiState } from './store';
-import { sameSignature } from './viewProps';
 
 export interface Problem { surfaceId: SurfaceId; nodeId: string; path: string; message: string }
+type NodeStatus = 'ready' | 'pending' | 'fallback';
 
 const toError = (p: Problem): ClientError => ({ code: 'VALIDATION_FAILED', surfaceId: p.surfaceId, path: p.path, message: p.message });
-const key = (p: Problem) => `${p.surfaceId}|${p.nodeId}|${p.path}|${p.message}`;
+// klucze z płytkiej tablicy napisów — id od agenta mogą zawierać dowolne znaki
+const nodeKey = (surfaceId: SurfaceId, nodeId: string) => JSON.stringify([surfaceId, nodeId]);
 
-/** Problemy walidacji wynikające z samego stanu surface'ów. */
-export function surfaceProblems(surfaces: AiUiState['surfaces']): Problem[] {
-    const out: Problem[] = [];
+/** Stan walidacji każdego obecnego węzła i problemy (fallbacki) — z samego stanu surface'ów. */
+export function scanSurfaces(surfaces: AiUiState['surfaces']) {
+    const problems: Problem[] = [];
+    const nodes = new Map<string, NodeStatus>();
     for (const surfaceId of SURFACE_IDS) {
         const surface = surfaces[surfaceId];
         if (!surface) continue;
         if (surfaceId === 'workspace') {
             for (const id of workspaceChildren(surface) ?? []) {
                 const view = resolveItem(surface, id);
-                if (view.status === 'fallback') out.push({ surfaceId, nodeId: id, path: view.path, message: view.reason });
+                nodes.set(nodeKey(surfaceId, id), view.status);
+                if (view.status === 'fallback') problems.push({ surfaceId, nodeId: id, path: view.path, message: view.reason });
             }
         } else {
-            for (const f of collectFallbacks(resolveTree(surface))) {
-                out.push({ surfaceId, nodeId: f.id, path: f.path ?? `/components/${f.id}`, message: f.reason });
-            }
+            const visit = (n: ResolvedNode) => {
+                nodes.set(nodeKey(surfaceId, n.id), n.kind === 'component' ? 'ready' : n.kind);
+                if (n.kind === 'fallback') problems.push({ surfaceId, nodeId: n.id, path: n.path ?? `/components/${n.id}`, message: n.reason });
+                if (n.kind === 'component') n.children.forEach(visit);
+            };
+            const tree = resolveTree(surface);
+            if (tree) visit(tree);
         }
     }
-    return out;
+    return { problems, nodes };
 }
 
 // Stan modułu (jeden overlay na stronę; restart efektu w StrictMode nie zgłasza ponownie).
+// Wartość = klucz węzła, którego dotyczy wystąpienie.
 let trackedRun: number | null = null;
-let active = new Set<string>();               // trwające wystąpienia problemów walidacji
-const rendered = new Map<string, readonly unknown[]>(); // surface|węzeł|komunikat → podpis danych, na których render się wywrócił
+const active = new Map<string, string>();          // trwające wystąpienia problemów walidacji
+const renderActive = new Map<string, string>();    // trwające wystąpienia błędów renderu
 
 function trackRun(runId: number) {
     if (runId === trackedRun) return;
     trackedRun = runId;
-    active = new Set();
-    rendered.clear();
+    active.clear();
+    renderActive.clear();
 }
 
 function sync(state: AiUiState) {
     const runId = state.scenario.runId;
     trackRun(runId);
-    const current = new Map(surfaceProblems(state.surfaces).map((p) => [key(p), p]));
-    current.forEach((p, k) => { if (!active.has(k)) state.reportClientError(toError(p), { runId }); });
-    active = new Set(current.keys());
+    const { problems, nodes } = scanSurfaces(state.surfaces);
+    // koniec wystąpień: walidacja wróciła do ready albo węzła już nie ma (błąd renderu — tylko brak węzła)
+    active.forEach((node, k) => { const s = nodes.get(node); if (s === undefined || s === 'ready') active.delete(k); });
+    renderActive.forEach((node, k) => { if (!nodes.has(node)) renderActive.delete(k); });
+    for (const p of problems) {
+        const k = JSON.stringify([p.surfaceId, p.nodeId, p.path, p.message]);
+        if (active.has(k)) continue;
+        active.set(k, nodeKey(p.surfaceId, p.nodeId));
+        state.reportClientError(toError(p), { runId });
+    }
 }
 
 /** Subskrypcja stanu: raportuje nowe wystąpienia problemów. Zwraca funkcję wyłączającą. */
@@ -68,25 +84,27 @@ export function startValidationReporting(): () => void {
     });
 }
 
-/**
- * Błąd renderu z lokalnego boundary. `data` = podpis danych, na których widok się wywrócił
- * (płytko równy podpis = to samo wystąpienie); `runId` = przebieg z chwili renderu.
- */
-export function reportRenderProblem(p: Problem, data: readonly unknown[], runId: number) {
+/** Błąd renderu z lokalnego boundary; `runId` = przebieg z chwili renderu. Raz na wystąpienie. */
+export function reportRenderProblem(p: Problem, runId: number) {
     const state = useAiUi.getState();
     if (runId === state.scenario.runId) {
         trackRun(runId);
-        const k = `${p.surfaceId}|${p.nodeId}|${p.message}`;
-        const prev = rendered.get(k);
-        if (prev && sameSignature(prev, data)) return;
-        rendered.set(k, data);
+        const k = JSON.stringify([p.surfaceId, p.nodeId, p.message]);
+        if (renderActive.has(k)) return;
+        renderActive.set(k, nodeKey(p.surfaceId, p.nodeId));
     }
     state.reportClientError(toError(p), { runId }); // inny przebieg: store odrzuci (jawne pochodzenie)
+}
+
+/** Udany render węzła po ponowieniu (RenderGuard) — koniec wystąpień błędu renderu tego węzła. */
+export function resolveRenderProblem(surfaceId: SurfaceId, nodeId: string) {
+    const node = nodeKey(surfaceId, nodeId);
+    renderActive.forEach((n, k) => { if (n === node) renderActive.delete(k); });
 }
 
 /** Testy: zapomnij stan modułu. */
 export function resetValidationReporting() {
     trackedRun = null;
-    active = new Set();
-    rendered.clear();
+    active.clear();
+    renderActive.clear();
 }

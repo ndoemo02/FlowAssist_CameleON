@@ -6,6 +6,7 @@
 // - po stanie terminalnym przebiegu nic nie jest wysyłane;
 // - raport niesie jawne pochodzenie (runId); raport z innego przebiegu nie jest wysyłany.
 
+import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ClientMessage } from '../contract';
 import { setTransport, useAiUi } from '../store';
@@ -122,6 +123,76 @@ describe('błąd renderu węzła drzewa (HUD) to jedno wystąpienie, dopóki pro
         } finally {
             TREE_VIEWS.Approval = original;
         }
+    });
+});
+
+// Weryfikacja Astry (R#5) + decyzja właściciela: odzyskanie = udany render po ponowieniu (błąd renderu)
+// albo powrót walidacji do ready. Sama zmiana danych węzła, który dalej jest zły, odzyskaniem nie jest.
+describe('błąd renderu: wystąpienie kończy się dopiero udanym renderem po ponowieniu', () => {
+    const hudApproval = (title: string, summary = 'S') =>
+        agent({ version: V, updateComponents: { surfaceId: 'hud', components: [{ id: 'root', component: 'Approval', title, summary }] } });
+    const withThrowingApproval = (fn: () => void) => {
+        const original = TREE_VIEWS.Approval;
+        TREE_VIEWS.Approval = ({ title }: { title: string }) => {
+            if (title === 'zły') throw new Error('boom');
+            return <p>{title}</p>;
+        };
+        try { fn(); } finally { TREE_VIEWS.Approval = original; }
+    };
+
+    it('złe propsy → zmiana danych węzła, nadal złe → 1 raport', () => withThrowingApproval(() => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        hudApproval('zły', 'S1');
+        const r = mount(<SurfaceRenderer surfaceId="hud" />);
+        hudApproval('zły', 'S2'); // inne propsy węzła → ponowienie renderu → ten sam błąd
+        r.rerender(<SurfaceRenderer surfaceId="hud" />);
+        expect(r.container.textContent).toContain('Nie mogę wyświetlić');
+        expect(errorsSent()).toHaveLength(1);
+    }));
+
+    it('złe → poprawne → te same złe propsy → 2 raporty (węzeł HUD)', () => withThrowingApproval(() => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        hudApproval('zły');
+        const r = mount(<SurfaceRenderer surfaceId="hud" />);
+        hudApproval('dobry');
+        r.rerender(<SurfaceRenderer surfaceId="hud" />);
+        expect(r.container.textContent).toContain('dobry');
+        hudApproval('zły');
+        r.rerender(<SurfaceRenderer surfaceId="hud" />);
+        expect(errorsSent()).toHaveLength(2);
+    }));
+
+    it('złe → poprawne → te same złe dane → 2 raporty (karta)', () => {
+        const original = REPRESENTATION_VIEWS.map2d;
+        REPRESENTATION_VIEWS.map2d = ({ points }: { points: { label: string }[] }) => {
+            if (points[0].label === 'zły') throw new Error('boom');
+            return <p>{points[0].label}</p>;
+        };
+        try {
+            workspaceItem();
+            // te same obiekty danych wracają (mock transport emituje stałe scenariusza bez serializacji)
+            const bad = { points: [{ label: 'zły', x: 0.5, y: 0.5 }] };
+            const good = { points: [{ label: 'dobry', x: 0.5, y: 0.5 }] };
+            const set = (value: unknown) => agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value } });
+            set(bad);
+            const r = mount(<ViewOf id="m" />);
+            act(() => set(good)); // act: render „dobry” zatwierdzony przed powrotem złych danych
+            expect(r.container.textContent).toContain('dobry');
+            act(() => set(bad));
+            expect(errorsSent()).toHaveLength(2);
+        } finally {
+            REPRESENTATION_VIEWS.map2d = original;
+        }
+    });
+});
+
+describe('walidacja: odzyskanie dopiero po powrocie do ready', () => {
+    it('fallback → pending (dane usunięte) → ten sam fallback → 1 raport', () => {
+        workspaceItem();
+        mapData(true);
+        agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m' } }); // brak danych → pending
+        mapData(true);
+        expect(errorsSent()).toHaveLength(1);
     });
 });
 

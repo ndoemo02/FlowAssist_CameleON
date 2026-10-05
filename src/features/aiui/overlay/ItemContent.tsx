@@ -8,7 +8,7 @@ import { FallbackCard, PendingCard } from '../components/FallbackCard';
 import RenderGuard from '../components/RenderGuard';
 import type { Density } from '../components/types';
 import { viewProps } from '../viewProps';
-import { reportRenderProblem } from '../validationReporting';
+import { reportRenderProblem, resolveRenderProblem } from '../validationReporting';
 
 /**
  * Widok jednego elementu stołu: subskrybuje surface 'workspace', ale wynik jest memoizowany,
@@ -31,7 +31,8 @@ export const ItemBody = memo(function ItemBody({ view, density = 'screen' }: { v
         <RenderGuard
             resetKeys={[view.content]}
             fallback={(error) => <FallbackCard type={view.title} reason={`błąd renderowania: ${error.message}`} path={path} />}
-            onError={(error) => reportRenderProblem({ surfaceId: 'workspace', nodeId: view.id, path, message: `błąd renderowania: ${error.message}` }, [view.content], runId)}
+            onError={(error) => reportRenderProblem({ surfaceId: 'workspace', nodeId: view.id, path, message: `błąd renderowania: ${error.message}` }, runId)}
+            onRecover={() => resolveRenderProblem('workspace', view.id)}
         >
             <RepresentationView representation={view.representation} content={view.content} density={density} />
         </RenderGuard>

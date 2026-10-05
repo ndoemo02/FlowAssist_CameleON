@@ -3,10 +3,13 @@
 Krótka mapa dla niezależnego recenzenta (tylko odczyt). Branch `feat/aiui-prototype`, commit zawierający ten plik.
 To kontekst, nie dowód poprawności: ADR-y opisują intencję i stan na dzień zapisu — weryfikuj w kodzie i testach.
 
-> **Status (2026-10-05):** pełny review `61209b8` wykonany (Opus → Astra: GO WITH FIXES). Poprawki są na branchu do
-> `1f12885`; weryfikacja Astry runda 1 (2 ISSUE) zamknięta do `9d3e901`, runda 2 (2 ISSUE) do `e820e0d`,
-> runda 3 (1 ISSUE) do `84096ff`, runda 4 (1 ISSUE) do `88e7af4` (kod). Weryfikacja bez ponownego pełnego audytu:
-> [`VERIFICATION_BRIEF.md`](VERIFICATION_BRIEF.md) (rundy 2–5 na końcu).
+> **Status końcowy (2026-10-06): P0 review hardening complete. Astra final verification: GO.**
+> Kod `88e7af4`; remote HEAD w chwili werdyktu `d53a2d4`. Pętla review zamknięta.
+> Przebieg: pełny review `61209b8` (Opus → Astra: GO WITH FIXES) → poprawki do `1f12885` → weryfikacja Astry:
+> runda 1 (2 ISSUE) zamknięta do `9d3e901`, runda 2 (2 ISSUE) do `e820e0d`, runda 3 (1 ISSUE) do `84096ff`,
+> runda 4 (1 ISSUE) do `88e7af4`, runda 5: **GO**. Szczegóły: [`VERIFICATION_BRIEF.md`](VERIFICATION_BRIEF.md).
+> **Z review pozostają otwarte wyłącznie FU-1, FU-2, FU-3 (przed P1.6).** Przed live transportem pozostaje też
+> P0.5 dostępność i reduced motion.
 
 ## Zakres
 
@@ -81,6 +84,7 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 | V2-R#5b | Zrealizowane `e820e0d` — obecność węzła w drzewie slotu = członkostwo w grafie definicji; pending rodzica nie kończy wystąpień dzieci | `validationReporting.ts` |
 | V3-R#5 | Zrealizowane `84096ff` — odzyskanie i deduplikacja błędu renderu per wariant renderowania (`card` / `screen` / `slot`) przy wspólnym wystąpieniu; udany render jednego wariantu nie zamyka błędu innego | `validationReporting.ts`, ADR 0003 |
 | V4-R#5 | Zrealizowane `88e7af4` — zmiana gęstości w zamontowanym `ItemBody` ponawia render (`resetKeys` = treść + gęstość); udany render po zmianie `resetKeys` odzyskuje tylko bieżący wariant | `ItemContent.tsx`, `RenderGuard.tsx`, nagłówek `validationReporting.ts` |
+| Weryfikacja | Zamknięta — Astra runda 5: GO (2026-10-06) | `VERIFICATION_BRIEF.md` |
 | FU-1..3 | OPEN — przed P1.6 (FU-3: głęboka ścieżka `updateDataModel` przepełnia stos w `dispatch`; kryterium akceptacji w AGENTS.md) | AGENTS.md |
 
 Świadome luki testów: kierunek agent → klient dla I3 pokrywa korpus replay (P0.2), nie test jednostkowy;

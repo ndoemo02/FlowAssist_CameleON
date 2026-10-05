@@ -93,6 +93,17 @@ Definicja główna: nagłówek `src/features/aiui/validationReporting.ts`; ADR 0
 Weryfikacja rundy 5: vitest 228/228; pełny tsc: 1 znany błąd (Lanyard); E2E celowane `surfaces` + `gestures`
 (oba projekty) na `88e7af4`: 13 passed / 9 skipped / 0 failed.
 
+**Wynik rundy 5 (Astra, 2026-10-06): GO** — poprawka zamyka ustalenie z rundy 4. Niezależne sondy DOM Astry:
+- sekwencja z rundy 4 (jedna instancja, zmiana gęstości): 2 raporty, oba udane rendery rzeczywiście występują;
+- strażnik właściciela: 1 raport, błąd `card` pozostaje otwarty;
+- oba warianty zawodzą: odzyskanie samego `screen` zachowuje wspólne wystąpienie; nawrót jest zgłaszany dopiero po odzyskaniu obu.
+
+## Zamknięcie
+
+**P0 review hardening complete. Astra final verification: GO** (kod `88e7af4`; remote HEAD w chwili werdyktu `d53a2d4`).
+Pętla review zamknięta — kolejne rundy tych samych ustaleń nie są planowane.
+Pozostaje przed live transportem: FU-1, FU-2, FU-3 (AGENTS.md) oraz P0.5 dostępność i reduced motion.
+
 ## Prompt startowy
 
 > Verify the review fixes on `feat/aiui-prototype` as a read-only reviewer. Start with `docs/review/VERIFICATION_BRIEF.md`.

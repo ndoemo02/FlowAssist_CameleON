@@ -85,7 +85,7 @@ Logika gestów jest czysta i testowana w `overlay/gestureLogic.ts`.
 
 Jedyne miejsce z referencjami Three.js; model A2UI ich nie zna.
 
-- `anchorRegistry` — rejestr meshy ekranu (z `StudioModel`) i publikacja stanu kotwicy.
+- `anchorRegistry` — rejestr meshy ekranu (z komponentu `StudioModel` zdefiniowanego w `src/app/page.tsx`) i publikacja stanu kotwicy.
 - `screenGeometry` — klaster meshy ekranu (bez rekwizytu `Object003`) i jego środek.
 - `measureScreen` — rzut unii meshy, wewnętrzny prostokąt przycięty do viewportu.
 - `ScreenAnchor` — bramka z histerezą: pokrycie (włączenie 0,82 / wyłączenie 0,75)

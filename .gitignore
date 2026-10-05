@@ -15,3 +15,5 @@ freeflow.json
 /test-results/
 /playwright-report/
 /blob-report/
+# Cache kompilatora TypeScript
+*.tsbuildinfo

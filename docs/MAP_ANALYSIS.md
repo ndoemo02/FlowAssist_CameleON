@@ -1,7 +1,7 @@
 > **LEGACY — poza CameleONem.** Opisuje widok mapy 3D z wcześniejszego etapu projektu.
 > Strona główna nie obsługuje już `?view=map` (`HomePage` nie używa `useView`);
 > komponent `ImmersiveMap` jest osiągalny tylko pod `/archive/showcase` i `/archive/old_home`, a kod w `src/`
-> nie ładuje już `map_lviv_ukraine.glb` (kopia tylko w `archive/old_maps/`). Aktualny stan projektu: [`AGENTS.md`](../AGENTS.md).
+> nie ładuje już `map_lviv_ukraine.glb` (kopia była w `archive/old_maps/`, usuniętym z drzewa 2026-10-05; dostępna w historii gita do `37ee1b8`). Aktualny stan projektu: [`AGENTS.md`](../AGENTS.md).
 
 # 🗺️ Analiza Modelu Mapy - Dokumentacja
 

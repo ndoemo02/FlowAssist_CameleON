@@ -174,8 +174,9 @@ Parametry URL (dev / demo):
 Haki dev w konsoli: `window.__aiui` (store), `window.__anchorRegistry`
 (`getScreenMeshes`, `getAnchorState`), `window.__screenAnchor` (tylko z `?anchor=probe`).
 
-TypeScript: globalny `npx tsc --noEmit` zwraca stare błędy z `archive/`;
-sprawdzaj zakres `src/features/aiui` i `src/app/page.tsx`.
+TypeScript: globalny `npx tsc --noEmit` po sprzątaniu repo (2026-10-05) zwraca 1 znany błąd
+w nieużywanym `src/app/components/safelayer/Lanyard.tsx` (zostawiony decyzją właściciela);
+każdy inny błąd jest regresją.
 
 ## Stan implementacji
 

@@ -24,5 +24,6 @@ Pozostałe parametry: `?speed=N`, `?anchor=probe`, `?dev` — opis w `AGENTS.md`
 - [`src/features/aiui/README.md`](src/features/aiui/README.md) — architektura modułu AI-to-UI
 - [`docs/history/`](docs/history/) — materiały historyczne sprzed CameleONa
 
-Pozostałe pliki w `docs/`, `REPO_AUDIT_2026-02-11.md`, `artifacts/` i `.agent/` są oznaczone
-jako historyczne lub legacy.
+Pozostałe pliki w `docs/`, `artifacts/` i `.agent/` są oznaczone jako historyczne lub legacy.
+Stary kod i nieużywane assety (`archive/`, `_BACKUP_WARSAW/`, `REPO_AUDIT_2026-02-11.md` itd.)
+usunięto z drzewa 2026-10-05; są w historii gita (przywracanie: `git checkout 37ee1b8 -- <ścieżka>`).

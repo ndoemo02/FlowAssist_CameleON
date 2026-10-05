@@ -23,6 +23,26 @@ describe('reconcileLayout', () => {
         expect(l.d.x === l.a.x && l.d.y === l.a.y).toBe(false);
     });
 
+    // Review #3: podmiana członkostwa bez zmiany liczby kart ([a,b,c] → [a,c,d]) dawała c i d w tym samym slocie.
+    it('P9: podmiana członkostwa (ta sama liczba kart) przelicza siatkę — nowa karta nie ląduje na starej', () => {
+        let l = reconcile({}, [item('a', 'card', 1), item('b', 'card', 2), item('c', 'card', 3)]);
+        l = reconcile(l, [item('a', 'card', 1), item('c', 'card', 3), item('d', 'card', 4)]);
+        expect(l.a).toMatchObject(autoSlot(0, 3));
+        expect(l.c).toMatchObject(autoSlot(1, 3));
+        expect(l.d).toMatchObject(autoSlot(2, 3));
+        expect(l.c.x === l.d.x && l.c.y === l.d.y).toBe(false);
+    });
+
+    it('P9: przy podmianie członkostwa karta przesunięta przez użytkownika zostaje; rev rośnie tylko przesuniętym przez siatkę', () => {
+        let l = reconcile({}, [item('a', 'card', 1), item('b', 'card', 2), item('c', 'card', 3)]);
+        l = cmd(l, { type: 'move', id: 'c', x: 0.9, y: 0.9, rev: l.c.rev });
+        const before = l;
+        l = reconcile(l, [item('a', 'card', 1), item('c', 'card', 3), item('d', 'card', 4)]);
+        expect(l.c).toMatchObject({ x: 0.9, y: 0.9, moved: true, rev: before.c.rev });
+        expect(l.a).toMatchObject({ ...autoSlot(0, 3), rev: before.a.rev }); // slot bez zmian → gest na a nie jest unieważniany
+        expect(l.d).toMatchObject(autoSlot(2, 3));
+    });
+
     it('bez zmian zwraca tę samą referencję', () => {
         const l = reconcile({}, [item('a')]);
         expect(reconcileLayout(l, [item('a')]).layout).toBe(l);

@@ -53,7 +53,10 @@ Współrzędne, rozmiar i kolejność warstw kart nigdy nie pochodzą od agenta,
 - P6: członkostwo = `Workspace.children`; niedostarczony ≠ usunięty; ponowne dodanie = nowy wpis.
 - P7: reset przy restarcie i `deleteSurface`.
 - P8: kolejność koordynatora.
-- P9: auto-layout i przeliczenie siatki dla kart nieprzesuniętych.
+- P9: auto-layout i przeliczenie siatki dla kart nieprzesuniętych. Przeliczenie następuje przy każdej zmianie
+  członkostwa (liczby **lub** zbioru id), więc podmiana karty bez zmiany liczby nie kładzie nowej karty na starej.
+  Karty przesunięte przez użytkownika zostają, a `rev` rośnie tylko kartom faktycznie przesuniętym przez siatkę.
+  *Zmiana kernela zatwierdzona jawnie przez właściciela (review #3, 2026-10-05; `layout.ts: reconcileLayout`).*
 - P10: pierwsza **obsługiwana** reprezentacja z listy agenta. Reprezentacja niedozwolona dla rodzaju (`KIND_REPRESENTATIONS`) daje fallback.
 
 **Konsekwencja P10:** rozszerzenie `catalog.ts: SUPPORTED_REPRESENTATIONS` zmienia wynik dla istniejących elementów, choć `workspace.ts` zostaje nietknięty. Patrz ADR 0002.

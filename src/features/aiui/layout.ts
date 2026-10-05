@@ -105,9 +105,10 @@ export function reconcileLayout(prev: Layout, items: ItemMeta[] | null): { layou
     if (Object.keys(prev).some((id) => !(id in next))) changed = true;
     if (!changed) return { layout: prev, screenHint: false };
 
-    // P9: przy zmianie liczby elementów karty NIEprzesunięte przez użytkownika wracają do siatki
-    // (nowy element nie ląduje na starej karcie); przesunięte zostają tam, gdzie je odłożono.
-    if (items.length !== Object.keys(prev).length) {
+    // P9: przy zmianie członkostwa (liczby LUB zbioru id — review #3: podmiana karty przy tej samej liczbie)
+    // karty NIEprzesunięte przez użytkownika wracają do siatki (nowy element nie ląduje na starej karcie);
+    // przesunięte zostają tam, gdzie je odłożono.
+    if (items.length !== Object.keys(prev).length || items.some((it) => !(it.id in prev))) {
         for (const it of items) {
             const e = next[it.id];
             if (e.moved) continue;

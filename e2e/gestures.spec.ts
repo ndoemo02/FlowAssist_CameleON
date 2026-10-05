@@ -113,6 +113,31 @@ test.describe('gesty kart (desktop)', () => {
         expect([after.x, after.y]).toEqual([before.x, before.y]);
     });
 
+    // Tap na przycisku karty to kliknięcie przycisku, nie gest karty: dwa szybkie „+” (< 350 ms) wysyłały kartę na ekran.
+    test('dwa szybkie kliknięcia „+” powiększają kartę dwa razy i nie wysyłają jej na ekran', async ({ page }) => {
+        await layoutCommand(page, { type: 'focus', id: 'kpis' });
+        const plus = page.getByRole('article', { name: 'Element kpis' }).getByRole('button', { name: 'Powiększ' });
+        const before = (await layout(page)).kpis;
+        const center = async () => { const b = (await plus.boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
+        // odstęp między tapami mierzony w stronie (to on decyduje o podwójnym tapie, nie czas po stronie testu)
+        await page.evaluate(() => {
+            const w = window as unknown as { __ups: number[] };
+            w.__ups = [];
+            document.addEventListener('pointerup', () => w.__ups.push(performance.now()), { capture: true });
+        });
+        const p1 = await center();
+        await page.mouse.click(p1.x, p1.y);
+        const p2 = await center(); // skala karty zmienia położenie przycisku
+        await page.mouse.click(p2.x, p2.y);
+        const ups = await page.evaluate(() => (window as unknown as { __ups: number[] }).__ups);
+        expect(ups).toHaveLength(2);
+        expect(ups[1] - ups[0]).toBeLessThan(350); // inaczej test nie sprawdza okna podwójnego tapu
+        await page.waitForTimeout(400);
+        const after = (await layout(page)).kpis;
+        expect(after.presentation).toBe('focus');
+        expect(after.scale).toBeCloseTo(before.scale * 1.15 * 1.15, 5);
+    });
+
     test('podwójny tap wysyła kartę na ekran', async ({ page }) => {
         const p = await hittablePoint(page, 'Element kpis');
         await page.mouse.click(p.x, p.y);

@@ -36,8 +36,8 @@ beforeEach(() => {
 });
 afterEach(() => unsub());
 
-function cardHandlers() {
-    useCardGestures({ id: 'a', cardRef: cardRef as never, containerRef: containerRef as never, baseTransform: base, onMenu: () => {}, enabled: true });
+function cardHandlers(id = 'a') {
+    useCardGestures({ id, cardRef: cardRef as never, containerRef: containerRef as never, baseTransform: base, onMenu: () => {}, enabled: true });
     return captured[0];
 }
 
@@ -63,6 +63,41 @@ describe('gest zaczęty na [data-nodrag] i anulowany (fromControl → cancel)', 
         onPinch({ ...common, first: false, last: true, canceled: true, memo, event: ev('wheel', true) });
         expect(writes).toBe(0);
         expect(useAiUi.getState().layout.a.scale).toBe(1);
+    });
+});
+
+// Tap kończący gest (pointerup, bez ruchu): `target.closest` odpowiada jak przycisk karty (button wewnątrz
+// [data-nodrag]) albo jak treść karty w focusie (sam [data-nodrag], bez przycisku).
+const tapOn = (where: 'button' | 'content') => ({
+    type: 'pointerup', stopPropagation() {},
+    target: { closest: (sel: string) => (sel.includes('[data-nodrag]') || (where === 'button' && sel.includes('button')) ? {} : null) },
+});
+const tap = (onDrag: Handler, where: 'button' | 'content') =>
+    onDrag({ first: false, last: true, tap: true, canceled: false, memo: undefined, movement: [0, 0], swipe: [0, 0], cancel, event: tapOn(where) });
+
+describe('podwójny tap (toScreen) nie liczy tapów na przyciskach karty', () => {
+    it('dwa szybkie kliknięcia „+” nie wysyłają karty w focusie na ekran', () => {
+        useAiUi.setState({ layout: { 'plus2': entry({ presentation: 'focus' }) } }); // osobne id: lastTap to stan modułu
+        const { onDrag } = cardHandlers('plus2');
+        tap(onDrag, 'button');
+        tap(onDrag, 'button');
+        expect(useAiUi.getState().layout['plus2'].presentation).toBe('focus');
+    });
+
+    it('kliknięcie przycisku i zaraz tap na treść też nie jest podwójnym tapem', () => {
+        useAiUi.setState({ layout: { 'plus-content': entry({ presentation: 'focus' }) } }); // osobne id: lastTap to stan modułu
+        const { onDrag } = cardHandlers('plus-content');
+        tap(onDrag, 'button');
+        tap(onDrag, 'content');
+        expect(useAiUi.getState().layout['plus-content'].presentation).toBe('focus');
+    });
+
+    it('podwójny tap na treść karty w focusie nadal wysyła ją na ekran', () => {
+        useAiUi.setState({ layout: { 'content2': entry({ presentation: 'focus' }) } }); // osobne id: lastTap to stan modułu
+        const { onDrag } = cardHandlers('content2');
+        tap(onDrag, 'content');
+        tap(onDrag, 'content');
+        expect(useAiUi.getState().layout['content2'].presentation).toBe('screen');
     });
 });
 

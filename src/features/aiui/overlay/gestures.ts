@@ -27,6 +27,10 @@ const lastTap = new Map<string, number>();
 /** Element z atrybutem data-nodrag (przyciski, menu) nie startuje gestów karty. */
 const fromControl = (e: { target: EventTarget | null } | undefined) => Boolean((e?.target as HTMLElement | null)?.closest?.('[data-nodrag]'));
 
+/** Tap na przycisku karty to kliknięcie przycisku, nie gest karty (treść karty w focusie przyciskiem nie jest). */
+const fromButton = (e: { target: EventTarget | null } | undefined) =>
+    Boolean((e?.target as HTMLElement | null)?.closest?.('button, a[href], input, select, textarea, [role="button"]'));
+
 /**
  * Gest przerwany przez przeglądarkę/system. @use-gesture zgłasza pointercancel/touchcancel jako zwykły
  * koniec gestu (`last`), więc bez tej kontroli anulowanie zapisywałoby geometrię (E2E-2, ADR 0006; I7).
@@ -61,9 +65,11 @@ export function useCardGestures({ id, cardRef, containerRef, baseTransform, enab
                 const e = entry();
                 if (!e) { restore(); cancel(); return; }
                 if (tap) {
-                    // podwójny tap → na ekran; pojedynczy → focus (zdejmowanie focusu — klik w tło)
-                    const t = performance.now(), prev = lastTap.get(id) ?? -Infinity;
-                    lastTap.set(id, t);
+                    // podwójny tap → na ekran; pojedynczy → focus (zdejmowanie focusu — klik w tło).
+                    // Tap na przycisku nie liczy się do podwójnego tapu: dwa szybkie „+” to nie „na ekran”.
+                    const onButton = fromButton(event);
+                    const t = performance.now(), prev = onButton ? -Infinity : lastTap.get(id) ?? -Infinity;
+                    if (onButton) lastTap.delete(id); else lastTap.set(id, t);
                     if (t - prev < DOUBLE_TAP_MS) { lastTap.delete(id); cmd({ type: 'toScreen', id }); }
                     else if (e.presentation === 'card') cmd({ type: 'focus', id });
                     return;

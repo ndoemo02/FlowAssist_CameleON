@@ -49,6 +49,12 @@
 
 Zmiany w `AgentTransport` są addytywne.
 
+## Schematy (P0.3)
+
+Pochodna specyfikacja osi 1 i 2: `src/features/aiui/schemas/flowassist-v2/` (koperty agent → klient i klient → agent, propsy
+komponentów po rozwiązaniu bindingów, treść reprezentacji). Parytet z guardami runtime pilnuje `__tests__/schema.test.ts`
+(korpus + mutacje). Schematy nie są używane w runtime; zmiana guardów pod schemat to jawna zmiana kontraktu.
+
 ## Otwarte
 
 1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie.

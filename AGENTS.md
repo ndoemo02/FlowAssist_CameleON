@@ -221,6 +221,15 @@ przez spóźnioną odpowiedź transportu.
 `gestureLogic`, `measureScreen`, `jsonPointer`, `resolveTree`, `loop`, `scenario`).
 Bez testów renderowania 3D.
 
+Od v1.3 (P0.2, P0.3) dochodzą:
+
+- `replay` — korpus fixture'ów (`__tests__/fixtures/corpus/*.json` + scenariusz `research`) odtwarzany
+  przez koordynator; ślady baseline w `__tests__/fixtures/traces/` (stan, efekty, komunikaty wychodzące).
+  Zmiana śladu = zmiana zachowania do przeglądu. Ustalenia: `docs/adr/0005-observed-behaviors.md`.
+- `schema` — warstwowy parytet JSON Schema (`src/features/aiui/schemas/flowassist-v2/`) z guardami
+  `parseEvent` / `validateProps` / `validateContent` na korpusie i jego mutacjach. Ajv tylko w testach;
+  autorytetem runtime pozostają guardy.
+
 ### Testy przeglądarkowe: agent-browser
 
 Kontrole runtime wykonuje `agent-browser` — osobna instancja Chrome w trybie headless,

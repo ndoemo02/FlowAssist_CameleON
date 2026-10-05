@@ -108,6 +108,13 @@ jego materiał (kolor liniowy 0,07). Robi to też przy rejestracji meshy.
 
 ## Testy
 
-`npm test` uruchamia 106 testów w 10 plikach `__tests__/`: `contract`, `reducer`, `layout`,
-`workspace`, `gestureLogic`, `measureScreen`, `jsonPointer`, `resolveTree`, `loop`, `scenario`.
-Kontrole przeglądarkowe opisuje `AGENTS.md` → „Testowanie”.
+`npm test` uruchamia pliki w `__tests__/`: `contract`, `reducer`, `layout`,
+`workspace`, `gestureLogic`, `measureScreen`, `jsonPointer`, `resolveTree`, `loop`, `scenario`
+(stan `6e96223`: 106 testów) oraz od v1.3:
+
+- `replay` — korpus konformacji (`fixtures/corpus/`, `fixtures/research.ts`) odtwarzany przez koordynator
+  (`fixtures/replay.ts`); ślady baseline w `fixtures/traces/`.
+- `schema` — parytet schematów `schemas/flowassist-v2/` (koperta, propsy po rozwiązaniu bindingów,
+  treść reprezentacji) z guardami runtime, na korpusie i mutacjach.
+
+Inwarianty i reguły: [`docs/adr/`](../../../docs/adr/). Kontrole przeglądarkowe opisuje `AGENTS.md` → „Testowanie”.

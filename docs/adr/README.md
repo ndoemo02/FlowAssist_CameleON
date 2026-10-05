@@ -10,6 +10,7 @@ zależności w v1.3+ jest oceniana względem tych dokumentów.
 | [0003](0003-local-vs-semantic-actions.md) | Akcje lokalne vs semantyczne | Zaakceptowany (v1.3) |
 | [0004](0004-library-adapter-rules.md) | Reguły adapterów bibliotek | Zaakceptowany (v1.3) |
 | [0005](0005-observed-behaviors.md) | Zachowania ujawnione przez korpus fixture'ów (OBS-1 do OBS-6) | Zaakceptowany; decyzje 2026-10-05 |
+
 ## Zasady
 
 - Stan opisany na kodzie z `6e96223` (kernel bez zmian od tego commita).

@@ -1,0 +1,205 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-v2/envelope.agent-to-client.schema.json",
+  "title": "flowassist/v2 — komunikat agent → klient",
+  "description": "Pochodna specyfikacja (plan v1.3.2, P0.3). Autorytet runtime: contract.ts: parseEvent. Zmiana guardów pod schemat = jawna zmiana kontraktu. Pierwszeństwo: stage, potem narration, potem koperta A2UI. Pozostałe klucze komunikatu ze stage/narration są dziś ignorowane (OBS-4: do odrzucenia w osobnym commicie).",
+  "type": "object",
+  "if": {
+    "required": [
+      "stage"
+    ]
+  },
+  "then": {
+    "properties": {
+      "stage": {
+        "type": "object",
+        "required": [],
+        "properties": {
+          "focus": {
+            "enum": [
+              "front",
+              "back"
+            ]
+          },
+          "drawer": {
+            "enum": [
+              "open",
+              "closed"
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "minProperties": 1
+      }
+    }
+  },
+  "else": {
+    "if": {
+      "required": [
+        "narration"
+      ]
+    },
+    "then": {
+      "properties": {
+        "narration": {
+          "type": "object",
+          "required": [
+            "text"
+          ],
+          "properties": {
+            "text": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "speak": {
+              "type": "boolean"
+            }
+          }
+        }
+      }
+    },
+    "else": {
+      "$ref": "#/$defs/a2ui"
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "required": [
+        "id",
+        "component"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "component": {
+          "type": "string",
+          "minLength": 1
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "a2ui": {
+      "type": "object",
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "version": {
+          "enum": [
+            "v0.9",
+            "v0.9.1"
+          ],
+          "description": "OBS-3: v0.9 tolerowane na wejściu do czasu handshake'u (ADR 0002, 0005)"
+        },
+        "createSurface": {
+          "type": "object",
+          "required": [
+            "surfaceId",
+            "catalogId"
+          ],
+          "properties": {
+            "surfaceId": {
+              "enum": [
+                "workspace",
+                "tasks-drawer",
+                "hud"
+              ]
+            },
+            "catalogId": {
+              "const": "flowassist/v2"
+            }
+          }
+        },
+        "updateComponents": {
+          "type": "object",
+          "required": [
+            "surfaceId",
+            "components"
+          ],
+          "properties": {
+            "surfaceId": {
+              "enum": [
+                "workspace",
+                "tasks-drawer",
+                "hud"
+              ]
+            },
+            "components": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/component"
+              }
+            }
+          }
+        },
+        "updateDataModel": {
+          "type": "object",
+          "required": [
+            "surfaceId"
+          ],
+          "properties": {
+            "surfaceId": {
+              "enum": [
+                "workspace",
+                "tasks-drawer",
+                "hud"
+              ]
+            },
+            "path": {
+              "type": "string",
+              "pattern": "^(/.*)?$"
+            },
+            "value": {}
+          }
+        },
+        "deleteSurface": {
+          "type": "object",
+          "required": [
+            "surfaceId"
+          ],
+          "properties": {
+            "surfaceId": {
+              "enum": [
+                "workspace",
+                "tasks-drawer",
+                "hud"
+              ]
+            }
+          }
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "createSurface"
+          ]
+        },
+        {
+          "required": [
+            "updateComponents"
+          ]
+        },
+        {
+          "required": [
+            "updateDataModel"
+          ]
+        },
+        {
+          "required": [
+            "deleteSurface"
+          ]
+        }
+      ]
+    }
+  }
+}

@@ -25,13 +25,17 @@ export const visualScale = (scale: number, focused: boolean) => (focused ? Math.
 const lastTap = new Map<string, number>();
 
 /** Element z atrybutem data-nodrag (przyciski, menu) nie startuje gestów karty. */
-const fromControl = (e: Event | undefined) => Boolean((e?.target as HTMLElement | null)?.closest?.('[data-nodrag]'));
+const fromControl = (e: { target: EventTarget | null } | undefined) => Boolean((e?.target as HTMLElement | null)?.closest?.('[data-nodrag]'));
 
 /**
  * Gest przerwany przez przeglądarkę/system. @use-gesture zgłasza pointercancel/touchcancel jako zwykły
  * koniec gestu (`last`), więc bez tej kontroli anulowanie zapisywałoby geometrię (E2E-2, ADR 0006; I7).
  */
 const cancelledEnd = (last: boolean, e: Event | undefined) => last && (e?.type === 'pointercancel' || e?.type === 'touchcancel');
+
+// Gest anulowany przez nas (`cancel()`: start na [data-nodrag], gest nieaktualny, brak wpisu): @use-gesture
+// woła potem handler jeszcze raz z `canceled`, `last` i `first: false` (setTimeout po cancel), a przy pointer
+// capture — przy każdym kolejnym ruchu do puszczenia przycisku. Taki callback nie może nic zapisać (review #2, I7).
 
 export interface CardGestureOptions {
     id: string;
@@ -48,9 +52,10 @@ export function useCardGestures({ id, cardRef, containerRef, baseTransform, enab
     const entry = () => useAiUi.getState().layout[id];
     const restore = () => { if (cardRef.current) cardRef.current.style.transform = baseTransform(); };
 
-    return useGesture(
+    const bind = useGesture(
         {
-            onDrag: ({ first, last, tap, movement: [mx, my], swipe: [, sy], event, memo, cancel }) => {
+            onDrag: ({ first, last, tap, movement: [mx, my], swipe: [, sy], event, memo, cancel, canceled }) => {
+                if (canceled) { restore(); return memo; }
                 if (first && fromControl(event)) { cancel(); return; }
                 if (cancelledEnd(last, event)) { restore(); return; }
                 const e = entry();
@@ -79,7 +84,8 @@ export function useCardGestures({ id, cardRef, containerRef, baseTransform, enab
                 }
                 return token;
             },
-            onPinch: ({ first, last, movement: [ms], memo, event, cancel }) => {
+            onPinch: ({ first, last, movement: [ms], memo, event, cancel, canceled }) => {
+                if (canceled) { restore(); return memo; }
                 if (first && fromControl(event)) { cancel(); return; }
                 if (cancelledEnd(last, event)) { restore(); return; }
                 const e = entry();
@@ -103,6 +109,13 @@ export function useCardGestures({ id, cardRef, containerRef, baseTransform, enab
             eventOptions: { passive: false },
         },
     );
+    // filterTaps: @use-gesture połyka (capture) click po geście, który nie był tapem — także po geście
+    // zaczętym na kontrolce [data-nodrag] i anulowanym. Kliknięcie w kontrolkę zawsze do niej dociera.
+    return (...args: Parameters<typeof bind>) => {
+        const props = bind(...args) as ReturnType<typeof bind> & { onClickCapture?: (e: React.MouseEvent) => void };
+        const swallowClick = props.onClickCapture;
+        return { ...props, onClickCapture: (e: React.MouseEvent) => { if (!fromControl(e)) swallowClick?.(e); } };
+    };
 }
 
 /** Uchwyt zmiany rozmiaru w rogu karty (desktop). */
@@ -110,8 +123,9 @@ export function useResizeHandle(id: string, cardRef: RefObject<HTMLElement>, bas
     const cmd = useAiUi.getState().layoutCommand;
     const restore = () => { if (cardRef.current) cardRef.current.style.transform = baseTransform(); };
     return useGesture({
-        onDrag: ({ last, movement: [mx, my], memo, cancel, event }) => {
+        onDrag: ({ last, movement: [mx, my], memo, cancel, canceled, event }) => {
             event.stopPropagation();
+            if (canceled) { restore(); return memo; }
             if (cancelledEnd(last, event)) { restore(); return; }
             const e = useAiUi.getState().layout[id];
             if (!e) { restore(); cancel(); return; }

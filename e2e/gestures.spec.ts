@@ -1,7 +1,7 @@
 // Gesty kart na stole (desktop): zapisy tylko na końcu gestu, anulowanie przy zmianie od agenta (ADR 0001, I7).
 // Regresja E2E-1 (docs/adr/0006): kontener stołu bez `preserve-3d`, więc pointerdown trafia w kartę.
 import { expect, test } from '@playwright/test';
-import { BACK, countLayoutWrites, dispatch, hittablePoint, item, layout, openApp, seedWorkspace, setAngle } from './helpers';
+import { BACK, countLayoutWrites, dispatch, hittablePoint, item, layout, layoutCommand, openApp, seedWorkspace, setAngle } from './helpers';
 
 test.describe('gesty kart (desktop)', () => {
     test.beforeEach(async ({ page }, info) => {
@@ -74,6 +74,43 @@ test.describe('gesty kart (desktop)', () => {
         await page.mouse.up();
         expect((await layout(page)).table.scale).toBe(before.scale);
         expect(await card.evaluate((el) => (el as HTMLElement).style.transform)).toBe(restTransform);
+    });
+
+    // Review #2 (I7): drag zaczęty na [data-nodrag] (treść karty w focusie) jest anulowany przez handler —
+    // końcowy callback biblioteki (canceled) nie może zapisać ani move, ani raise.
+    test('drag zaczęty na treści karty w focusie ([data-nodrag]) nie zapisuje geometrii', async ({ page }) => {
+        await layoutCommand(page, { type: 'focus', id: 'kpis' });
+        const content = page.getByRole('article', { name: 'Element kpis' }).locator('[data-nodrag]').first();
+        const box = (await content.boundingBox())!;
+        const p = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        expect(await page.evaluate(([x, y]) => Boolean(document.elementFromPoint(x, y)?.closest('article [data-nodrag]')), [p.x, p.y] as const)).toBe(true);
+        const before = (await layout(page)).kpis;
+        const writes = await countLayoutWrites(page);
+        await page.mouse.move(p.x, p.y);
+        await page.mouse.down();
+        await page.mouse.move(p.x + 30, p.y + 10); // pierwsza intencjonalna klatka niesie widoczne przesunięcie
+        for (let i = 1; i <= 3; i++) await page.mouse.move(p.x + 30 + i * 10, p.y + 10);
+        await page.mouse.up();
+        await page.waitForTimeout(50); // callback biblioteki po cancel() idzie przez setTimeout
+        expect(await writes()).toBe(0);
+        const after = (await layout(page)).kpis;
+        expect([after.x, after.y, after.z, after.scale]).toEqual([before.x, before.y, before.z, before.scale]);
+    });
+
+    // Review #2: kliknięcie kontrolki z drobnym ruchem (≥ 3 px, próg intencji) nie może zostać połknięte.
+    test('kliknięcie przycisku karty z drobnym ruchem wykonuje akcję i nie przesuwa karty', async ({ page }) => {
+        await layoutCommand(page, { type: 'focus', id: 'kpis' });
+        const button = page.getByRole('article', { name: 'Element kpis' }).getByRole('button', { name: 'Powiększ' });
+        const box = (await button.boundingBox())!;
+        const p = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+        const before = (await layout(page)).kpis;
+        await page.mouse.move(p.x, p.y);
+        await page.mouse.down();
+        await page.mouse.move(p.x + 4, p.y + 1);
+        await page.mouse.up();
+        await expect.poll(async () => (await layout(page)).kpis.scale).toBeCloseTo(before.scale * 1.15, 5);
+        const after = (await layout(page)).kpis;
+        expect([after.x, after.y]).toEqual([before.x, before.y]);
     });
 
     test('podwójny tap wysyła kartę na ekran', async ({ page }) => {

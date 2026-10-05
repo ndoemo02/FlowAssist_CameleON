@@ -168,7 +168,7 @@ Parametry URL (dev / demo):
 
 - `?demo=research` — autostart scenariusza po intro (ukrywa Leva)
 - `?speed=N` — mnożnik prędkości mock transportu
-- `?anchor=probe` — panel testowy ze spike'u ScreenAnchor (zostaje do czasu potwierdzenia warstwy ekranu)
+- `?anchor=probe` — panel testowy ze spike'u ScreenAnchor (tylko poza produkcją; zostaje do czasu potwierdzenia warstwy ekranu)
 - `?dev` — wymusza panel Leva
 
 Haki dev w konsoli: `window.__aiui` (store), `window.__anchorRegistry`

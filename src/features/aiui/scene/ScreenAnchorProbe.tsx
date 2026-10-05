@@ -8,7 +8,9 @@ import { subscribeAnchor, getAnchorState } from './anchorRegistry';
 
 export default function ScreenAnchorProbe() {
     const [enabled, setEnabled] = useState(false);
-    useEffect(() => setEnabled(new URLSearchParams(window.location.search).get('anchor') === 'probe'), []);
+    // narzędzie developerskie: w produkcji parametr URL nie włącza panelu ani haka __screenAnchor (review #7)
+    useEffect(() => setEnabled(process.env.NODE_ENV !== 'production'
+        && new URLSearchParams(window.location.search).get('anchor') === 'probe'), []);
     return enabled ? <Probe /> : null;
 }
 

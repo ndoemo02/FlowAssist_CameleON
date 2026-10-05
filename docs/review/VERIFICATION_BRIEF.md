@@ -64,6 +64,19 @@ na `a7b3a67`: 11 passed / 9 skipped / 2 failed — obie porażki środowiskowe (
 własny strażnik ważności testu (odstęp tapów 646 ms > 350 ms, test niekonkluzywny) i `waitScreenMeshes` 90 s (FLAKE-1);
 jednorazowe ponowienie tych dwóch testów (desktop): 2/2 passed.
 
+## Runda 4: poprawka po weryfikacji rundy 3 (2026-10-05)
+
+Weryfikacja rundy 3: członkostwo z grafu definicji — OK (także węzeł poza `MAX_DEPTH`, graf z cyklem); FU-3 — OK;
+odzyskanie po remoncie — 1 ISSUE (udany render innej instancji zamykał trwający błąd). Zakres rundy 4: `2d73cb4..84096ff`
+(kod) + commit dokumentacji po nim.
+
+| # | Commit | Co zmieniono | Test błędu | Pytanie do weryfikacji |
+|---|---|---|---|---|
+| V3-R#5 MEDIUM | `84096ff` | Decyzja właściciela: odzyskanie i deduplikacja per wariant renderowania (`card` / `screen` dla elementu stołu, `slot` dla węzła drzewa) przy wspólnym wystąpieniu problemu. Pierwszy zawodzący wariant raportuje, kolejne dołączają; udany render wariantu usuwa tylko ten wariant; wystąpienie kończy się, gdy nie zawodzi żaden wariant (albo węzeł / przebieg się kończy). Akceptowane: niewyrenderowany ponownie uszkodzony wariant zostaje otwarty, dopóki sam nie przejdzie poprawnego renderu | karta zawodzi, ekran zdrowy, ponowienie karty nadal zawodzi → 1; ekran zawodzi → karta zdrowa → ekran znowu zawodzi → 1; strażnik: oba warianty zawodzą → poprawne dane → złe → 2 | Czy wariant = gęstość (stabilny przez remount) jest właściwą granulacją — czy istnieje drugi widok tego samego wariantu, który mógłby się wzajemnie „odzyskiwać”? |
+
+Weryfikacja rundy 4: vitest 226/226; pełny tsc: 1 znany błąd (Lanyard); E2E celowane `surfaces` + `gestures`
+(oba projekty) na `84096ff`: 13 passed / 9 skipped / 0 failed.
+
 ## Prompt startowy
 
 > Verify the review fixes on `feat/aiui-prototype` as a read-only reviewer. Start with `docs/review/VERIFICATION_BRIEF.md`.

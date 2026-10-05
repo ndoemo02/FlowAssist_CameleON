@@ -27,6 +27,12 @@ const lastTap = new Map<string, number>();
 /** Element z atrybutem data-nodrag (przyciski, menu) nie startuje gestów karty. */
 const fromControl = (e: Event | undefined) => Boolean((e?.target as HTMLElement | null)?.closest?.('[data-nodrag]'));
 
+/**
+ * Gest przerwany przez przeglądarkę/system. @use-gesture zgłasza pointercancel/touchcancel jako zwykły
+ * koniec gestu (`last`), więc bez tej kontroli anulowanie zapisywałoby geometrię (E2E-2, ADR 0006; I7).
+ */
+const cancelledEnd = (last: boolean, e: Event | undefined) => last && (e?.type === 'pointercancel' || e?.type === 'touchcancel');
+
 export interface CardGestureOptions {
     id: string;
     cardRef: RefObject<HTMLElement>;
@@ -46,6 +52,7 @@ export function useCardGestures({ id, cardRef, containerRef, baseTransform, enab
         {
             onDrag: ({ first, last, tap, movement: [mx, my], swipe: [, sy], event, memo, cancel }) => {
                 if (first && fromControl(event)) { cancel(); return; }
+                if (cancelledEnd(last, event)) { restore(); return; }
                 const e = entry();
                 if (!e) { restore(); cancel(); return; }
                 if (tap) {
@@ -74,6 +81,7 @@ export function useCardGestures({ id, cardRef, containerRef, baseTransform, enab
             },
             onPinch: ({ first, last, movement: [ms], memo, event, cancel }) => {
                 if (first && fromControl(event)) { cancel(); return; }
+                if (cancelledEnd(last, event)) { restore(); return; }
                 const e = entry();
                 if (!e) { restore(); cancel(); return; }
                 const m = (memo as { token: GestureToken; scale: number } | undefined) ?? { token: gestureToken(e, { w: 1, h: 1 }), scale: e.scale };
@@ -104,6 +112,7 @@ export function useResizeHandle(id: string, cardRef: RefObject<HTMLElement>, bas
     return useGesture({
         onDrag: ({ last, movement: [mx, my], memo, cancel, event }) => {
             event.stopPropagation();
+            if (cancelledEnd(last, event)) { restore(); return; }
             const e = useAiUi.getState().layout[id];
             if (!e) { restore(); cancel(); return; }
             const m = (memo as { token: GestureToken; scale: number } | undefined) ?? { token: gestureToken(e, { w: 1, h: 1 }), scale: e.scale };

@@ -1,6 +1,6 @@
 # ADR 0006: Ustalenia harnessu przeglądarkowego (P0.1)
 
-- **Status:** zaakceptowany 2026-10-05. **E2E-1:** zrealizowane — opcja (a). **E2E-2: OPEN** (czeka na decyzję). **FLAKE-1: OPEN** (bramka 9/10). A11Y-1..3 przechodzą do P0.5.
+- **Status:** zaakceptowany 2026-10-05. **E2E-1:** zrealizowane — opcja (a). **E2E-2:** zrealizowane. **FLAKE-2: obserwowany** (podwójny tap pod obciążeniem). **FLAKE-1: OPEN** (bramka 9/10). A11Y-1..3 przechodzą do P0.5.
 - **Kontekst:** P0.1 wprowadził Playwright + axe-core (devDependencies, tylko Chromium) z testami w `e2e/`.
   - Stan aplikacji ustawiamy przez dev-hook `window.__aiui`, bez osi czasu mocka.
   - WebGL w headless jest programowy (SwiftShader), więc testy nie mierzą FPS ani renderów.
@@ -27,13 +27,20 @@
   - `gestures.spec`: drag (raise + jeden commit), anulowanie przez zmianę od agenta i podwójny tap przechodzą. Test `pointercancel` ujawnił E2E-2.
   - Regresja desktop: smoke, anchor, compact, lifecycle, surfaces, a11y zielone. Dwa wcześniejsze przekroczenia czasu a11y (oczekiwanie na meshe ekranu 81 s) wynikały z pamięci maszyny zajętej w ponad 80%: przebieg kontrolny z `preserve-3d` i przebieg z poprawką po zwolnieniu pamięci przeszły.
 
-## E2E-2 (OPEN): `pointercancel` w trakcie przeciągania zapisuje geometrię
+## E2E-2 (zrealizowane): `pointercancel` w trakcie przeciągania zapisuje geometrię
 
 - **Obserwacja:** po `pointercancel` (pointerId zgodny z gestem) pozycja karty jest zapisana już przed `pointerup` — sonda w przeglądarce: `x 0,8333 → 0,8671` w chwili anulowania.
 - **Przyczyna:** `@use-gesture` 10.3.1 podpina `pointercancel` pod ten sam handler co `pointerup` (`DragEngine.pointerUp`), więc `onDrag` dostaje zwykły koniec gestu (`last`). `useCardGestures.onDrag` i `useResizeHandle` w `overlay/gestures.ts` przy `last` nie sprawdzają `event.type` i wysyłają `move` / `resize`.
 - **Zasięg:** mysz praktycznie nie generuje `pointercancel`; dotyczy dotyku i pióra (przeglądarka przejmuje gest, utrata kontaktu) w układzie desktop, np. tablet w poziomie. Kontrakt gestów (I7: zapis tylko na końcu gestu, anulowanie bez zapisu) jest naruszony.
 - **Właściciel:** warstwa gestów, `overlay/gestures.ts`. Nie kernel, nie protokół.
-- **Propozycja:** przy `last` z `event.type === 'pointercancel'` przywrócić `transform` i nie wysyłać polecenia (karta i uchwyt rozmiaru); włączyć test `pointercancel` w `gestures.spec`. Osobny commit „fix(aiui)” po decyzji właściciela.
+- **Realizacja (2026-10-05, decyzja właściciela):** `cancelledEnd` w `overlay/gestures.ts` — przy `last` z `pointercancel`/`touchcancel` gest przywraca `transform` i nie wysyła polecenia: drag karty (także ścieżka tap), pinch karty, uchwyt rozmiaru.
+  - Testy e2e (najpierw czerwone, potem zielone): drag i zmiana rozmiaru z `pointercancel`; każdy sprawdza, że gest trwał (zmieniony `transform`), że stan się nie zmienił i że `transform` wrócił.
+  - Pinch: ta sama przyczyna w bibliotece (`bind(...'cancel', pinchEnd)`), poprawiony tym samym warunkiem, ale **bez testu e2e** (pinch dotykowy nie jest wiarygodnie symulowany w desktopowym Chromium).
+
+## FLAKE-2 (obserwowany): podwójny tap pod obciążeniem maszyny
+
+- Jeden raz w pełnym przebiegu `gestures.spec` drugi klik zarejestrował się jako pojedynczy tap (focus zamiast screen). Okno podwójnego tapu to 350 ms (`DOUBLE_TAP_MS`), a test wykonuje dwa sekwencyjne `mouse.click` z rundami do przeglądarki. Ponowienie 3/3 i pełny `gestures.spec` 5/5 zielone.
+- Prawdopodobnie artefakt testu pod obciążeniem, nie aplikacji. Bez zmian; jeśli wróci, rozważyć sprawdzenie odstępu między klikami w teście.
 
 
 

@@ -42,17 +42,38 @@ test.describe('gesty kart (desktop)', () => {
         expect(after.presentation).toBe('focus');
     });
 
+    // E2E-2 (ADR 0006): @use-gesture zgłasza pointercancel jako zwykły koniec gestu — anulowanie nie może nic zapisać.
     test('pointercancel w trakcie drag nie zapisuje geometrii', async ({ page }) => {
-        test.fixme(true, 'E2E-2 (ADR 0006): @use-gesture traktuje pointercancel jak pointerup, więc drag zapisuje geometrię — czeka na decyzję właściciela');
+        const card = page.getByRole('article', { name: 'Element table' });
         const p = await hittablePoint(page, 'Element table');
         const before = (await layout(page)).table;
+        const restTransform = await card.evaluate((el) => (el as HTMLElement).style.transform);
         await page.mouse.move(p.x, p.y);
         await page.mouse.down();
         for (let i = 1; i <= 5; i++) await page.mouse.move(p.x + i * 10, p.y + i * 4);
-        await page.getByRole('article', { name: 'Element table' }).dispatchEvent('pointercancel', { pointerId: 1, bubbles: true });
+        expect(await card.evaluate((el) => (el as HTMLElement).style.transform)).not.toBe(restTransform); // gest trwa
+        await card.dispatchEvent('pointercancel', { pointerId: 1, bubbles: true });
         await page.mouse.up();
         const after = (await layout(page)).table;
         expect([after.x, after.y]).toEqual([before.x, before.y]);
+        expect(await card.evaluate((el) => (el as HTMLElement).style.transform)).toBe(restTransform); // transform przywrócony
+    });
+
+    test('pointercancel w trakcie zmiany rozmiaru nie zapisuje skali', async ({ page }) => {
+        const card = page.getByRole('article', { name: 'Element table' });
+        const handle = card.locator('[aria-label="Zmień rozmiar"]');
+        const box = (await handle.boundingBox())!;
+        const hx = box.x + box.width / 2, hy = box.y + box.height / 2;
+        const before = (await layout(page)).table;
+        const restTransform = await card.evaluate((el) => (el as HTMLElement).style.transform);
+        await page.mouse.move(hx, hy);
+        await page.mouse.down();
+        for (let i = 1; i <= 5; i++) await page.mouse.move(hx + i * 12, hy + i * 12);
+        expect(await card.evaluate((el) => (el as HTMLElement).style.transform)).not.toBe(restTransform); // gest trwa
+        await handle.dispatchEvent('pointercancel', { pointerId: 1, bubbles: true });
+        await page.mouse.up();
+        expect((await layout(page)).table.scale).toBe(before.scale);
+        expect(await card.evaluate((el) => (el as HTMLElement).style.transform)).toBe(restTransform);
     });
 
     test('podwójny tap wysyła kartę na ekran', async ({ page }) => {

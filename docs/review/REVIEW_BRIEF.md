@@ -3,6 +3,9 @@
 Krótka mapa dla niezależnego recenzenta (tylko odczyt). Branch `feat/aiui-prototype`, commit zawierający ten plik.
 To kontekst, nie dowód poprawności: ADR-y opisują intencję i stan na dzień zapisu — weryfikuj w kodzie i testach.
 
+> **Status (2026-10-05):** pełny review `61209b8` wykonany (Opus → Astra: GO WITH FIXES). Poprawki są na branchu do
+> `1f12885` (kod). Weryfikacja poprawek bez ponownego pełnego audytu: [`VERIFICATION_BRIEF.md`](VERIFICATION_BRIEF.md).
+
 ## Zakres
 
 **W zakresie:**
@@ -45,7 +48,7 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 ## Granica zaufania AI → UI (stan dziś)
 
 - Wejście agenta: `contract.ts: parseEvent` → walidatory `catalog.ts` → lokalne widoki `registry.tsx`. Ajv tylko w testach; autorytetem runtime są guardy.
-- Dev-hooki `window.__aiui`, `__anchorRegistry` (i `__screenAnchor` z `?anchor=probe`) mają istnieć tylko poza produkcją — warto zweryfikować bramkowanie.
+- Dev-hooki `window.__aiui`, `__anchorRegistry` i `__screenAnchor` (`?anchor=probe`) istnieją tylko poza produkcją (R#7: sonda bramkowana od `544fb31`; w bundlu `next build` brak kodu sondy).
 - Prawdziwe niezaufane dane z sieci pojawią się dopiero z adapterem AG-UI; review bezpieczeństwa tej granicy jest zaplanowany osobno (P1.7/P1.6).
 
 ## Znane i rozstrzygnięte (nie zgłaszać ponownie bez nowego dowodu)
@@ -62,15 +65,27 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 | FLAKE-1 | OPEN — sporadycznie meshe ekranu nie rejestrują się w 90 s; tropy: wideo/Suspense, brak pamięci | ADR 0006 |
 | FLAKE-2 | Obserwowany — podwójny tap (okno 350 ms) pod obciążeniem | ADR 0006 |
 | A11Y-1..3 | Zaplanowane na P0.5 (baseline axe) | ADR 0006 |
+| R#1 | Zrealizowane `9367eb5` — wrogie dane agenta (`ref`, `null` w taskach, skrajne liczby) nie wychodzą poza kartę / węzeł; lokalne boundary z odzyskaniem | `viewProps.ts`, `components/RenderGuard.tsx` |
+| R#2 | Zrealizowane `5d46bc6` — callback `canceled` nie zapisuje; klik w `[data-nodrag]` nie jest połykany | `overlay/gestures.ts` |
+| R#3 | Zrealizowane `39af130` (kernel, zgoda właściciela) — siatka P9 przy zmianie zbioru id | ADR 0001, `layout.ts` |
+| R#4 | Zrealizowane `0aad0f3` — kanoniczne indeksy tablic w JSON Pointer, odrzucenie bez zmiany dokumentu | ADR 0002, `jsonPointer.ts` |
+| R#5 | Zrealizowane `2f0dfcc` — `VALIDATION_FAILED` raz na wystąpienie, z pochodzeniem przebiegu; reszta = FU-1 | `validationReporting.ts`, AGENTS.md |
+| R#6 | Odłożone do P1.6 (FU-2) — `dispatch(raw)` bez `runId` | AGENTS.md |
+| R#7 | Zrealizowane `544fb31` — `?anchor=probe` tylko poza produkcją | `scene/ScreenAnchorProbe.tsx` |
+| NEW-1 | Zrealizowane `1f12885` — tap na przycisku karty nie liczy się do podwójnego tapu („+ +” ≠ ekran) | `overlay/gestures.ts` |
 
 Świadome luki testów: kierunek agent → klient dla I3 pokrywa korpus replay (P0.2), nie test jednostkowy;
-`VALIDATION_FAILED` z warstwy UI widać tylko w przeglądarce; `raise`/`focus`/`toScreen` celowo bez tokenu gestu (I7).
+`raise`/`focus`/`toScreen` celowo bez tokenu gestu (I7). `VALIDATION_FAILED` z warstwy UI pokrywają od R#5 testy jsdom
+(`validationReporting.test.tsx`); replay korpusu go nie widzi (raportuje warstwa UI, nie koordynator).
 
 ## Weryfikacja lokalna
 
-- `npm test` — vitest (155 testów: kontrakt, reducer, układ, gesty, replay korpusu, parytet schematów).
+- `npm test` — vitest (214 testów na `1f12885`: kontrakt, reducer, układ, gesty, replay korpusu, parytet schematów,
+  render DOM w jsdom — `*.test.tsx`).
 - `npx tsc --noEmit` — oczekiwany dokładnie 1 znany błąd (`safelayer/Lanyard.tsx`); każdy inny to regresja.
 - `npm run test:e2e` — wymaga ~4 GB wolnej pamięci; timeouty przy pamięci zajętej > 80% są środowiskowe.
+- `npx next build` — nie uruchamiać, gdy działa `next dev` na tym samym katalogu: build nadpisuje `.next` i serwer dev
+  (np. e2e na porcie 3100) zwraca 404 na chunki — po buildzie zrestartować serwer dev.
 
 ## Prompt startowy (do wklejenia w nowej sesji)
 

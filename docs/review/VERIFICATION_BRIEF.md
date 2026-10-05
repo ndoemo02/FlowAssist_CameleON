@@ -49,6 +49,21 @@ Weryfikacja rundy 1: R#2, R#3, R#4, R#7, NEW-1 — CONFIRMED; R#1 i R#5 — ISSU
 Weryfikacja rundy 2: vitest 219/219; tsc tylko Lanyard; E2E celowane `surfaces` + `gestures` (oba projekty) na `0f71c72`:
 13 passed / 9 skipped / 0 failed. Pełne E2E i `next build` nie były powtarzane po rundzie 2.
 
+## Runda 3: poprawki po weryfikacji rundy 2 (2026-10-05)
+
+Weryfikacja rundy 2: `propsSignature` — OK; FU-3 — OK jako follow-up (dodane kryterium akceptacji, `a7b3a67`);
+R#5 — 2 ISSUE. Zakres rundy 3: `1c741b1..e820e0d` (kod) + `a7b3a67` i commit dokumentacji po nim.
+
+| # | Commit | Co zmieniono | Test błędu | Pytanie do weryfikacji |
+|---|---|---|---|---|
+| V2-R#5a MEDIUM | `df55d09` | `RenderGuard` zgłasza też zatwierdzony udany pierwszy render nowej instancji (`componentDidMount` bez błędu); `resolveRenderProblem` niesie `runId` z chwili renderu i ignoruje inny przebieg. Samo odmontowanie i zmiana danych bez udanego renderu nie kończą wystąpienia | złe → zwinięcie HUD → poprawne dane → rozwinięcie z udanym renderem → złe → 2; strażnik: odmontowanie + dane nadal złe → remount → 1 | Czy udany render jednej instancji (np. ekran) przy błędzie drugiej (karta, inna gęstość) może zamknąć wystąpienie za wcześnie w praktyce? |
+| V2-R#5b MEDIUM | `e820e0d` | Obecność węzła w drzewach slotów = członkostwo w grafie definicji (`root` → `children`, iteracyjnie, odporne na cykle); nierozwiązany członek (np. pod rodzicem w pending) = `unavailable`: ani odzyskany, ani usunięty | dziecko w fallbacku → rodzic pending → rodzic gotowy, dziecko nadal złe → 1; strażnik: usunięcie z `children` i ponowne dodanie → 2 | Czy członkostwo z grafu definicji pokrywa wszystkie przypadki „chwilowej niedostępności” (np. węzeł poza `MAX_DEPTH`)? |
+
+Weryfikacja rundy 3: vitest 223/223; pełny tsc: 1 znany błąd (Lanyard). E2E celowane `surfaces` + `gestures` (oba projekty)
+na `a7b3a67`: 11 passed / 9 skipped / 2 failed — obie porażki środowiskowe (pamięć ~2,7 GB wolnego): „+ +” zatrzymany przez
+własny strażnik ważności testu (odstęp tapów 646 ms > 350 ms, test niekonkluzywny) i `waitScreenMeshes` 90 s (FLAKE-1);
+jednorazowe ponowienie tych dwóch testów (desktop): 2/2 passed.
+
 ## Prompt startowy
 
 > Verify the review fixes on `feat/aiui-prototype` as a read-only reviewer. Start with `docs/review/VERIFICATION_BRIEF.md`.

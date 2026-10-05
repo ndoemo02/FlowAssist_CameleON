@@ -11,7 +11,7 @@
 | Hint agenta (przychodzący) | `presentation`, `stage.focus` | walidowany hint; stosowany wg P3–P5 | `reducer.ts`, `layout.ts: reconcileLayout` |
 | Operacja semantyczna | „Pogłęb”, „Zatwierdź”, „Odrzuć”, „Pokaż jako…”, akcje z `WorkspaceItem.actions` | `store.sendAction(name, surfaceId, sourceComponentId, context)` → A2UI `action` z `itemId` i migawką układu `{ screen, focus, dismissed }`; widok zmienia dopiero odpowiedź agenta | `store.ts: sendAction`, `layout.ts: layoutSnapshot`, `contract.ts: buildAction` |
 | Stan efemeryczny UI | otwarcie menu, rozwinięcie decyzji, zoom treści ekranu | lokalny `useState` w komponencie; ani store, ani agent | `WorkspaceLayer` (`menu`), `ScreenLayer` (`menu`, `zoom`), `HudLayer` (`expanded`) |
-| Błąd klienta | nieprawidłowe propsy lub treść | A2UI `error` `VALIDATION_FAILED`, raz na problem | `ItemContent.tsx: useItemView`, `store.reportClientError` |
+| Błąd klienta | nieprawidłowe propsy lub treść, błąd renderu | A2UI `error` `VALIDATION_FAILED`, raz na wystąpienie problemu (nawrót po odzyskaniu = nowe zgłoszenie); tylko w tym samym, aktywnym przebiegu | `validationReporting.ts`, `store.reportClientError(error, { runId })` |
 
 ## Reguły
 

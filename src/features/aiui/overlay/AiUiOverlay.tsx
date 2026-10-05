@@ -7,6 +7,7 @@ import type { Surface } from '../reducer';
 import { resolveTree, type ResolvedNode } from '../resolveTree';
 import { FOCUS_ANGLE, slotVisibility } from '../slots';
 import { useAiUi, type ScenarioStatus } from '../store';
+import { startValidationReporting } from '../validationReporting';
 import HudLayer from './HudLayer';
 import ScreenLayer from './ScreenLayer';
 import { useCompact } from './useCompact';
@@ -22,6 +23,8 @@ const DEMO_PROMPT = 'Zbadaj popyt na rezerwacje online w salonach usługowych w 
 export default function AiUiOverlay() {
     const compact = useCompact();
     useDemoAutostart();
+    // VALIDATION_FAILED do agenta: ze stanu, raz na wystąpienie problemu (review #5)
+    useEffect(() => startValidationReporting(), []);
 
     return (
         <div className="pointer-events-none absolute inset-0 z-20">

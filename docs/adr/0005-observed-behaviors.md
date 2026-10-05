@@ -69,7 +69,7 @@
   - `presentation: 'dismissed'` od agenta unieważnia **cały** element (fallback z `VALIDATION_FAILED` z warstwy UI), a nie tylko hint.
 
   Rekomendacja: zostawić ścisłą walidację wartości wyliczeniowych. Ostrzeganie agenta o ignorowanych polach układu to rola lintu lub adaptera, nie kernela.
-- **Fixture 04:** `VALIDATION_FAILED` dla fallbacku wysyła warstwa UI (`ItemContent.tsx: useItemView`), nie koordynator. Replay bez Reacta go nie widzi; pokryje to harness przeglądarkowy (P0.1).
+- **Fixture 04:** `VALIDATION_FAILED` dla fallbacku wysyła warstwa UI (`validationReporting.ts`, instalowany przez `AiUiOverlay`), nie koordynator, więc replay go nie widzi. Od review #5 raport liczony jest ze stanu (raz na wystąpienie, niezależnie od zamontowanych widoków); pokrywa go `__tests__/validationReporting.test.tsx`.
 - **Fixture 08:**
   - powtórzone `narration` z `speak` mówi ponownie. Dla różnych zdarzeń to poprawne; dla tego samego identyfikatora deduplikuje adapter;
   - powtórzone `updateDataModel` nie ma efektów;

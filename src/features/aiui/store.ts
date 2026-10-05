@@ -54,7 +54,7 @@ export interface AiUiState extends CoreState {
     setSceneReady(): void;
     toggleOrbitPanel(): void;
     sendAction(name: string, surfaceId: SurfaceId, sourceComponentId: string, context?: Record<string, unknown>): void;
-    reportClientError(error: ClientError): void;
+    reportClientError(error: ClientError, origin: { runId: number }): void;
     setDrawer(drawer: DrawerState): void;
     startScenario(id: string, prompt?: string): boolean;
     stopScenario(): void;
@@ -203,7 +203,14 @@ export const useAiUi = create<AiUiState>()((set, get) => {
             getTransport().send(buildAction(name, surfaceId, sourceComponentId, { ...context, workspace: layoutSnapshot(get().layout) }));
         },
 
-        reportClientError(error) {
+        // Review #5: raport niesie jawne pochodzenie (przebieg, w którym powstał). Wysyłany tylko w tym samym,
+        // aktywnym przebiegu — spóźniony raport po restarcie lub po done/error nie trafia do agenta.
+        reportClientError(error, origin) {
+            const { runId, status } = get().scenario;
+            if (origin.runId !== runId || (status !== 'running' && status !== 'awaiting_action')) {
+                console.warn(`[aiui] raport renderera pominięty — przebieg ${origin.runId} nie jest aktywny (bieżący ${runId}: ${status}).`, error);
+                return;
+            }
             console.warn('[aiui] renderer odrzucił komponent:', error);
             transport?.send(buildError(error));
         },

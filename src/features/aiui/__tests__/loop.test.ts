@@ -123,7 +123,7 @@ describe('pętla action → transport → event → UI', () => {
         expect(st().scenario.runId).toBe(firstRun + 1);
         expect(st().surfaces.workspace).toBeUndefined();
         expect(st().layout).toEqual({});
-        st().dispatch({ narration: { text: 'stare' } }, firstRun);
+        st().transportDispatch({ narration: { text: 'stare' } }, firstRun);
         expect(st().narration.text).toBeNull();
 
         vi.advanceTimersByTime(1000);
@@ -133,7 +133,7 @@ describe('pętla action → transport → event → UI', () => {
     it('deleteSurface(workspace) resetuje układ (P7)', () => {
         st().startScenario('test');
         vi.advanceTimersByTime(1000);
-        st().dispatch({ version: V, deleteSurface: { surfaceId: 'workspace' } });
+        st().devDispatch({ version: V, deleteSurface: { surfaceId: 'workspace' } });
         expect(st().layout).toEqual({});
     });
 });
@@ -155,7 +155,7 @@ describe('trwałe zakończenie przebiegu (Astra #2)', () => {
         const runId = st().scenario.runId;
         st().receiveStatus(runId, 'done');
         st().receiveStatus(runId, 'awaiting_action');
-        st().dispatch({ narration: { text: 'spóźnione' } }, runId);
+        st().transportDispatch({ narration: { text: 'spóźnione' } }, runId);
         expect(st().scenario.status).toBe('done');
         expect(st().narration.text).toBeNull();
     });
@@ -203,7 +203,7 @@ describe('OBS-2: stage.focus agenta respektuje okres łaski ręcznego obrotu (P3
     it('w ciągu 2 s po ręcznym obrocie: nie przejmuje kamery ani stage.focus; drawer stosowany', () => {
         st().setAngle(1, 'manual');
         vi.advanceTimersByTime(1500);
-        st().dispatch({ stage: { focus: 'back', drawer: 'open' } });
+        st().devDispatch({ stage: { focus: 'back', drawer: 'open' } });
         expect(st().camera).toMatchObject({ angle: 1, source: 'manual', tween: null });
         expect(st().stage).toEqual({ focus: 'front', drawer: 'open' });
     });
@@ -211,7 +211,7 @@ describe('OBS-2: stage.focus agenta respektuje okres łaski ręcznego obrotu (P3
     it('po okresie łaski: przejmuje kamerę i ustawia stage.focus', () => {
         st().setAngle(1, 'manual');
         vi.advanceTimersByTime(2500);
-        st().dispatch({ stage: { focus: 'back' } });
+        st().devDispatch({ stage: { focus: 'back' } });
         expect(st().stage.focus).toBe('back');
         expect(st().camera.source).toBe('director');
         settle();
@@ -219,12 +219,12 @@ describe('OBS-2: stage.focus agenta respektuje okres łaski ręcznego obrotu (P3
     });
 
     it('powtórzony ten sam stage.focus po okresie łaski nadal może ponownie skierować kamerę', () => {
-        st().dispatch({ stage: { focus: 'back' } });
+        st().devDispatch({ stage: { focus: 'back' } });
         settle();
         expect(angleAbs()).toBeCloseTo(Math.PI, 5);
         st().setAngle(1, 'manual');
         vi.advanceTimersByTime(2500);
-        st().dispatch({ stage: { focus: 'back' } }); // stage.focus już 'back' — efekt kamery mimo to
+        st().devDispatch({ stage: { focus: 'back' } }); // stage.focus już 'back' — efekt kamery mimo to
         expect(st().camera.source).toBe('director');
         settle();
         expect(angleAbs()).toBeCloseTo(Math.PI, 5);
@@ -233,10 +233,10 @@ describe('OBS-2: stage.focus agenta respektuje okres łaski ręcznego obrotu (P3
     it('stage.focus zignorowany w okresie łaski nie blokuje poprawnego przejęcia po nim', () => {
         st().setAngle(1, 'manual');
         vi.advanceTimersByTime(500);
-        st().dispatch({ stage: { focus: 'back' } });
+        st().devDispatch({ stage: { focus: 'back' } });
         expect(st().stage.focus).toBe('front');
         vi.advanceTimersByTime(2000); // razem 2,5 s od ręcznego obrotu
-        st().dispatch({ stage: { focus: 'back' } });
+        st().devDispatch({ stage: { focus: 'back' } });
         expect(st().stage.focus).toBe('back');
         settle();
         expect(angleAbs()).toBeCloseTo(Math.PI, 5);
@@ -314,13 +314,13 @@ describe('kamera i referencje stanu', () => {
 
     it('powrót na front kończy się dokładnie na 0 (gałąź cinematic)', () => {
         useAiUi.setState({ camera: { angle: FOCUS_ANGLE.back, source: 'manual', tween: null } });
-        st().dispatch({ stage: { focus: 'front' } });
+        st().devDispatch({ stage: { focus: 'front' } });
         settle();
         expect(st().camera.angle).toBe(0);
     });
 
     it('ręczny suwak przerywa auto-tween', () => {
-        st().dispatch({ stage: { focus: 'back' } });
+        st().devDispatch({ stage: { focus: 'back' } });
         st().tickCamera(0.3);
         st().setAngle(0.5, 'manual');
         expect(st().camera.tween).toBeNull();

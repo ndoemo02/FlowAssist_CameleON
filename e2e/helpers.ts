@@ -63,9 +63,9 @@ export async function hittablePoint(page: Page, cardName: string) {
     return p;
 }
 
-/** Zdarzenie agenta przez koordynator (bez runId — poza przebiegiem mocka). */
+/** Zdarzenie agenta przez DEWELOPERSKIE wejście koordynatora (devDispatch: bez runId, poza przebiegiem mocka). */
 export async function dispatch(page: Page, event: unknown) {
-    await page.evaluate((e) => (window as unknown as { __aiui: { getState(): { dispatch(raw: unknown): void } } }).__aiui.getState().dispatch(e), event);
+    await page.evaluate((e) => (window as unknown as { __aiui: { getState(): { devDispatch(raw: unknown): void } } }).__aiui.getState().devDispatch(e), event);
 }
 
 /** Stół z trzema elementami (wykres, KPI, tabela) i danymi. */

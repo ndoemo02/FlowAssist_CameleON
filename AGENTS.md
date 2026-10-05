@@ -340,8 +340,8 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
 - **Follow-upy przed P1.6** (review 2026-10-05, `docs/review/REVIEW_BRIEF.md`):
   - ~~**FU-1 (reszta #5)**~~ — zrealizowane: błędy struktury (komponent niedostępny w slocie, root `workspace`
     niebędący `Workspace`) raportuje `validationReporting.ts` ze stanu, tym samym cyklem wystąpienia;
-  - **FU-2 (#6, odłożone):** `store.dispatch(raw)` bez `runId` omija izolację I6. Oddzielić wejście
-    developerskie od transportowego razem z adapterem (zmiana kernela).
+  - ~~**FU-2 (#6)**~~ — zrealizowane: wejście transportowe `transportDispatch(raw, runId)` (runId wymagany)
+    i deweloperskie `devDispatch(raw)` (dev-hook / testy, wyłączone w produkcji) są rozdzielone (ADR 0001, I6);
   - ~~**FU-3**~~ — zrealizowane: limity ścieżki `updateDataModel` (≤ 512 znaków, ≤ 32 segmenty) w `contract.ts:
     PROTOCOL_LIMITS`, sprawdzane w `parseEvent` przed reducerem (ADR 0002). Opis pierwotny:
     `jsonPointer.ts: setAt` jest rekurencyjne po segmentach ścieżki — `updateDataModel` z ekstremalnie

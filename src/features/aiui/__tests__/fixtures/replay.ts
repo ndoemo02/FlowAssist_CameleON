@@ -121,7 +121,7 @@ function run(fixture: Fixture, speakMock: { mock: { calls: unknown[][] } }): Che
     try {
         for (const step of fixture.steps) {
             if ('start' in step) st().startScenario(step.start);
-            else if ('event' in step) st().dispatch(step.event, runIdFor(step.run));
+            else if ('event' in step) st().transportDispatch(step.event, runIdFor(step.run));
             else if ('status' in step) st().receiveStatus(runIdFor(step.run), step.status);
             else if ('command' in step) {
                 const { withToken, ...cmd } = step.command;

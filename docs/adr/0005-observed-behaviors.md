@@ -20,7 +20,7 @@
 
 ### OBS-1: komunikat niezgodny z kontraktem jest odrzucany po cichu (fixture 03)
 - **Obserwacja:** `createSurface` z obcym katalogiem: `parseEvent` zwraca `null`, a `store.dispatch` wypisuje tylko `console.warn`. Agent **nie dostaje** błędu. Dowiaduje się pośrednio dopiero przy kolejnym `updateComponents` (`SURFACE_NOT_FOUND`).
-- **Właściciel:** to nie duplikat transportowy, tylko brak informacji zwrotnej o walidacji koperty. Odrzucenie dzieje się w `store.ts: dispatch` (kernel).
+- **Właściciel:** to nie duplikat transportowy, tylko brak informacji zwrotnej o walidacji koperty. Odrzucenie dzieje się w koordynatorze `store.ts` (`apply`, za `transportDispatch`; kernel).
 - **Opcje:**
   - (a) zostawić;
   - (b) adapter (P1.6) przed `onEvent` sam woła eksportowane `parseEvent` i przy `null` odsyła `VALIDATION_FAILED` w ramach profilu transportowego. Kernel bez zmian;

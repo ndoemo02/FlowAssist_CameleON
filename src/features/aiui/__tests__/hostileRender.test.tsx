@@ -28,7 +28,7 @@ function startRun() {
     useAiUi.getState().setSceneReady();
     useAiUi.getState().startScenario('test');
 }
-const agent = (raw: unknown) => useAiUi.getState().dispatch(raw, useAiUi.getState().scenario.runId);
+const agent = (raw: unknown) => useAiUi.getState().transportDispatch(raw, useAiUi.getState().scenario.runId);
 const errorsSent = () => sent.filter((m): m is Extract<ClientMessage, { error: unknown }> => 'error' in m).map((m) => m.error);
 
 /** Surface workspace z jednym elementem `m` (treść z bindingu /items/m). */

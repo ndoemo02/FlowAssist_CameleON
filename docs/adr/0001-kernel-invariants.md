@@ -9,8 +9,8 @@
 
 ## Pliki kernela
 
-`reducer.ts`, `layout.ts`, koordynator w `store.ts` (`dispatch`, `layoutCommand`, `receiveStatus`,
-`sendAction`, `tweenTo`/`tickCamera`), `workspace.ts`, `overlay/gestureLogic.ts`,
+`reducer.ts`, `layout.ts`, koordynator w `store.ts` (`apply` za wejściami `transportDispatch` / `devDispatch`,
+`layoutCommand`, `receiveStatus`, `sendAction`, `tweenTo`/`tickCamera`), `workspace.ts`, `overlay/gestureLogic.ts`,
 `scene/measureScreen.ts`, `scene/ScreenAnchor.tsx`, `scene/anchorRegistry.ts`.
 
 ## Inwarianty
@@ -66,7 +66,7 @@ Współrzędne, rozmiar i kolejność warstw kart nigdy nie pochodzą od agenta,
 ### I5: kolejność koordynatora
 Zdarzenie agenta: `parseEvent` → `reduce` → `reconcileLayout` (tylko gdy zmienił się surface `workspace`) → jeden `set()` → efekty (kamera, TTS, raport błędów).
 Komenda użytkownika: `presentationReducer` → jeden `set()` → kamera.
-- **Kod:** `store.ts: dispatch`, `layoutCommand`.
+- **Kod:** `store.ts: apply` (wspólny dla `transportDispatch` i `devDispatch`), `layoutCommand`.
 - **Testy:** `loop.test.ts`: „kamera i referencje stanu”, „koordynator: ekran i kamera (P3)”.
 
 ### I6: izolacja przebiegów i trwałość stanu terminalnego
@@ -75,8 +75,15 @@ Komenda użytkownika: `presentationReducer` → jeden `set()` → kamera.
 - Akcje semantyczne są wysyłane tylko w `running` i `awaiting_action`.
 
 Ochrona jest w store, niezależnie od transportu.
-- **Kod:** `store.ts: dispatch`, `receiveStatus`, `sendAction`.
-- **Testy:** `loop.test.ts`: „trwałe zakończenie przebiegu”, „restart odcina zdarzenia starego przebiegu”.
+- **Wejścia (FU-2, zmiana API kernela zatwierdzona przez właściciela 2026-10-06):**
+  - `transportDispatch(raw, runId)` — jedyne wejście transportu (most `setTransport`); `runId` **wymagany**,
+    inny lub zamknięty przebieg → odrzucone. Brak `runId` jest błędem typu;
+  - `devDispatch(raw)` — świadome wejście dev/test (dev-hook `window.__aiui`, seedowanie e2e, testy koordynatora)
+    **bez** izolacji przebiegów; w produkcji wyłączone. Transport nie ma do niego dostępu.
+  - Oba wołają ten sam koordynator (`apply`), więc ich zachowanie po przyjęciu zdarzenia jest identyczne.
+- **Kod:** `store.ts: transportDispatch`, `receiveStatus`, `sendAction`.
+- **Testy:** `loop.test.ts`: „trwałe zakończenie przebiegu”, „restart odcina zdarzenia starego przebiegu”;
+  `runIsolation.test.ts` (bieżący / stary / po terminalnym, brak `runId`, `devDispatch` w produkcji, skan `transport/`).
 - **Uwaga:** chwilowa utrata połączenia nie może prowadzić do `done`/`error` (decyzja v1.3.2; adapter P1.6).
 
 ### I7: tożsamość gestu

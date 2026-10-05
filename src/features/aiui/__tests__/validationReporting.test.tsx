@@ -25,7 +25,7 @@ let stopReporting: () => void = () => {};
 const mount = (el: Parameters<typeof render>[0]) => { const r = render(el); mounted.push(r); return r; };
 const errorsSent = () => sent.filter((m): m is Extract<ClientMessage, { error: unknown }> => 'error' in m).map((m) => m.error);
 const runId = () => useAiUi.getState().scenario.runId;
-const agent = (raw: unknown) => useAiUi.getState().dispatch(raw, runId());
+const agent = (raw: unknown) => useAiUi.getState().transportDispatch(raw, runId());
 
 function startRun() {
     useAiUi.getState().setSceneReady();

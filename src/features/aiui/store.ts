@@ -46,7 +46,10 @@ export interface AiUiState extends CoreState {
     ui: { orbitPanel: boolean };
     layout: Layout;
 
-    dispatch(raw: unknown, runId?: number): void;
+    /** Wejście transportowe: runId wymagany (I6). */
+    transportDispatch(raw: unknown, runId: number): void;
+    /** Wejście deweloperskie (dev-hooki, testy): bez izolacji przebiegów; w produkcji wyłączone. */
+    devDispatch(raw: unknown): void;
     layoutCommand(cmd: LayoutCommand): void;
     receiveStatus(runId: number, status: RunStatus, error?: string): void;
     setAngle(angle: number, source: 'manual'): void;
@@ -70,7 +73,7 @@ export function setTransport(next: AgentTransport) {
     transport?.stop();
     transport = next;
     unsubscribe = next.subscribe(
-        (runId, raw) => useAiUi.getState().dispatch(raw, runId),
+        (runId, raw) => useAiUi.getState().transportDispatch(raw, runId),
         (runId, status, error) => useAiUi.getState().receiveStatus(runId, status, error),
     );
 }
@@ -116,42 +119,59 @@ export const useAiUi = create<AiUiState>()((set, get) => {
         }
     };
 
+    // Koordynator zdarzenia agenta (I5): parseEvent → reduce → reconcileLayout → jeden set() → efekty.
+    // Wspólne dla obu wejść (transportDispatch / devDispatch), żeby ich zachowanie nie mogło się rozjechać.
+    const apply = (raw: unknown) => {
+        const event = parseEvent(raw);
+        if (!event) {
+            console.warn('[aiui] odrzucony komunikat (niezgodny z kontraktem):', raw);
+            return;
+        }
+        const { surfaces, stage, narration, layout } = get();
+        const reduced = reduce({ surfaces, stage, narration }, event);
+        const { state } = reduced;
+        let { effects } = reduced;
+        const manualGrace = now() - lastManualAt <= MANUAL_GRACE_MS;
+        // P3 (ADR 0005, OBS-2): w okresie łaski po ręcznym obrocie stage.focus agenta nie przejmuje kamery
+        // ani nie zmienia stage.focus (jak hint 'screen'); drawer z tego samego komunikatu stosowany normalnie.
+        let agentStage = state.stage;
+        if (manualGrace && 'stage' in event && event.stage.focus) {
+            effects = effects.filter((e) => e.type !== 'focus');
+            if (state.stage.focus !== stage.focus) {
+                agentStage = state.stage.drawer === stage.drawer ? stage : { ...state.stage, focus: stage.focus };
+            }
+        }
+        // P8: uzgodnienie układu tylko, gdy zmienił się surface 'workspace' (w tym deleteSurface → reset, P7)
+        const r = state.surfaces.workspace !== surfaces.workspace
+            ? reconcileLayout(layout, workspaceMeta(state.surfaces.workspace))
+            : { layout, screenHint: false };
+        // P3: hint agenta 'screen' przenosi kamerę (i semantyczny cel), o ile użytkownik nie obraca ręcznie
+        const cameraToScreen = r.screenHint && !manualGrace;
+        const nextStage = cameraToScreen && agentStage.focus !== 'front' ? { ...agentStage, focus: 'front' as const } : agentStage;
+        if (state.surfaces !== surfaces || nextStage !== stage || state.narration !== narration || r.layout !== layout) {
+            set({ surfaces: state.surfaces, stage: nextStage, narration: state.narration, layout: r.layout });
+        }
+        runEffects(effects);
+        if (cameraToScreen) tweenTo(FOCUS_ANGLE.front);
+    };
+
     return {
         ...initialState(),
 
-        dispatch(raw, runId) {
-            if (runId !== undefined && (runId !== get().scenario.runId || isClosed(get().scenario.status))) return; // stary lub zamknięty przebieg
-            const event = parseEvent(raw);
-            if (!event) {
-                console.warn('[aiui] odrzucony komunikat (niezgodny z kontraktem):', raw);
+        // Wejście TRANSPORTOWE (FU-2, I6): runId wymagany. Zdarzenie innego lub zamkniętego przebiegu jest odrzucane.
+        transportDispatch(raw, runId) {
+            if (runId !== get().scenario.runId || isClosed(get().scenario.status)) return; // stary lub zamknięty przebieg
+            apply(raw);
+        },
+
+        // Wejście DEWELOPERSKIE (dev-hooki, testy, seedowanie e2e): świadomie BEZ izolacji przebiegów.
+        // W produkcji wyłączone. Transport nigdy z niego nie korzysta (setTransport → transportDispatch).
+        devDispatch(raw) {
+            if (process.env.NODE_ENV === 'production') {
+                console.warn('[aiui] devDispatch jest wyłączony w produkcji — zdarzenie pominięte.');
                 return;
             }
-            const { surfaces, stage, narration, layout } = get();
-            const reduced = reduce({ surfaces, stage, narration }, event);
-            const { state } = reduced;
-            let { effects } = reduced;
-            const manualGrace = now() - lastManualAt <= MANUAL_GRACE_MS;
-            // P3 (ADR 0005, OBS-2): w okresie łaski po ręcznym obrocie stage.focus agenta nie przejmuje kamery
-            // ani nie zmienia stage.focus (jak hint 'screen'); drawer z tego samego komunikatu stosowany normalnie.
-            let agentStage = state.stage;
-            if (manualGrace && 'stage' in event && event.stage.focus) {
-                effects = effects.filter((e) => e.type !== 'focus');
-                if (state.stage.focus !== stage.focus) {
-                    agentStage = state.stage.drawer === stage.drawer ? stage : { ...state.stage, focus: stage.focus };
-                }
-            }
-            // P8: uzgodnienie układu tylko, gdy zmienił się surface 'workspace' (w tym deleteSurface → reset, P7)
-            const r = state.surfaces.workspace !== surfaces.workspace
-                ? reconcileLayout(layout, workspaceMeta(state.surfaces.workspace))
-                : { layout, screenHint: false };
-            // P3: hint agenta 'screen' przenosi kamerę (i semantyczny cel), o ile użytkownik nie obraca ręcznie
-            const cameraToScreen = r.screenHint && !manualGrace;
-            const nextStage = cameraToScreen && agentStage.focus !== 'front' ? { ...agentStage, focus: 'front' as const } : agentStage;
-            if (state.surfaces !== surfaces || nextStage !== stage || state.narration !== narration || r.layout !== layout) {
-                set({ surfaces: state.surfaces, stage: nextStage, narration: state.narration, layout: r.layout });
-            }
-            runEffects(effects);
-            if (cameraToScreen) tweenTo(FOCUS_ANGLE.front);
+            apply(raw);
         },
 
         layoutCommand(cmd) {
@@ -245,7 +265,7 @@ export const useAiUi = create<AiUiState>()((set, get) => {
 export const selectScreenBusy = (s: AiUiState) =>
     isScreenOccupied(s.layout) || s.scenario.status === 'running' || s.scenario.status === 'awaiting_action';
 
-// Dev: sterowanie z konsoli, np. __aiui.getState().dispatch({ stage: { focus: 'back' } })
+// Dev: sterowanie z konsoli, np. __aiui.getState().devDispatch({ stage: { focus: 'back' } })
 if (typeof window !== 'undefined' && process.env.NODE_ENV !== 'production') {
     (window as unknown as { __aiui: typeof useAiUi }).__aiui = useAiUi;
 }

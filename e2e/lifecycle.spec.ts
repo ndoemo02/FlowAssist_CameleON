@@ -6,7 +6,7 @@ type Api = { __aiui: { getState(): {
     scenario: { runId: number; status: string };
     startScenario(id: string): boolean;
     stopScenario(): void;
-    dispatch(raw: unknown, runId?: number): void;
+    transportDispatch(raw: unknown, runId: number): void;
     receiveStatus(runId: number, status: string): void;
 } } };
 
@@ -16,8 +16,8 @@ test('stary przebieg i ruch po done są ignorowane w UI', async ({ page }, info)
     const hud = page.getByRole('complementary', { name: 'Decyzja' });
     const hudEvents = (runId: number) => page.evaluate((r) => {
         const s = (window as unknown as Api).__aiui.getState();
-        s.dispatch({ version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } }, r);
-        s.dispatch({ version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'root', component: 'Approval', title: 'Spóźnione', summary: 'x' }] } }, r);
+        s.transportDispatch({ version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } }, r);
+        s.transportDispatch({ version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'root', component: 'Approval', title: 'Spóźnione', summary: 'x' }] } }, r);
     }, runId);
 
     // uwaga: getState() zwraca migawkę — runId czytamy PO akcji, nie z obiektu sprzed niej

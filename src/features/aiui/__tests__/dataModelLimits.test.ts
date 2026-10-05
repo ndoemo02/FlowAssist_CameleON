@@ -40,7 +40,7 @@ describe('ekstremalna ścieżka przez ścieżkę transportową (kryterium akcept
 
     it('złośliwa ścieżka 10 000 segmentów: odrzucona, stan bez zmian, bez wyjątku; następny poprawny event obsłużony', () => {
         const runId = useAiUi.getState().scenario.runId;
-        const dispatch = (raw: unknown) => useAiUi.getState().dispatch(raw, runId);
+        const dispatch = (raw: unknown) => useAiUi.getState().transportDispatch(raw, runId);
         dispatch({ version: V, createSurface: { surfaceId: 'workspace', catalogId: 'flowassist/v2' } });
         dispatch(udm('/items', { a: 1 }));
         const before = useAiUi.getState().surfaces;

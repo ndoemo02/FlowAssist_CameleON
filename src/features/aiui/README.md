@@ -11,7 +11,8 @@ focusem i ekranem bez kopiowania danych.
 
 ```
 transport (MockTransport)
-  └─ store.dispatch(raw, runId)          # zdarzenia spoza bieżącego runu są odrzucane
+  └─ store.transportDispatch(raw, runId) # runId wymagany; zdarzenia spoza bieżącego runu są odrzucane
+                                         # (devDispatch(raw) — tylko dev-hook / testy, bez izolacji runów)
        ├─ parseEvent                     # contract.ts — guardy, nieznane zdarzenie = ignoruj
        ├─ reduce                         # reducer.ts — surface'y, komponenty, data model
        ├─ reconcileLayout                # layout.ts — członkostwo, hinty agenta, auto-layout

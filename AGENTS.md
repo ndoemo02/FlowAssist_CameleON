@@ -337,6 +337,12 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
   - reduced motion;
   - ADR-y.
 - **P1 (obowiązkowo):** handshake możliwości → jeden adapter AG-UI (dowód wymienności mocka na prawdziwy transport).
+- **Follow-upy przed P1.6** (review 2026-10-05, `docs/review/REVIEW_BRIEF.md`):
+  - **FU-1 (reszta #5):** dwa fallbacki nie są zgłaszane agentowi jako `VALIDATION_FAILED` (`validationReporting.ts` ich nie widzi):
+    komponent spoza slotu („komponent niedostępny w tym slocie”, np. root HUD = `Workspace`)
+    oraz root surface'u `workspace` niebędący `Workspace` (stół się nie rysuje, bez raportu);
+  - **FU-2 (#6, odłożone):** `store.dispatch(raw)` bez `runId` omija izolację I6. Oddzielić wejście
+    developerskie od transportowego razem z adapterem (zmiana kernela).
 - **P1 (warunkowo):** Radix albo React Aria, tylko jeśli po P0 natywna mechanika menu i fokusu okaże się krucha.
 - **Poza v1.3:** spike'i gestów, wykresów i tabel. Eksperymenty P2 (MCP Apps, Drei Html, graph2d, Vega-Lite, MapLibre) w v1.4.
 

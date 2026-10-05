@@ -4,7 +4,8 @@ Krótka mapa dla niezależnego recenzenta (tylko odczyt). Branch `feat/aiui-prot
 To kontekst, nie dowód poprawności: ADR-y opisują intencję i stan na dzień zapisu — weryfikuj w kodzie i testach.
 
 > **Status (2026-10-05):** pełny review `61209b8` wykonany (Opus → Astra: GO WITH FIXES). Poprawki są na branchu do
-> `1f12885` (kod). Weryfikacja poprawek bez ponownego pełnego audytu: [`VERIFICATION_BRIEF.md`](VERIFICATION_BRIEF.md).
+> `1f12885`; weryfikacja Astry (runda 1: GO WITH FIXES, 2 ISSUE) zamknięta poprawkami do `9d3e901` (kod).
+> Weryfikacja bez ponownego pełnego audytu: [`VERIFICATION_BRIEF.md`](VERIFICATION_BRIEF.md) (runda 2 na końcu).
 
 ## Zakres
 
@@ -73,6 +74,9 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 | R#6 | Odłożone do P1.6 (FU-2) — `dispatch(raw)` bez `runId` | AGENTS.md |
 | R#7 | Zrealizowane `544fb31` — `?anchor=probe` tylko poza produkcją | `scene/ScreenAnchorProbe.tsx` |
 | NEW-1 | Zrealizowane `1f12885` — tap na przycisku karty nie liczy się do podwójnego tapu („+ +” ≠ ekran) | `overlay/gestures.ts` |
+| V-R#1 | Zrealizowane `e20be49` — regresja z `2f0dfcc`: brak głębokiej serializacji propsów przed boundary (płytki podpis, przygotowanie widoku pod boundary) | `SurfaceRenderer.tsx`, `viewProps.ts` |
+| V-R#5 | Zrealizowane `9d3e901` — wystąpienie kończy się dopiero odzyskaniem (walidacja `ready` lub udany render po ponowieniu) | `validationReporting.ts`, `RenderGuard.tsx`, ADR 0003 |
+| FU-1..3 | OPEN — przed P1.6 (FU-3: głęboka ścieżka `updateDataModel` przepełnia stos w `dispatch`) | AGENTS.md |
 
 Świadome luki testów: kierunek agent → klient dla I3 pokrywa korpus replay (P0.2), nie test jednostkowy;
 `raise`/`focus`/`toScreen` celowo bez tokenu gestu (I7). `VALIDATION_FAILED` z warstwy UI pokrywają od R#5 testy jsdom
@@ -80,7 +84,7 @@ Powierzchnia protokołu (nie kernel): `contract.ts`, `catalog.ts`, `transport/ty
 
 ## Weryfikacja lokalna
 
-- `npm test` — vitest (214 testów na `1f12885`: kontrakt, reducer, układ, gesty, replay korpusu, parytet schematów,
+- `npm test` — vitest (219 testów na `9d3e901`: kontrakt, reducer, układ, gesty, replay korpusu, parytet schematów,
   render DOM w jsdom — `*.test.tsx`).
 - `npx tsc --noEmit` — oczekiwany dokładnie 1 znany błąd (`safelayer/Lanyard.tsx`); każdy inny to regresja.
 - `npm run test:e2e` — wymaga ~4 GB wolnej pamięci; timeouty przy pamięci zajętej > 80% są środowiskowe.

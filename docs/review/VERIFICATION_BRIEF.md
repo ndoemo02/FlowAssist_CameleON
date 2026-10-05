@@ -36,10 +36,23 @@ Złote ślady replay: **bez zmian** (13/13 zgodnych na każdym commicie).
 - `npm test`: 214/214. `npx tsc --noEmit`: tylko znany błąd `safelayer/Lanyard.tsx`. `npx next build`: PASS.
 - `npm run test:e2e`: 19 passed / 11 skipped / 0 failed na `39af130` (pełny zestaw); `gestures.spec` desktop 8/8 na `1f12885`.
 
+## Runda 2: poprawki po weryfikacji Astry (2026-10-05)
+
+Weryfikacja rundy 1: R#2, R#3, R#4, R#7, NEW-1 — CONFIRMED; R#1 i R#5 — ISSUE. Zakres rundy 2: `1f12885..9d3e901` (kod)
++ `0f71c72` (FU-3) i commit dokumentacji po nim.
+
+| # | Commit | Co zmieniono | Test błędu | Pytanie do weryfikacji |
+|---|---|---|---|---|
+| V-R#1 HIGH | `e20be49` | Regresja z `2f0dfcc`: zamiast `JSON.stringify(node.props)` przed boundary — płytki podpis propsów (`propsSignature`, Object.is); `RenderGuard.resetKeys`; przygotowanie widoku (`viewProps` + widok) w `TreeNodeView` pod boundary | `hostileRender`: `Approval` z polem o głębokości 12 000 | Czy pozostała jakakolwiek głęboka trawersacja danych agenta przed boundary? |
+| V-R#5 MEDIUM | `9d3e901` | Odzyskanie (decyzja właściciela) = walidacja wraca do `ready` albo udany render po ponowieniu (`RenderGuard.onRecover`). Zmiana danych węzła, który dalej jest zły, to to samo wystąpienie. Zniknięcie węzła / nowy przebieg kończą wystąpienie | `validationReporting.test.tsx`: zmiana danych nadal złe → 1; złe → dobre → te same złe → 2 (HUD i karta); walidacja fallback → pending → fallback → 1 | Czy zakończenie wystąpienia przy zniknięciu węzła jest akceptowalne (poza literą reguły)? |
+
+Weryfikacja rundy 2: vitest 219/219; tsc tylko Lanyard; E2E celowane `surfaces` + `gestures` (oba projekty) na `0f71c72`:
+13 passed / 9 skipped / 0 failed. Pełne E2E i `next build` nie były powtarzane po rundzie 2.
+
 ## Prompt startowy
 
 > Verify the review fixes on `feat/aiui-prototype` as a read-only reviewer. Start with `docs/review/VERIFICATION_BRIEF.md`.
-> Scope: the commits listed there (`61209b8..1f12885` + docs). Do not re-audit the whole branch.
+> Scope: the commits listed there (`61209b8..1f12885` + docs; round 2: `1f12885..9d3e901`). Do not re-audit the whole branch.
 > For each finding: confirm the test reproduces the original scenario, the fix addresses the root cause without
 > side effects on I1–I10, and answer the question in its row. Report only: CONFIRMED / ISSUE (with file, scenario, fix
 > direction) per finding, then anything newly broken by these commits. End with GO / GO WITH FIXES / NO-GO.

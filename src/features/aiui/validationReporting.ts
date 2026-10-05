@@ -6,6 +6,9 @@
 //   - problem walidacji: węzeł wraca do `ready` (pending to jeszcze nie odzyskanie);
 //   - błąd renderu (RenderGuard): zatwierdzony udany render — po ponowieniu albo pierwszy render nowej instancji
 //     (remount panelu). Sama zmiana danych ani samo odmontowanie odzyskaniem nie są.
+//     Odzyskanie liczone PER WARIANT renderowania (gęstość: card / screen; węzeł slotu: slot), przy wspólnym
+//     wystąpieniu problemu: pierwszy zawodzący wariant raportuje, kolejne tylko dołączają; udany render jednego
+//     wariantu nie zamyka błędu innego. Wystąpienie kończy się, gdy żaden wariant już nie zawodzi.
 //   Zniknięcie węzła (lub nowy przebieg) też kończy wystąpienie. Po odzyskaniu nawrót = nowy raport.
 // - Każdy raport niesie przebieg, w którym powstał; store wysyła go tylko w tym samym, aktywnym przebiegu.
 // Instaluje go warstwa UI (AiUiOverlay) — koordynator (store.dispatch) nie raportuje fallbacków.
@@ -70,7 +73,8 @@ export function scanSurfaces(surfaces: AiUiState['surfaces']) {
 // Wartość = klucz węzła, którego dotyczy wystąpienie.
 let trackedRun: number | null = null;
 const active = new Map<string, string>();          // trwające wystąpienia problemów walidacji
-const renderActive = new Map<string, string>();    // trwające wystąpienia błędów renderu
+// trwające wystąpienia błędów renderu: węzeł + warianty renderowania, które zawiodły i jeszcze się nie odzyskały
+const renderActive = new Map<string, { node: string; failing: Set<string> }>();
 
 function trackRun(runId: number) {
     if (runId === trackedRun) return;
@@ -86,7 +90,7 @@ function sync(state: AiUiState) {
     // koniec wystąpień: walidacja wróciła do ready albo węzeł nie jest już członkiem (błąd renderu — tylko to drugie);
     // 'unavailable' (np. pod rodzicem w pending) i 'pending' nie kończą wystąpienia
     active.forEach((node, k) => { const s = nodes.get(node); if (s === undefined || s === 'ready') active.delete(k); });
-    renderActive.forEach((node, k) => { if (!nodes.has(node)) renderActive.delete(k); });
+    renderActive.forEach((o, k) => { if (!nodes.has(o.node)) renderActive.delete(k); });
     for (const p of problems) {
         const k = JSON.stringify([p.surfaceId, p.nodeId, p.path, p.message]);
         if (active.has(k)) continue;
@@ -103,26 +107,35 @@ export function startValidationReporting(): () => void {
     });
 }
 
-/** Błąd renderu z lokalnego boundary; `runId` = przebieg z chwili renderu. Raz na wystąpienie. */
-export function reportRenderProblem(p: Problem, runId: number) {
+/**
+ * Błąd renderu z lokalnego boundary w wariancie `variant`; `runId` = przebieg z chwili renderu.
+ * Raz na wystąpienie: kolejny zawodzący wariant tylko dołącza do trwającego wystąpienia.
+ */
+export function reportRenderProblem(p: Problem, variant: string, runId: number) {
     const state = useAiUi.getState();
     if (runId === state.scenario.runId) {
         trackRun(runId);
         const k = JSON.stringify([p.surfaceId, p.nodeId, p.message]);
-        if (renderActive.has(k)) return;
-        renderActive.set(k, nodeKey(p.surfaceId, p.nodeId));
+        const open = renderActive.get(k);
+        if (open) { open.failing.add(variant); return; }
+        renderActive.set(k, { node: nodeKey(p.surfaceId, p.nodeId), failing: new Set([variant]) });
     }
     state.reportClientError(toError(p), { runId }); // inny przebieg: store odrzuci (jawne pochodzenie)
 }
 
 /**
- * Zatwierdzony udany render węzła (RenderGuard: po montażu albo po ponowieniu) — koniec wystąpień błędu renderu
- * tego węzła. `runId` = przebieg z chwili renderu: render z innego przebiegu niczego nie zamyka.
+ * Zatwierdzony udany render węzła w wariancie `variant` (RenderGuard: po montażu albo po ponowieniu) — ten wariant
+ * się odzyskał; wystąpienie kończy się, gdy nie zawodzi już żaden wariant. `runId` = przebieg z chwili renderu:
+ * render z innego przebiegu niczego nie zamyka.
  */
-export function resolveRenderProblem(surfaceId: SurfaceId, nodeId: string, runId: number) {
+export function resolveRenderProblem(surfaceId: SurfaceId, nodeId: string, variant: string, runId: number) {
     if (runId !== useAiUi.getState().scenario.runId) return;
     const node = nodeKey(surfaceId, nodeId);
-    renderActive.forEach((n, k) => { if (n === node) renderActive.delete(k); });
+    renderActive.forEach((o, k) => {
+        if (o.node !== node) return;
+        o.failing.delete(variant);
+        if (o.failing.size === 0) renderActive.delete(k);
+    });
 }
 
 /** Testy: zapomnij stan modułu. */

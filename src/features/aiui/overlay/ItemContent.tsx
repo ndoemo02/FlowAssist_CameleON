@@ -31,8 +31,8 @@ export const ItemBody = memo(function ItemBody({ view, density = 'screen' }: { v
         <RenderGuard
             resetKeys={[view.content]}
             fallback={(error) => <FallbackCard type={view.title} reason={`błąd renderowania: ${error.message}`} path={path} />}
-            onError={(error) => reportRenderProblem({ surfaceId: 'workspace', nodeId: view.id, path, message: `błąd renderowania: ${error.message}` }, runId)}
-            onRecover={() => resolveRenderProblem('workspace', view.id, runId)}
+            onError={(error) => reportRenderProblem({ surfaceId: 'workspace', nodeId: view.id, path, message: `błąd renderowania: ${error.message}` }, density, runId)}
+            onRecover={() => resolveRenderProblem('workspace', view.id, density, runId)}
         >
             <RepresentationView representation={view.representation} content={view.content} density={density} />
         </RenderGuard>

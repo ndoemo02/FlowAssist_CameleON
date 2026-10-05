@@ -210,6 +210,52 @@ describe('błąd renderu: wystąpienie kończy się dopiero udanym renderem po p
 
 // Weryfikacja Astry, runda 2: obecność węzła = członkostwo w grafie definicji (root → children),
 // nie rozwiązane drzewo. Potomek rodzica w pending jest chwilowo niedostępny, a nie usunięty.
+// Weryfikacja Astry, runda 3 + decyzja właściciela: odzyskanie i deduplikacja liczone per wariant renderowania
+// (gęstość: card / screen), przy wspólnym wystąpieniu problemu. Udany render jednego wariantu nie zamyka
+// błędu innego; uszkodzony wariant zostaje otwarty, dopóki sam nie przejdzie poprawnego renderu.
+describe('błąd renderu: odzyskanie per wariant renderowania', () => {
+    /** Widok mapy rzucający tylko w wybranych gęstościach (np. błąd zależny od gęstości). */
+    const throwingIn = (bad: (density: string, label: string) => boolean, fn: () => void) => {
+        const original = REPRESENTATION_VIEWS.map2d;
+        REPRESENTATION_VIEWS.map2d = ({ points, density }: { points: { label: string }[]; density: string }) => {
+            if (bad(density, points[0].label)) throw new Error('boom');
+            return <p>{points[0].label}</p>;
+        };
+        try { fn(); } finally { REPRESENTATION_VIEWS.map2d = original; }
+    };
+    const set = (label: string) => agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: { points: [{ label, x: 0.5, y: 0.5 }] } } });
+
+    it('karta zawodzi, ekran zdrowy, ponowienie karty nadal zawodzi → 1 raport', () => throwingIn((d) => d === 'card', () => {
+        workspaceItem();
+        set('A');
+        const card = mount(<ViewOf id="m" density="card" />);
+        mount(<ViewOf id="m" density="screen" />);           // udany render innego wariantu
+        act(() => set('B'));                                   // nowe dane → ponowienie karty → nadal błąd
+        expect(card.container.textContent).toContain('Nie mogę wyświetlić');
+        expect(errorsSent()).toHaveLength(1);
+    }));
+
+    it('ekran zawodzi → karta zdrowa → ekran znowu zawodzi → 1 raport', () => throwingIn((d) => d === 'screen', () => {
+        workspaceItem();
+        set('A');
+        mount(<ViewOf id="m" density="screen" />).unmount();  // ekran z błędem, potem „Na stół”
+        mount(<ViewOf id="m" density="card" />);               // karta renderuje się poprawnie
+        mount(<ViewOf id="m" density="screen" />);             // ponownie „Na ekran”: ten sam błąd
+        expect(errorsSent()).toHaveLength(1);
+    }));
+
+    it('strażnik: karta i ekran zawodzą → poprawne dane (oba warianty odzyskane) → znowu złe → 2 raporty', () => throwingIn((_, label) => label === 'zły', () => {
+        workspaceItem();
+        set('zły');
+        const card = mount(<ViewOf id="m" density="card" />);
+        mount(<ViewOf id="m" density="screen" />);
+        act(() => set('dobry'));
+        expect(card.container.textContent).toContain('dobry');
+        act(() => set('zły'));
+        expect(errorsSent()).toHaveLength(2);
+    }));
+});
+
 describe('walidacja: pending rodzica to nie usunięcie dziecka', () => {
     /** HUD: root (kontener z bindingiem /n — bez danych = pending) z dzieckiem `a` (Approval bez summary = fallback). */
     function hudParentChild(children: string[]) {
@@ -250,8 +296,8 @@ describe('walidacja: odzyskanie dopiero po powrocie do ready', () => {
 });
 
 /** ItemBody z bieżącym widokiem elementu (jak treść karty / panelu ekranu). */
-function ViewOf({ id }: { id: string }) {
-    return <ItemBody view={useItemView(id)} />;
+function ViewOf({ id, density }: { id: string; density?: 'card' | 'screen' }) {
+    return <ItemBody view={useItemView(id)} density={density} />;
 }
 
 describe('reset po odzyskaniu poprawności', () => {

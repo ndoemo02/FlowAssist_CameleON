@@ -19,6 +19,7 @@ import ScreenAnchorProbe from '@/features/aiui/scene/ScreenAnchorProbe';
 import { getScreenMeshes, onScreenMeshes, registerScreenMeshes } from '@/features/aiui/scene/anchorRegistry';
 import { dollyAlongView, focusDistance, frontDollyFactor } from '@/features/aiui/scene/frontFit';
 import { screenCenter } from '@/features/aiui/scene/screenGeometry';
+import { cameraTickSeconds, entryProgress, smoothing, useReducedMotionRef } from '@/features/aiui/motion';
 import { devToolsEnabled } from '@/lib/devTools';
 
 // --- CONFIG ---
@@ -828,6 +829,8 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
     const scrollProgressRef = useRef(0);
     const cinematicPosRef = useRef(new THREE.Vector3());
     const cinematicTargetRef = useRef(new THREE.Vector3());
+    // P0.6: prefers-reduced-motion — każda gałąź kamery od razu w stanie końcowym (bez wygładzania)
+    const reducedMotion = useReducedMotionRef();
 
     // === DEVELOPER PANEL ===
     const { freeCamera, controlMode, precision, rotateSpeed, panSpeed, moveSpeed } = useControls('Director Camera', {
@@ -989,7 +992,9 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
     // === MAIN FRAME LOOP ===
     useFrame((_, delta) => {
         // Kąt orbity z warstwy AI-to-UI (suwak 360° lub director); odczyt bez subskrypcji Reacta.
-        useAiUi.getState().tickCamera(delta);
+        // ograniczony ruch: cały czas tweenu w jednej klatce (kąt i źródło director bez zmian — P3, kernel nietknięty)
+        const reduced = reducedMotion.current;
+        useAiUi.getState().tickCamera(cameraTickSeconds(delta, reduced));
         const orbitAngle = useAiUi.getState().camera.angle;
 
         // ─── FREE CAMERA MODE ───
@@ -1021,7 +1026,7 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
         // Cinematic entry + scroll push-in.
         if (!freeCamera && Math.abs(orbitAngle) < 0.001 && controlsRef.current && initializedRef.current) {
             const entryElapsed = entryStartRef.current === null ? 0 : Math.max(0, performance.now() / 1000 - entryStartRef.current);
-            const entryProgress = introActive ? 0 : smoothstep01(entryElapsed / 1.9);
+            const entry = entryProgress({ introActive, elapsed: entryElapsed, reduced });
             const scrollProgress = scrollProgressRef.current;
 
             const introPos = new THREE.Vector3(...cueSet.intro.position);
@@ -1031,18 +1036,18 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
             const wideTarget = new THREE.Vector3(...cueSet.wide.target);
             const closeTarget = new THREE.Vector3(...cueSet.close.target);
 
-            cinematicPosRef.current.lerpVectors(introPos, widePos, entryProgress);
-            cinematicTargetRef.current.lerpVectors(introTarget, wideTarget, entryProgress);
+            cinematicPosRef.current.lerpVectors(introPos, widePos, entry);
+            cinematicTargetRef.current.lerpVectors(introTarget, wideTarget, entry);
 
             cinematicPosRef.current.lerp(closePos, scrollProgress);
             cinematicTargetRef.current.lerp(closeTarget, scrollProgress);
 
-            camera.position.lerp(cinematicPosRef.current, 1 - Math.exp(-delta * 4.8));
-            controlsRef.current.target.lerp(cinematicTargetRef.current, 1 - Math.exp(-delta * 5.8));
+            camera.position.lerp(cinematicPosRef.current, smoothing(delta, 4.8, reduced));
+            controlsRef.current.target.lerp(cinematicTargetRef.current, smoothing(delta, 5.8, reduced));
             (camera as THREE.PerspectiveCamera).fov = THREE.MathUtils.lerp(
                 (camera as THREE.PerspectiveCamera).fov,
                 THREE.MathUtils.lerp(cueSet.wide.fov, cueSet.close.fov, scrollProgress),
-                1 - Math.exp(-delta * 4.2)
+                smoothing(delta, 4.2, reduced)
             );
             (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
             controlsRef.current.update();
@@ -1055,7 +1060,7 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
             const rotatedViewDir = initialViewDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -orbitAngle);
 
             // Tłumiony dojazd zamiast skoku (np. gdy kamera była w cue "close" po scrollu).
-            camera.position.lerp(initialPos, 1 - Math.exp(-delta * 4.8));
+            camera.position.lerp(initialPos, smoothing(delta, 4.8, reduced));
             const newTarget = new THREE.Vector3().addVectors(camera.position, rotatedViewDir);
             controlsRef.current.target.copy(newTarget);
             camera.lookAt(newTarget);

@@ -106,6 +106,24 @@ Logika gestów jest czysta i testowana w `overlay/gestureLogic.ts`.
 
   Testy: `__tests__/focus.test.tsx`.
 
+## Ograniczony ruch (`motion.ts`, P0.6)
+
+Przy `prefers-reduced-motion: reduce` każda gałąź kamery osiąga stan końcowy bez wygładzania, a overlay nie animuje:
+
+- **kąt orbity:** `page.tsx` woła `tickCamera(cameraTickSeconds(delta, reduced))` — przy ograniczonym ruchu cały
+  czas tweenu (`TWEEN_SECONDS`), więc tween kończy się w jednej klatce; kąt i źródło `director` zachowują semantykę P3,
+  kernel (`store.ts`) bez zmian;
+- **cinematic i orbita:** współczynniki `1 - e^(-delta·k)` (pozycja, target, FOV; dojazd z „close” do orbity) przez
+  `smoothing(delta, k, reduced)` → 1; dojazd intro → wide (`entryProgress`) od razu 1. Mapowanie scrolla na kadr
+  „close” zostaje (steruje nim użytkownik);
+- **Framer Motion:** `MotionConfig reducedMotion="user"` w `AiUiOverlay`;
+- **CSS:** `globals.css` — w `[data-aiui-overlay]` przejścia i animacje (opacity warstw, szuflada, pulsowanie) bez ruchu.
+
+Preferencja jest śledzona na żywo (`useReducedMotionRef`, odczyt w pętli klatek bez re-renderów).
+Testy: `__tests__/motion.test.ts` (współczynniki, tween w jednej klatce ze źródłem `director`), e2e `motion.spec.ts`
+(`reducedMotion: 'reduce'`: brak kątów pośrednich + rzeczywista aktywacja `ScreenAnchor`, ręczne przerwanie, scroll do
+„close” → Back → Front).
+
 ## Adapter sceny (`scene/`)
 
 Jedyne miejsce z referencjami Three.js; model A2UI ich nie zna.

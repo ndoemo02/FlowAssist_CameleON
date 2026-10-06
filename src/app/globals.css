@@ -61,3 +61,14 @@
         ) 1;
     }
 }
+
+/* P0.6 (plan v1.3.2, R5): ograniczony ruch w overlayu CameleON — przejścia i animacje CSS (opacity warstw,
+   szuflada, pulsowanie szkieletów i statusu) bez ruchu. Framer Motion: MotionConfig w AiUiOverlay; kamera: page.tsx. */
+@media (prefers-reduced-motion: reduce) {
+    [data-aiui-overlay],
+    [data-aiui-overlay] * {
+        transition-duration: 0s !important;
+        animation-duration: 0s !important;
+        animation-iteration-count: 1 !important;
+    }
+}

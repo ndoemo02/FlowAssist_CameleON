@@ -1,6 +1,6 @@
 'use client';
 
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion } from 'framer-motion';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import SurfaceRenderer from '../SurfaceRenderer';
 import type { Surface } from '../reducer';
@@ -33,17 +33,20 @@ export default function AiUiOverlay() {
     useFocusRescue(root); // P0.5: fokus znikającego elementu trafia na bezpieczny cel, nie na <body>
 
     return (
-        <div ref={root} className="pointer-events-none absolute inset-0 z-20">
-            <NarrationRegion />
-            <ClientRegions />
-            <WorkspaceLayer compact={compact} />
-            <ScreenLayer />
-            <AgentStatus compact={compact} />
-            <TasksDrawer compact={compact} />
-            <HudLayer compact={compact} />
-            <NarrationCaption compact={compact} />
-            <PromptPill compact={compact} />
-        </div>
+        // P0.6: Framer Motion szanuje prefers-reduced-motion (transformy bez animacji); przejścia CSS — globals.css
+        <MotionConfig reducedMotion="user">
+            <div ref={root} data-aiui-overlay className="pointer-events-none absolute inset-0 z-20">
+                <NarrationRegion />
+                <ClientRegions />
+                <WorkspaceLayer compact={compact} />
+                <ScreenLayer />
+                <AgentStatus compact={compact} />
+                <TasksDrawer compact={compact} />
+                <HudLayer compact={compact} />
+                <NarrationCaption compact={compact} />
+                <PromptPill compact={compact} />
+            </div>
+        </MotionConfig>
     );
 }
 

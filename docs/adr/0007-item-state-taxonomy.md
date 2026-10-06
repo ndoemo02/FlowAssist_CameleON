@@ -134,7 +134,8 @@ Komponent katalogu bez widoku w slocie (`TREE_VIEWS`) resolver zwraca jako `comp
 
 - **Obserwacja (ujawniona przy ST-1(b)):**
   - `workspace.ts: workspaceMeta` bierze `presentation` i `priority` z surowej definicji (`typeof c.presentation === 'string'`, `typeof c.priority === 'number'`). Binding tych propsów daje w układzie `hint: null` i `priority: 0`, także gdy jego dane już są.
-  - `resolveItem` rozwiązuje je w widoku `ready` (`hint`, `priority`), ale te pola widoku nie są nigdzie czytane: układ (`layout.ts: reconcileLayout`, P4, P5, P9) korzysta tylko z `workspaceMeta`.
+  - Układ (`layout.ts: reconcileLayout`, P4, P5, P9) korzysta tylko z `workspaceMeta`. Do Q2 `resolveItem` rozwiązywał je też w widoku `ready`
+    (`hint`, `priority`), ale tych pól nikt nie czytał; po Q2 widok ich nie ma.
   - Skutek: agent, który zbinduje poprawną wartość `presentation` (np. `'screen'`) albo `priority`, nie zmieni układu i nie dostanie raportu. Po ST-1(b) taki binding nadal wstrzymuje gotowość elementu (`pending` do nadejścia danych) i podlega walidacji: zła wartość, np. `'dismissed'`, daje fallback `/presentation` z raportem. Ignoruje go wyłącznie układ.
   - Test: `itemStates`: „ST-4: …”.
 - **Właściciel:** `workspace.ts: workspaceMeta` (kernel) i polityka hintów P4/P5 (`layout.ts`, ADR 0001).
@@ -155,6 +156,10 @@ Recenzja niezależna w świeżym kontekście (2026-10-06), werdykt GO WITH FIXES
   temat lifecycle P1.6.
 - **Q2 (ST-4):** pola `hint` i `priority` widoku `ready` nie są nigdzie czytane, układ korzysta z `workspaceMeta`. Usunąć je z `WorkspaceItemView` albo oznaczyć jako nieautorytatywne, zanim ktoś zacznie ich używać (zmiana `workspace.ts`).
   **Decyzja:** usunąć jako osobny kernel cleanup w P1.7 (razem z opisem ST-4 w profilu).
+  **Zrealizowane (P1.7a, 2026-10-06):** pola usunięte z wariantu `ready` `WorkspaceItemView`; `workspaceMeta` bez zmian.
+  Przed zmianą sprawdzono grepem i typami, że nikt ich nie czyta (konsumenci widoku: `ItemContent`, `ScreenLayer`,
+  `WorkspaceLayer`, `LiveRegions`, `userCommand`, `validationReporting`, replay); tsc bez nowych błędów, ślady replay bez zmian.
+  Testy: `itemStates` (ST-4: widok bez pól przy bindingu i przy wartości dosłownej, `workspaceMeta` bez zmian), `workspace`.
 - **Q3 (przed P1.6, istniejące wcześniej):** `resolveItem` i `resolveTree` budują propsy w zwykłym obiekcie, więc klucz `__proto__` od agenta zmienia jego prototyp (dziedziczone pola trafiają do walidatorów). Nie dotyczy `Object.prototype` (brak globalnego skażenia). Kandydat na utwardzenie granicy danych razem z adapterem: `Object.create(null)` albo odrzucenie klucza w `parseEvent`.
   **Decyzja → FU-4, zrealizowane:** granica protokołu odrzuca zarezerwowane klucze własne `__proto__`, `constructor`,
   `prototype` na każdym poziomie ładunku oraz te nazwy jako `id`, wpis `children` i segment ścieżki (ADR 0002).

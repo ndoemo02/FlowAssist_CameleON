@@ -12,7 +12,7 @@ export interface ItemAction { name: string; label: string; variant?: 'primary' |
 export type WorkspaceItemView =
     | {
         status: 'ready'; id: string; kind: ItemKind; title: string; representation: SupportedRepresentation;
-        content: Record<string, unknown>; actions: ItemAction[]; priority: number; hint: Presentation | null;
+        content: Record<string, unknown>; actions: ItemAction[]; // hint i priorytet: tylko workspaceMeta (ST-4, Q2)
     }
     | { status: 'pending'; id: string; title?: string }                    // komponent lub dane jeszcze nie dotarły
     | { status: 'fallback'; id: string; title?: string; reason: string; path: string };
@@ -74,7 +74,6 @@ export function resolveItem(surface: Surface, id: string): WorkspaceItemView {
 
     return {
         status: 'ready', id, kind: props.kind as ItemKind, title: props.title as string, representation, content,
-        actions: (props.actions as ItemAction[] | undefined) ?? [], priority: (props.priority as number | undefined) ?? 0,
-        hint: (props.presentation as Presentation | undefined) ?? null,
+        actions: (props.actions as ItemAction[] | undefined) ?? [],
     };
 }

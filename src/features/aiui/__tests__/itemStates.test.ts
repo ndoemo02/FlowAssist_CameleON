@@ -91,13 +91,17 @@ describe('ADR 0007 ST-1(b): pending = nierozwiązany binding', () => {
         expect(reported('workspace', late)).toEqual([]);
     });
 
-    it('stół: opcjonalny prop z bindingu bez danych (priority, presentation, actions) → pending; po dosłaniu → ready z wartościami', () => {
+    it('stół: opcjonalny prop z bindingu bez danych (priority, presentation, actions) → pending; po dosłaniu → ready', () => {
         const a = item('a', { priority: { path: '/m/p' }, presentation: { path: '/m/h' }, actions: { path: '/m/a' } });
         const early = ws({ a }, chartData());
         expect(resolveItem(early, 'a')).toMatchObject({ status: 'pending' });
         expect(reported('workspace', early)).toEqual([]);
         const late = ws({ a }, { ...chartData(), m: { p: 2, h: 'focus', a: [{ name: 'more', label: 'Więcej' }] } });
-        expect(resolveItem(late, 'a')).toMatchObject({ status: 'ready', priority: 2, hint: 'focus', actions: [{ name: 'more', label: 'Więcej' }] });
+        const view = resolveItem(late, 'a');
+        expect(view).toMatchObject({ status: 'ready', actions: [{ name: 'more', label: 'Więcej' }] });
+        // Q2: widok nie niesie hint/priority — układ czyta je wyłącznie z workspaceMeta (ST-4)
+        expect(view).not.toHaveProperty('hint');
+        expect(view).not.toHaveProperty('priority');
     });
 
     it('stół: binding rozwiązany do złej wartości to nadal błąd propsów (null ≠ brak danych)', () => {
@@ -158,11 +162,23 @@ describe('ADR 0007 ST-1(b): pending = nierozwiązany binding', () => {
 });
 
 describe('ADR 0007 ST-4: układ czyta hint i priorytet z dosłownej definicji', () => {
-    it('presentation i priority z bindingu nie trafiają do workspaceMeta, choć widok ready ma je rozwiązane', () => {
+    it('presentation i priority z bindingu nie trafiają do workspaceMeta; widok ready ich nie niesie (Q2)', () => {
         const a = item('a', { presentation: { path: '/m/h' }, priority: { path: '/m/p' } });
         const s = ws({ a }, { ...chartData(), m: { h: 'screen', p: 5 } });
-        expect(resolveItem(s, 'a')).toMatchObject({ status: 'ready', hint: 'screen', priority: 5 });
+        const view = resolveItem(s, 'a');
+        expect(view).toMatchObject({ status: 'ready' });
+        expect(view).not.toHaveProperty('hint');
+        expect(view).not.toHaveProperty('priority');
         expect(workspaceMeta(s)).toEqual([{ id: 'a', delivered: true, hint: null, priority: 0 }]);
+    });
+
+    it('dosłowne presentation i priority: workspaceMeta bez zmian, widok ready bez tych pól (Q2)', () => {
+        const s = ws({ a: item('a', { presentation: 'screen', priority: 5 }) }, chartData());
+        const view = resolveItem(s, 'a');
+        expect(view).toMatchObject({ status: 'ready' });
+        expect(view).not.toHaveProperty('hint');
+        expect(view).not.toHaveProperty('priority');
+        expect(workspaceMeta(s)).toEqual([{ id: 'a', delivered: true, hint: 'screen', priority: 5 }]);
     });
 });
 

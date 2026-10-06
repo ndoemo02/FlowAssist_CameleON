@@ -30,7 +30,9 @@ describe('workspace', () => {
 
     it('wybiera pierwszą obsługiwaną reprezentację (P10) i rozwiązuje treść', () => {
         const v = resolveItem(surface({ chart: chartItem() }, { items: { chart: { kind: 'line', series } } }), 'chart');
-        expect(v).toMatchObject({ status: 'ready', representation: 'chart2d', kind: 'chart', hint: 'card' });
+        expect(v).toMatchObject({ status: 'ready', representation: 'chart2d', kind: 'chart' });
+        expect(v).not.toHaveProperty('hint'); // Q2: hint/priority tylko w workspaceMeta
+        expect(v).not.toHaveProperty('priority');
     });
 
     it('tylko nieobsługiwane reprezentacje → fallback', () => {

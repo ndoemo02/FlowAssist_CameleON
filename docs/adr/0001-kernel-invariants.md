@@ -49,7 +49,9 @@ Współrzędne, rozmiar i kolejność warstw kart nigdy nie pochodzą od agenta,
 - P1: co najwyżej jeden element na ekranie.
 - P2: co najwyżej jeden w focusie.
 - P3: kamera według źródła komendy.
-- P4: hint stosowany przy zmianie wartości.
+- P4: hint stosowany przy zmianie wartości. Hint i priorytet układ czyta wyłącznie z `workspaceMeta` (dosłowna definicja,
+  ADR 0007 ST-4); widok `ready` z `resolveItem` ich nie niesie.
+  *Zmiana kernela zatwierdzona jawnie przez właściciela (Q2, 2026-10-06; `workspace.ts: WorkspaceItemView`, usunięte martwe pola `hint` i `priority`).*
 - P5: `dismissed` nadrzędne.
 - P6: członkostwo = `Workspace.children`; niedostarczony ≠ usunięty; ponowne dodanie = nowy wpis.
   Dostarczony `WorkspaceItem` (zły typ komponentu to fallback przed bindingami) jest `pending`, dopóki któryś jego binding

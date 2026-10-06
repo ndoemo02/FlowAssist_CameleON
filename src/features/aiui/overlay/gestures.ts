@@ -12,9 +12,10 @@ import { useAiUi } from '../store';
 import { SCALE_MAX, SCALE_MIN } from '../layout';
 import { dragEndCommand, gestureToken, isGestureStale, keyCommand, type GestureToken } from './gestureLogic';
 import { userLayoutCommand } from './userCommand';
+import { DOUBLE_TAP_MS } from './gestureConstants';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
-const DOUBLE_TAP_MS = 350;
+// DOUBLE_TAP_MS: gestureConstants.ts (wspólne ze strażnikiem FLAKE-2 w e2e)
 const FOCUS_BOOST = 1.2;      // powiększenie karty w focusie…
 const MAX_VISUAL_SCALE = 1.5; // …ale łącznie nie więcej (karta nie zasłania własnych przycisków)
 

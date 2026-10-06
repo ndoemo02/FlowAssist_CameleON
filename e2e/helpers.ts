@@ -107,8 +107,9 @@ export async function countLayoutWrites(page: Page) {
     return () => page.evaluate(() => (window as unknown as { __layoutWrites: number }).__layoutWrites);
 }
 
-/** Okno podwójnego tapu aplikacji: `overlay/gestures.ts: DOUBLE_TAP_MS` (podwójny tap ⇔ odstęp < 350 ms). */
-export const DOUBLE_TAP_MS = 350;
+// Okno podwójnego tapu aplikacji — jedno źródło z overlayem (podwójny tap ⇔ odstęp < DOUBLE_TAP_MS).
+import { DOUBLE_TAP_MS } from '../src/features/aiui/overlay/gestureConstants';
+export { DOUBLE_TAP_MS };
 
 /** Zaczyna zapisywać czasy `pointerup` w stronie — to odstęp w stronie decyduje o podwójnym tapie, nie czas po stronie testu. */
 export async function recordPointerUps(page: Page) {
@@ -128,7 +129,8 @@ export async function recordPointerUps(page: Page) {
  */
 export async function requireDoubleTapWindow(page: Page) {
     const ups = await page.evaluate(() => (window as unknown as { __ups: number[] }).__ups);
-    if (ups.length !== 2) throw new Error(`INCONCLUSIVE (środowisko, FLAKE-2): oczekiwano 2 zdarzeń pointerup, jest ${ups.length}`);
+    // inna liczba zdarzeń to nie środowisko, tylko błąd harnessu albo regresja połykająca zdarzenia — osobna etykieta
+    if (ups.length !== 2) throw new Error(`HARNESS (FLAKE-2 strażnik): oczekiwano 2 zdarzeń pointerup, jest ${ups.length} — błąd harnessu albo regresja połykająca zdarzenia; to nie jest PASS`);
     const gap = ups[1] - ups[0];
     test.info().annotations.push({ type: 'tap-gap-ms', description: gap.toFixed(1) });
     if (gap >= DOUBLE_TAP_MS) {

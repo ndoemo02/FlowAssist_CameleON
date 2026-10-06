@@ -98,7 +98,8 @@ function ScreenPanel({ id }: { id: string }) {
                 </div>
             )}
             {/* pinch tylko na treści ekranu; touch-action pozwala przewijać, a pinch trafia do nas */}
-            <div {...pinch()} className="min-h-0 flex-1 overflow-auto p-3" style={{ touchAction: 'pan-x pan-y' }}>
+            {/* przewijana treść osiągalna z klawiatury (A11Y-3) */}
+            <div {...pinch()} tabIndex={0} role="group" aria-label={`Treść: ${title}`} className="min-h-0 flex-1 overflow-auto p-3" style={{ touchAction: 'pan-x pan-y' }}>
                 <div style={{ transform: `scale(${zoom})`, transformOrigin: '0 0', width: `${100 / zoom}%` }}>
                     <ItemBody view={view} />
                 </div>

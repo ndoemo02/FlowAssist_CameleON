@@ -1,38 +1,5 @@
 {
- "back": [
-  {
-   "id": "aria-prohibited-attr",
-   "impact": "serious",
-   "nodes": 3
-  },
-  {
-   "id": "svg-img-alt",
-   "impact": "serious",
-   "nodes": 1
-  }
- ],
- "front": [
-  {
-   "id": "scrollable-region-focusable",
-   "impact": "serious",
-   "nodes": 1
-  },
-  {
-   "id": "svg-img-alt",
-   "impact": "serious",
-   "nodes": 1
-  }
- ],
- "hud": [
-  {
-   "id": "scrollable-region-focusable",
-   "impact": "serious",
-   "nodes": 1
-  },
-  {
-   "id": "svg-img-alt",
-   "impact": "serious",
-   "nodes": 1
-  }
- ]
+ "back": [],
+ "front": [],
+ "hud": []
 }

@@ -61,7 +61,7 @@ test.describe('gesty kart (desktop)', () => {
 
     test('pointercancel w trakcie zmiany rozmiaru nie zapisuje skali', async ({ page }) => {
         const card = page.getByRole('article', { name: 'Element table' });
-        const handle = card.locator('[aria-label="Zmień rozmiar"]');
+        const handle = card.locator('[data-resize-handle]'); // uchwyt ma aria-hidden (A11Y-1), więc bez nazwy dostępnej
         const box = (await handle.boundingBox())!;
         const hx = box.x + box.width / 2, hy = box.y + box.height / 2;
         const before = (await layout(page)).table;

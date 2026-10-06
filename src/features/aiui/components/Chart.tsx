@@ -41,11 +41,13 @@ export default function Chart({ kind, title, series, density = 'screen' }: ViewP
     const xAt = (i: number) => PAD.l + (xs.length === 1 ? innerW / 2 : (i / (xs.length - 1)) * innerW);
     const yAt = (v: number) => PAD.t + innerH - (v / maxY) * innerH;
     const slot = innerW / xs.length, barW = (slot * 0.7) / series.length;
+    // role="img" wymaga niepustej nazwy; `title` jest opcjonalny w katalogu (A11Y-2)
+    const name = title || `Wykres ${kind === 'bar' ? 'słupkowy' : 'liniowy'}: ${series.map((s) => s.label).join(', ')}`;
 
     return (
         <figure className={`rounded-xl border border-white/10 bg-white/[0.03] ${density === 'card' ? 'p-2' : 'p-4'}`}>
             {title && <figcaption className="mb-2 text-sm text-white/80">{title}</figcaption>}
-            <svg viewBox={`0 0 ${W} ${H}`} className={`h-auto w-full ${density === 'screen' ? 'max-h-[32vh]' : ''}`} role="img" aria-label={title}>
+            <svg viewBox={`0 0 ${W} ${H}`} className={`h-auto w-full ${density === 'screen' ? 'max-h-[32vh]' : ''}`} role="img" aria-label={name}>
                 {ticks.map((v) => (
                     <g key={v}>
                         <line x1={PAD.l} x2={W - PAD.r} y1={yAt(v)} y2={yAt(v)} stroke="rgba(255,255,255,0.08)" />

@@ -133,7 +133,12 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
                 <h3 className="truncate text-[13px] font-medium text-white/90">{title}</h3>
                 {view.status === 'ready' && <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/50">{KIND_LABEL[view.kind]}</span>}
             </header>
-            <div className={`p-3 ${compact ? 'min-h-0 flex-1 overflow-auto' : focused ? 'max-h-[340px] overflow-auto' : 'max-h-[200px] overflow-hidden'}`} data-nodrag={focused ? true : undefined}>
+            {/* compact: przewijana treść osiągalna z klawiatury (A11Y-3) */}
+            <div
+                className={`p-3 ${compact ? 'min-h-0 flex-1 overflow-auto' : focused ? 'max-h-[340px] overflow-auto' : 'max-h-[200px] overflow-hidden'}`}
+                data-nodrag={focused ? true : undefined}
+                {...(compact ? { tabIndex: 0, role: 'group', 'aria-label': `Treść: ${title}` } : {})}
+            >
                 <ItemBody view={view} density="card" />
             </div>
             {(focused || compact) && controls}
@@ -146,7 +151,8 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
                 </div>
             )}
             {!compact && (
-                <div data-nodrag {...resize()} aria-label="Zmień rozmiar" className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none bg-[linear-gradient(135deg,transparent_50%,rgba(255,255,255,0.35)_50%)]" />
+                // uchwyt tylko dla wskaźnika — klawiatura zmienia rozmiar przyciskami „−/+” (A11Y-1)
+                <div data-nodrag data-resize-handle {...resize()} aria-hidden="true" className="absolute bottom-0 right-0 h-4 w-4 cursor-nwse-resize touch-none bg-[linear-gradient(135deg,transparent_50%,rgba(255,255,255,0.35)_50%)]" />
             )}
         </article>
     );

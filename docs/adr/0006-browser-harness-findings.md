@@ -1,6 +1,6 @@
 # ADR 0006: Ustalenia harnessu przeglądarkowego (P0.1)
 
-- **Status:** zaakceptowany 2026-10-05. **E2E-1:** zrealizowane — opcja (a). **E2E-2:** zrealizowane. **FLAKE-2: obserwowany** (podwójny tap pod obciążeniem). **FLAKE-1: OPEN** (bramka 9/10). A11Y-1..3 przechodzą do P0.5.
+- **Status:** zaakceptowany 2026-10-05. **E2E-1:** zrealizowane — opcja (a). **E2E-2:** zrealizowane. **FLAKE-2: obserwowany** (podwójny tap pod obciążeniem). **FLAKE-1: OPEN** (bramka 9/10). **A11Y-1..3: naprawione w P0.5** (baseline axe = zero naruszeń).
 - **Kontekst:** P0.1 wprowadził Playwright + axe-core (devDependencies, tylko Chromium) z testami w `e2e/`.
   - Stan aplikacji ustawiamy przez dev-hook `window.__aiui`, bez osi czasu mocka.
   - WebGL w headless jest programowy (SwiftShader), więc testy nie mierzą FPS ani renderów.
@@ -41,12 +41,22 @@
 
 - Jeden raz w pełnym przebiegu `gestures.spec` drugi klik zarejestrował się jako pojedynczy tap (focus zamiast screen). Okno podwójnego tapu to 350 ms (`DOUBLE_TAP_MS`), a test wykonuje dwa sekwencyjne `mouse.click` z rundami do przeglądarki. Ponowienie 3/3 i pełny `gestures.spec` 5/5 zielone.
 - Prawdopodobnie artefakt testu pod obciążeniem, nie aplikacji. Bez zmian; jeśli wróci, rozważyć sprawdzenie odstępu między klikami w teście.
+- **Nawrót (2026-10-06, P0.5):** pełny przebieg (9,6 min zamiast typowych 7) — „podwójny tap wysyła kartę na ekran” dał `focus`, zaraz po 120-sekundowym timeoucie poprzedniego testu (błąd selektora uchwytu po A11Y-1, poprawiony). Kontrolny `gestures.spec` desktop: 8/8. Zmieniony kod nie dotyka ścieżki tapu na desktopie. Warunek z punktu wyżej spełniony: kandydat na strażnik ważności (pomiar odstępu klików w stronie, jak w teście przycisków po NEW-1) — do decyzji właściciela.
 
 
 
 ## A11Y: baseline axe (WCAG 2.1 A/AA, zakres: overlay CameleON)
 
-Baseline zapisany w `e2e/__snapshots__/a11y.spec.ts/axe-baseline-{desktop,compact}.json`. Nowe naruszenie albo zmiana liczby węzłów daje czerwony test. Do naprawy w **P0.5**:
+Baseline zapisany w `e2e/__snapshots__/a11y.spec.ts/axe-baseline-{desktop,compact}.json`. Nowe naruszenie albo zmiana liczby węzłów daje czerwony test.
+
+> **P0.5: A11Y-1..3 naprawione; baseline = zero naruszeń** na wszystkich etapach (Back, Front z ekranem, HUD) w obu projektach. Poprawki:
+> - **A11Y-1:** uchwyt „Zmień rozmiar” ma `aria-hidden="true"` zamiast `aria-label` bez roli. To kontrolka tylko dla wskaźnika; klawiatura zmienia rozmiar przyciskami „−/+” karty z fokusem.
+> - **A11Y-2:** `Chart.tsx` nadaje `role="img"` nazwę zawsze: tytuł albo „Wykres liniowy/słupkowy: <etykiety serii>” (`__tests__/a11yViews.test.tsx`).
+> - **A11Y-3:** przewijana treść panelu ekranu (`ScreenLayer.tsx`) i karty w pasku compact (`WorkspaceLayer.tsx`) ma `tabIndex=0`, `role="group"` i nazwę „Treść: <tytuł>”. Poza zakresem znaleziska, nie wykryte przez skan: treść karty z fokusem na desktopie (`max-h-[340px] overflow-auto`) i szuflada tasków — do oceny w P0.5 (fokus może przejść z karty na treść i wyłączyć skróty karty).
+>
+> Opis poniżej dotyczy baseline'u sprzed P0.5.
+
+Do naprawy w **P0.5** (stan sprzed poprawek):
 
 | # | Reguła | Gdzie | Źródło |
 |---|---|---|---|

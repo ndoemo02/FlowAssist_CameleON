@@ -1,6 +1,6 @@
 # ADR 0002: Trzy osie zgodności protokołu
 
-- **Status:** zaakceptowany (v1.3). Polityka przyjmowania wersji koperty jest **otwarta** (sekcja „Otwarte”).
+- **Status:** zaakceptowany (v1.3). Oś 2 doprecyzowana decyzją D2 (2026-10-06, właściciel + review Astry): obsługiwane reprezentacje to capabilities, nie katalog. Mechanizm handshake'u ustalony (P1.7a). Polityka przyjmowania wersji koperty: do zamknięcia w profilu (P1.7b).
 - **Kontekst:**
   - `contract.ts`, `catalog.ts` i `transport/types.ts` to powierzchnia protokołu, nie zamrożony kernel.
   - Jeden numer wersji (np. `flowassist/v2.x`) mieszałby trzy niezależne rzeczy: kopertę A2UI, katalog komponentów oraz transport z rozszerzeniami aplikacji.
@@ -28,7 +28,10 @@
 
 **Zasady:**
 - nowy komponent, `kind` lub reprezentacja w kontrakcie oznacza nowy identyfikator katalogu;
-- **rozszerzenie `SUPPORTED_REPRESENTATIONS`** (klient zaczyna rysować reprezentację, która już jest w kontrakcie) zmienia wynik P10 dla istniejących elementów (ADR 0001, I4). Wymaga więc nowego identyfikatora katalogu albo handshake'u możliwości (P1.7), żeby agent wiedział, co klient obsługuje;
+- **rozszerzenie `SUPPORTED_REPRESENTATIONS`** (klient zaczyna rysować reprezentację, która już jest w kontrakcie) zmienia wynik P10 dla istniejących elementów (ADR 0001, I4). **Decyzja D2 (2026-10-06):** to zmiana **capabilities**, nie katalogu — klient deklaruje ją w rozszerzeniu `flowassist.kinds` handshake'u (oś 3), a identyfikator katalogu zostaje. Nowy identyfikator katalogu oznacza wyłącznie zmianę kontraktu komponentów (punkt wyżej).
+  - Uzasadnienie: sam `catalogId` nie mówi, które reprezentacje klient obsługuje (dopuszczenie agenta na jego podstawie to zgadywanie), a osobne identyfikatory dla każdej kombinacji reprezentacji mnożą katalogi i mieszają osie 2 i 3.
+  - Warunek: w profilu `flowassist-transport/1` rozszerzenie `flowassist` jest **obowiązkowe** po obu stronach. Agent A2UI, który podaje tylko `supportedCatalogIds`, nie przechodzi negocjacji (jawny błąd przed pierwszym zdarzeniem), więc nie zobaczy po cichu innego wyniku P10. Tryb bazowy A2UI bez rozszerzenia to w przyszłości osobny, jawnie wybierany profil, nie fallback.
+  - Ta decyzja koryguje zdanie planu v1.3.2 (P1.7: „rozszerzenie listy obsługiwanych reprezentacji wymaga nowego identyfikatora katalogu”);
 - przyjmowanie kilku katalogów naraz to jawna zmiana `contract.ts` z testami, nie skutek uboczny podbicia numeru;
 - nowa wartość `presentation` (np. `spatial`) **nie** jest zmianą katalogu, tylko decyzją o kernelu (`layout.ts`).
 
@@ -43,11 +46,32 @@
 **Zasada:** profil transportowy (roboczo `flowassist-transport/1`) jest wersjonowany osobno i obejmuje:
 - rozszerzenia aplikacji (`stage`, `narration`);
 - ramkę zdarzenia: identyfikator i sekwencja w obrębie przebiegu. Ramka jest częścią transportu, nie komunikatów A2UI;
-- handshake możliwości (P1.7): wersja koperty, identyfikator katalogu, **obsługiwane** reprezentacje i rodzaje z `catalog.ts`;
+- handshake możliwości (P1.7a, sekcja niżej): identyfikator katalogu i **obsługiwane** reprezentacje per rodzaj z `catalog.ts`; reguły stałe dla wersji profilu (wersje koperty, limity, klucze zarezerwowane) nie są wysyłane;
 - sygnały lifecycle przebiegu. Status wynika z sygnałów semantycznych, nigdy z fizycznego końca strumienia (EOF);
 - stan połączenia jako oś niezależną od `RunStatus` (adapter, P1.6).
 
 Zmiany w `AgentTransport` są addytywne.
+
+### Handshake możliwości (P1.7a)
+
+Mechanizm (zweryfikowany 2026-10-06 na normatywnych schematach A2UI `client_capabilities.json` i `server_capabilities.json`,
+v0.9 ≡ v0.9.1): capabilities jadą w **metadanych transportu**, nie jako komunikat A2UI. Obiekt standardowy jest zagnieżdżony
+pod kluczem wersji: `a2uiClientCapabilities: { "v0.9": { supportedCatalogIds } }`; po stronie serwera `supportedCatalogIds`
+jest opcjonalne, a `acceptsInlineCatalogs` domyślnie `false`. Katalogów inline nie używamy (I10).
+
+- **Klient:** `StartRequest.capabilities = { a2uiClientCapabilities, flowassist: { profile, kinds } }`; rozszerzenie
+  `flowassist` leży **poza** obiektem A2UI. Wartość liczy `startScenario` raz na przebieg i zamraża; adapter jej nie buduje.
+- **Serwer:** `AgentTransport.serverCapabilities()` → `{ transportProfiles, a2uiServerCapabilities, flowassist?: { kinds } }`
+  albo `null` (nieznane).
+- **Negocjacja** (czysta funkcja, stała kolejność, pierwsza porażka wygrywa): 0 capabilities serwera znane → 1 wspólny
+  profil → 2 poprawny kształt A2UI → 3 wspólny `catalogId` → 4 rozszerzenie `flowassist` (zły kształt = błąd; nieznane,
+  poprawnie utypowane rodzaje i reprezentacje są pomijane) → 5 niepuste przecięcie reprezentacji per rodzaj. Porażka =
+  `error` przebiegu przed pierwszym zdarzeniem, nigdy cichy fallback. Kontrola `catalogId` w `parseEvent` zostaje jako
+  druga linia obrony; reprezentację spoza obsługi klienta P10 i tak zamienia w fallback z raportem.
+- **Zgoda na wysyłkę jest per przebieg:** ustanawia ją wyłącznie udana negocjacja danego przebiegu; każdy `start`
+  i `stop` ją resetuje. Po porażce albo `stop` żadne `send` nie trafia do backendu.
+- Ramka zdarzeń, lifecycle, reconnect, raportowanie odrzuconych kopert i wiązanie z AG-UI: zamknięcie profilu (P1.7b),
+  implementacja w P1.6.
 
 ## Schematy (P0.3)
 
@@ -111,8 +135,8 @@ Nazwy podobne (`constructorName`, `proto`, `__proto`) i wartości tekstowe `"__p
 
 ## Otwarte
 
-1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie.
-2. **Mechanizm handshake'u** w specyfikacji A2UI v0.9.1 (metadane / inicjalizacja): sprawdzić w specyfikacji przed P1.7.
+1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie. Kandydat na uzasadnienie: schematy upstream v0.9.1 same przyjmują `version ∈ {"v0.9","v0.9.1"}`. Zamknięcie w dokumencie profilu (P1.7b).
+2. ~~**Mechanizm handshake'u**~~ — **zamknięte (2026-10-06):** metadane transportu, kształt wg schematów upstream (sekcja „Handshake możliwości”).
 3. **Które zdarzenia AG-UI niosą sygnały lifecycle:** research przed P1.6. `RUN_FINISHED` dotyczy pojedynczego wywołania backendu, nie przebiegu CameleON.
 4. **Indeks tablicy ≥ długości:** kanoniczny indeks równy długości tablicy dziś ją wydłuża, a większy tworzy dziury
    (`[ , , x]`). Nieobjęte decyzją z review #4 — do rozstrzygnięcia (odrzucać czy dopuszczać).

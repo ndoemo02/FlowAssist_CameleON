@@ -58,12 +58,23 @@ describe('dokument profilu: przykłady i reguły maszynowe', () => {
         expect(frame(example), errors(frame)).toBe(true);
     });
 
+    it('przykład wejścia biegu akcji z §8.1: wpis resume spełnia schemat', () => {
+        const example = jsonBlocks.map((b) => { try { return JSON.parse(b); } catch { return null; } })
+            .find((o) => Array.isArray(o?.resume));
+        expect(example).toBeTruthy();
+        expect(example.resume).toHaveLength(1);
+        expect(resumeEntry(example.resume[0]), errors(resumeEntry)).toBe(true);
+    });
+
     it('stałe schematów = blok reguł (nazwa ramki, profil, reason interruptu, kody, limity, klucze, surface)', () => {
         const f = readSchema('frame.schema.json');
         expect(f.properties.name.const).toBe(RULES.agui.frameEventName);
         expect(f.properties.value.properties.profile.const).toBe(RULES.profile);
         expect(readSchema('interrupt.schema.json').properties.reason.const).toBe(RULES.agui.awaitingActionReason);
         expect(readSchema('diagnostic.schema.json').properties.code.enum).toEqual(RULES.codes.diagnostics);
+        const a2uiErrorCodes = readSchema('forwarded-props.schema.json').properties.flowassist.properties.a2uiErrors.items.allOf[2];
+        expect(a2uiErrorCodes.properties.error.properties.code.enum).toEqual(RULES.codes.a2uiErrors);
+        expect(readSchema('message.schema.json').$defs.id.pattern).toBe(`^[^${RULES.idForbiddenChars.join('')}]+$`);
         const fp = readSchema('forwarded-props.schema.json').properties.flowassist.properties;
         expect(fp.profile.const).toBe(RULES.profile);
         expect(fp.a2uiErrors.maxItems).toBe(RULES.limits.pendingReportsMax);
@@ -120,10 +131,31 @@ describe('schemat ramki', () => {
         ['dodatkowy klucz w value', withValue({ id: 'x' })],
         ['dodatkowe pole zdarzenia', { ...FRAME, extra: 1 }],
         ['wiadomość mieszana (OBS-4)', withValue({ message: { stage: { focus: 'back' }, narration: { text: null } } })],
-        ['wiadomość z zarezerwowanym kluczem (FU-4)', withValue({ message: JSON.parse('{"stage":{"focus":"back","__proto__":{}}}') })],
+        // FU-4: klucz zarezerwowany w danych, które poza nim są poprawne (sam klucz jest jedyną przyczyną odrzucenia)
+        ['klucz zarezerwowany w wartości data modelu (FU-4)', withValue({ message: JSON.parse('{"version":"v0.9.1","updateDataModel":{"surfaceId":"workspace","path":"/m","value":{"constructor":1}}}') })],
         ['kilka wiadomości w jednej ramce', withValue({ message: [{ stage: { focus: 'back' } }] })],
+        // D17: obiekty zamknięte (dziś runtime je przepuszcza — egzekwowanie w P1.6)
+        ['narration z nieznanym kluczem (D17)', withValue({ message: { narration: { text: 'a', extra: true } } })],
+        ['koperta z dodatkowym polem najwyższego poziomu (D17)', withValue({ message: { version: 'v0.9.1', deleteSurface: { surfaceId: 'hud' }, trace: 1 } })],
+        ['payload z polem spoza upstream (D17)', withValue({ message: { version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2', extra: 1 } } })],
+        ['updateDataModel z polem spoza upstream (D17)', withValue({ message: { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a', value: 1, op: 'add' } } })],
+        // D19: znaki ścieżki w identyfikatorach
+        ['id z "/" (D19)', withValue({ message: { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'a/b', component: 'TaskList' }] } } })],
+        ['id z "~" (D19)', withValue({ message: { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'a~1', component: 'TaskList' }] } } })],
+        ['wpis children z "/" (D19)', withValue({ message: { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'root', component: 'TaskList', children: ['x/y'] }] } } })],
     ])('odrzuca: %s', (_, f) => {
         expect(frame(f)).toBe(false);
+    });
+
+    it.each([
+        ['propsy komponentu otwarte (I3, OBS-6)', { version: 'v0.9.1', updateComponents: { surfaceId: 'workspace', components: [{ id: 'c1', component: 'WorkspaceItem', kind: 'chart', x: 3, custom: { a: 1 } }] } }],
+        ['createSurface z theme i sendDataModel (upstream; klient ignoruje)', { version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2', theme: {}, sendDataModel: false } }],
+        ['updateDataModel bez path i value (upstream)', { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud' } }],
+        ['narration bez speak', { narration: { text: null } }],
+        ['kontrola FU-4: ta sama wartość z kluczem podobnym (constructorName)', { version: 'v0.9.1', updateDataModel: { surfaceId: 'workspace', path: '/m', value: { constructorName: 1 } } }],
+        ['id z innymi znakami (kropka, myślnik, unicode)', { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'zad-1.ą', component: 'TaskList', children: ['b.2'] }] } }],
+    ])('znane otwarte — przyjmuje: %s', (_, message) => {
+        expect(frame(withValue({ message })), errors(frame)).toBe(true);
     });
 });
 
@@ -150,6 +182,7 @@ describe('schemat forwardedProps', () => {
         ['nieznany surface w resync', props({ resync: { surfaces: ['main'] } })],
         ['powtórzony surface w resync', props({ resync: { surfaces: ['hud', 'hud'] } })],
         ['akcja w a2uiErrors (akcje jadą w resume)', props({ a2uiErrors: [buildAction('approve', 'hud', 'approval')] })],
+        ['raport A2UI z kodem spoza zamkniętej listy (§11.2)', props({ a2uiErrors: [buildError({ code: 'RENDER_CRASHED', surfaceId: 'hud', message: 'm' })] })],
         ['nieznany kod diagnostyki', props({ diagnostics: [{ ...DIAG, code: 'OTHER' }] })],
         ['33 raporty', props({ diagnostics: Array.from({ length: 33 }, () => DIAG) })],
         ['dodatkowe pole profilu', props({ limits: PROFILE_RULES.limits })],
@@ -190,7 +223,7 @@ describe('schemat interruptu awaiting_action i odpowiedzi', () => {
 
     it.each([
         ['inny reason', { id: 'i', reason: 'approval' }],
-        ['expiresAt (zakazane w profilu/1)', { id: 'i', reason: 'flowassist.awaiting_action', expiresAt: '2026-10-07T00:00:00Z' }],
+        ['expiresAt (obowiązek agenta: nie wysyłać; klient je ignoruje, §6.4)', { id: 'i', reason: 'flowassist.awaiting_action', expiresAt: '2026-10-07T00:00:00Z' }],
         ['pusty id', { id: '', reason: 'flowassist.awaiting_action' }],
     ])('interrupt odrzucony: %s', (_, i) => {
         expect(interrupt(i)).toBe(false);

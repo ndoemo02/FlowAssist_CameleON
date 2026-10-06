@@ -2,18 +2,36 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://flowassist.local/schemas/flowassist-transport-1/interrupt.schema.json",
   "title": "flowassist-transport/1 — interrupt awaiting_action i odpowiedź (resume)",
-  "description": "Profil §6.3, §7.2 i §8.1. Główny schemat: AG-UI Interrupt w profilu/1 (reason stały, bez expiresAt). $defs.resumeEntry: wpis RunAgentInput.resume — albo odpowiedź biegu akcji (status resolved, payload = koperta A2UI action, flowassist-v2/envelope.client-to-agent.schema.json), albo porzucenie niepokrytego interruptu w biegu resync (status cancelled, bez payload; reguła pokrycia AG-UI, nie ponowienie akcji). Który wariant wolno w którym biegu, sprawdza adapter. RUN_FINISHED z wynikiem interrupt niesie dokładnie jeden taki interrupt (reguła zestawu, sprawdza adapter).",
+  "description": "Profil §6.4, §7.4 i §8.1. Główny schemat opisuje OBOWIĄZEK AGENTA: AG-UI Interrupt w profilu/1 (reason stały, bez expiresAt). Klient expiresAt ignoruje i nie odrzuca z jego powodu interruptu (§6.4). $defs.resumeEntry: wpis RunAgentInput.resume — albo odpowiedź biegu akcji (status resolved, payload = koperta A2UI action, flowassist-v2/envelope.client-to-agent.schema.json), albo porzucenie niepokrytego interruptu w biegu resync (status cancelled, bez payload; reguła pokrycia AG-UI, nie ponowienie akcji). Który wariant wolno w którym biegu, sprawdza adapter. RUN_FINISHED z wynikiem interrupt niesie dokładnie jeden taki interrupt (reguła zestawu, sprawdza adapter).",
   "type": "object",
-  "required": ["id", "reason"],
+  "required": [
+    "id",
+    "reason"
+  ],
   "additionalProperties": false,
   "properties": {
-    "id": { "type": "string", "minLength": 1 },
-    "reason": { "const": "flowassist.awaiting_action" },
-    "message": { "type": "string" },
-    "toolCallId": { "type": "string" },
-    "responseSchema": { "type": "object" },
-    "metadata": { "type": "object" },
-    "subagentRunId": { "type": "string" }
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reason": {
+      "const": "flowassist.awaiting_action"
+    },
+    "message": {
+      "type": "string"
+    },
+    "toolCallId": {
+      "type": "string"
+    },
+    "responseSchema": {
+      "type": "object"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "subagentRunId": {
+      "type": "string"
+    }
   },
   "$defs": {
     "resumeEntry": {
@@ -21,29 +39,56 @@
         {
           "title": "odpowiedź akcją (bieg akcji)",
           "type": "object",
-          "required": ["interruptId", "status", "payload"],
+          "required": [
+            "interruptId",
+            "status",
+            "payload"
+          ],
           "additionalProperties": false,
           "properties": {
-            "interruptId": { "type": "string", "minLength": 1 },
-            "status": { "const": "resolved" },
+            "interruptId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "const": "resolved"
+            },
             "payload": {
               "allOf": [
-                { "$ref": "../flowassist-v2/envelope.client-to-agent.schema.json" },
-                { "required": ["action"] }
+                {
+                  "$ref": "../flowassist-v2/envelope.client-to-agent.schema.json"
+                },
+                {
+                  "required": [
+                    "action"
+                  ]
+                }
               ]
             },
-            "metadata": { "type": "object" }
+            "metadata": {
+              "type": "object"
+            }
           }
         },
         {
           "title": "porzucenie niepokrytego interruptu (bieg resync)",
           "type": "object",
-          "required": ["interruptId", "status"],
+          "required": [
+            "interruptId",
+            "status"
+          ],
           "additionalProperties": false,
           "properties": {
-            "interruptId": { "type": "string", "minLength": 1 },
-            "status": { "const": "cancelled" },
-            "metadata": { "type": "object" }
+            "interruptId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "const": "cancelled"
+            },
+            "metadata": {
+              "type": "object"
+            }
           }
         }
       ]

@@ -2,25 +2,49 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://flowassist.local/schemas/flowassist-transport-1/forwarded-props.schema.json",
   "title": "flowassist-transport/1 — RunAgentInput.forwardedProps (klient → agent)",
-  "description": "Profil §4.4 i §11.4. Jedyny kanał aplikacji w RunAgentInput (AG-UI: pośrednicy go nie zmieniają). capabilities = zamrożony snapshot przebiegu w KAŻDYM biegu. scenario tylko w biegu startu, resync tylko w biegu resync (reguła rodzaju biegu, nie kształtu). a2uiErrors: koperty A2UI error (flowassist-v2/envelope.client-to-agent.schema.json); łączny limit a2uiErrors + diagnostics = 32 (limits.pendingReportsMax) pilnuje adapter.",
+  "description": "Profil §4.4 i §11.4. Jedyny kanał aplikacji w RunAgentInput (AG-UI: pośrednicy go nie zmieniają). capabilities = zamrożony snapshot przebiegu w KAŻDYM biegu. scenario: bieg startu i bieg resync zastępujący niepotwierdzony start; resync tylko w biegu resync (reguły rodzaju biegu, nie kształtu). a2uiErrors: koperty A2UI error (flowassist-v2/envelope.client-to-agent.schema.json) z kodem z zamkniętej listy profilu; łączny limit a2uiErrors + diagnostics = 32 (limits.pendingReportsMax) pilnuje adapter.",
   "type": "object",
-  "required": ["flowassist"],
+  "required": [
+    "flowassist"
+  ],
   "additionalProperties": false,
   "properties": {
     "flowassist": {
       "type": "object",
-      "required": ["profile", "capabilities"],
+      "required": [
+        "profile",
+        "capabilities"
+      ],
       "additionalProperties": false,
       "properties": {
-        "profile": { "const": "flowassist-transport/1" },
-        "capabilities": { "$ref": "client-capabilities.schema.json" },
-        "scenario": { "type": "string", "minLength": 1 },
+        "profile": {
+          "const": "flowassist-transport/1"
+        },
+        "capabilities": {
+          "$ref": "client-capabilities.schema.json"
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
         "resync": {
           "type": "object",
-          "required": ["surfaces"],
+          "required": [
+            "surfaces"
+          ],
           "additionalProperties": false,
           "properties": {
-            "surfaces": { "type": "array", "uniqueItems": true, "items": { "enum": ["workspace", "tasks-drawer", "hud"] } }
+            "surfaces": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "workspace",
+                  "tasks-drawer",
+                  "hud"
+                ]
+              }
+            }
           }
         },
         "a2uiErrors": {
@@ -28,12 +52,39 @@
           "maxItems": 32,
           "items": {
             "allOf": [
-              { "$ref": "../flowassist-v2/envelope.client-to-agent.schema.json" },
-              { "required": ["error"] }
+              {
+                "$ref": "../flowassist-v2/envelope.client-to-agent.schema.json"
+              },
+              {
+                "required": [
+                  "error"
+                ]
+              },
+              {
+                "properties": {
+                  "error": {
+                    "properties": {
+                      "code": {
+                        "enum": [
+                          "VALIDATION_FAILED",
+                          "SURFACE_EXISTS",
+                          "SURFACE_NOT_FOUND"
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
             ]
           }
         },
-        "diagnostics": { "type": "array", "maxItems": 32, "items": { "$ref": "diagnostic.schema.json" } }
+        "diagnostics": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "$ref": "diagnostic.schema.json"
+          }
+        }
       }
     }
   }

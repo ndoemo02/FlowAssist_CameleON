@@ -5,12 +5,14 @@
 //   żeby nie nadpisywał narracji; błąd blokujący (przebieg w `error`) — role="alert";
 // - napływ danych nigdy nie przejmuje fokusu.
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { setTransport, useAiUi } from '../store';
 import AiUiOverlay from '../overlay/AiUiOverlay';
 import { userLayoutCommand } from '../overlay/userCommand';
-import { resetAnnouncer } from '../overlay/announcer';
+import { announce, resetAnnouncer } from '../overlay/announcer';
 import { installDomStubs, render, type Rendered } from './fixtures/render';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
@@ -61,6 +63,13 @@ describe('region narracji agenta', () => {
         agent({ narration: { text: 'Pierwsze zdanie' } });
         expect(narrationRegion(r)).toBe(region);
         expect(region.textContent).toContain('Pierwsze zdanie');
+        // wizualny napis (jest w DOM po pierwszej narracji) jest aria-hidden i nie jest regionem na żywo
+        const caption = Array.from(r.container.querySelectorAll('p')).find((p) => p.textContent?.includes('Pierwsze zdanie'));
+        expect(caption?.getAttribute('aria-hidden')).toBe('true');
+        expect(caption?.getAttribute('role')).toBeNull();
+        expect(caption?.getAttribute('aria-live')).toBeNull();
+        const liveFirst = r.container.querySelectorAll('[role="status"], [aria-live]');
+        expect(Array.from(liveFirst).filter((el) => el.textContent?.includes('Pierwsze zdanie'))).toEqual([region]);
         agent({ narration: { text: 'Drugie zdanie' } });
         expect(narrationRegion(r)).toBe(region);
         expect(region.textContent).toContain('Drugie zdanie');
@@ -183,5 +192,70 @@ describe('napływ danych nie przejmuje fokusu', () => {
         ] } });
         expect(document.activeElement).toBe(outside);
         outside.remove();
+    });
+});
+
+describe('cykl ogłoszeń w przebiegu (review kroków 1–2)', () => {
+    it('nowy przebieg czyści nieaktualny alert', () => {
+        const r = mount();
+        startRun();
+        act(() => useAiUi.getState().receiveStatus(runId(), 'error', 'x'));
+        expect(alertRegion(r).textContent).toContain('Błąd przebiegu');
+        startRun();
+        expect(alertRegion(r).textContent).toBe('');
+    });
+
+    it('ten sam element w nowym przebiegu jest znowu nowością', () => {
+        const r = mount();
+        startRun();
+        workspaceItem();
+        expect(statusRegion(r).textContent).toContain('Nowy element na stole: Zapytania');
+        startRun();
+        workspaceItem();
+        expect(statusRegion(r).textContent).toContain('Nowy element na stole: Zapytania');
+    });
+
+    it('fallback → ready → fallback: nawrót błędu jest ogłaszany ponownie', () => {
+        const r = mount();
+        startRun();
+        workspaceItem(false);
+        const data = (kind: string) => agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: { ...chartData, kind } } });
+        data('pie');
+        expect(statusRegion(r).textContent).toContain('Nie można wyświetlić elementu: Zapytania');
+        data('line');
+        expect(statusRegion(r).textContent).not.toContain('Nie można wyświetlić');
+        data('pie');
+        expect(statusRegion(r).textContent).toContain('Nie można wyświetlić elementu: Zapytania');
+    });
+
+    it('element usunięty z Workspace.children i dodany ponownie w tym samym przebiegu jest nowością (P6)', () => {
+        const r = mount();
+        startRun();
+        workspaceItem();
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: [] }] } });
+        act(() => announce('znacznik')); // region z innym komunikatem: ogłoszenie musi pojawić się na nowo
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: ['m'] }] } });
+        expect(statusRegion(r).textContent).toContain('Nowy element na stole: Zapytania');
+    });
+
+    it('klawisz Delete na karcie (skrót klawiatury) potwierdza ukrycie', () => {
+        const r = mount();
+        startRun();
+        workspaceItem();
+        act(() => useAiUi.getState().setAngle(Math.PI, 'manual'));
+        const card = r.container.querySelector<HTMLElement>('article[aria-label="Zapytania"]')!;
+        act(() => card.focus());
+        act(() => { card.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true, cancelable: true })); });
+        expect(statusRegion(r).textContent).toContain('Ukryto: Zapytania');
+    });
+});
+
+describe('strażnik statyczny: komendy układu z overlayu idą przez userLayoutCommand', () => {
+    it('poza userCommand.ts żaden plik overlay/ nie woła store.layoutCommand', () => {
+        const dir = join(process.cwd(), 'src/features/aiui/overlay/'); // jsdom: import.meta.url nie jest file:
+        const offenders = readdirSync(dir)
+            .filter((f) => /\.(ts|tsx)$/.test(f) && f !== 'userCommand.ts')
+            .filter((f) => /layoutCommand\b/.test(readFileSync(dir + f, 'utf-8').replace(/userLayoutCommand/g, '')));
+        expect(offenders).toEqual([]);
     });
 });

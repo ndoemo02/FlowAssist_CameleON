@@ -90,3 +90,21 @@ test('„Ukryj” z klawiatury na karcie z focusem: fokus na kontenerze stołu (
     await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.focusLayer ?? null)).toBe('table');
     await expect(page.getByRole('status').filter({ hasText: 'Ukryto: Element kpis' })).toHaveCount(1);
 });
+
+// Review P0.5 (A11Y-1): klawiatura nie wprowadza karty w focus, więc kontrolki karty są widoczne przy fokusie klawiatury.
+test('fokus klawiatury na karcie pokazuje kontrolki „−/+”; zmiana rozmiaru z klawiatury', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'compact ma kontrolki zawsze');
+    await openApp(page);
+    await seedWorkspace(page);
+    await setAngle(page, BACK);
+    const card = page.getByRole('article', { name: 'Element kpis' });
+    const plus = card.getByRole('button', { name: 'Powiększ' });
+    await expect(plus).toHaveCount(0);
+    await card.focus();
+    await expect(plus).toBeVisible();
+    await plus.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => (await page.evaluate(() =>
+        (window as unknown as { __aiui: { getState(): { layout: Record<string, { scale: number; presentation: string }> } } }).__aiui.getState().layout.kpis))).toMatchObject({ presentation: 'card' });
+    expect((await page.evaluate(() => (window as unknown as { __aiui: { getState(): { layout: Record<string, { scale: number }> } } }).__aiui.getState().layout.kpis.scale))).toBeGreaterThan(1);
+});

@@ -21,6 +21,10 @@ describe('A11Y-2: nazwa dostępna wykresu', () => {
         expect(label(mount(<Chart kind="line" title="Zapytania" series={series} onAction={() => {}} />))).toBe('Zapytania');
     });
 
+    it('tytuł z samych spacji traktowany jak brak tytułu', () => {
+        expect(label(mount(<Chart kind="line" title="   " series={series} onAction={() => {}} />))).toContain('Wykres liniowy');
+    });
+
     it('bez tytułu: niepusta nazwa z rodzajem wykresu i etykietami serii', () => {
         const name = label(mount(<Chart kind="bar" series={series} onAction={() => {}} />));
         expect(name).toContain('słupkowy');

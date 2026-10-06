@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useAiUi, type AiUiState } from '../store';
 import { resolveItem, workspaceChildren } from '../workspace';
-import { alertAnnounce, announce, useAnnouncer } from './announcer';
+import { alertAnnounce, announce, clearAlert, useAnnouncer } from './announcer';
 
 // Regiony ogłoszeń dla czytników ekranu (P0.5, plan v1.3.2 R7). Zawsze zamontowane w AiUiOverlay, niezależnie
 // od widoczności napisów (compact: napisy chowane przy otwartej szufladzie), zmienia się tylko ich treść.
@@ -61,23 +61,30 @@ export function useClientAnnouncements() {
         return useAiUi.subscribe((s, p) => {
             const messages: string[] = [];
             const newRun = s.scenario.runId !== p.scenario.runId;
-            if (newRun) { ready = new Set(); failed = new Set(); decision = null; }
+            if (newRun) { ready = new Set(); failed = new Set(); decision = null; clearAlert(); }
             if (s.scenario.status !== p.scenario.status || newRun) {
                 if (s.scenario.status === 'running' && newRun) messages.push('Agent rozpoczął pracę');
                 if (s.scenario.status === 'done') messages.push('Przebieg zakończony');
                 if (s.scenario.status === 'error') alertAnnounce(`Błąd przebiegu${s.scenario.error ? `: ${s.scenario.error}` : ''}`);
             }
-            if (s.surfaces !== p.surfaces) {
+            // tylko zmiana surface'u stołu rozwiązuje elementy (HUD, szuflada tasków nie)
+            if (s.surfaces.workspace !== p.surfaces.workspace) {
                 const surface = s.surfaces.workspace;
+                const members = new Set((surface && workspaceChildren(surface)) ?? []);
+                // P6: element, który wypadł z Workspace.children, po ponownym dodaniu jest nowym wpisem — znowu nowością
+                ready.forEach((id) => { if (!members.has(id)) ready.delete(id); });
+                failed.forEach((id) => { if (!members.has(id)) failed.delete(id); });
                 const fresh: string[] = [], broken: string[] = [];
-                for (const id of (surface && workspaceChildren(surface)) ?? []) {
+                members.forEach((id) => {
                     const v = resolveItem(surface!, id);
                     if (v.status === 'ready') failed.delete(id); // po naprawie nawrót błędu jest znowu nowością
                     if (v.status === 'ready' && !ready.has(id)) { ready.add(id); fresh.push(v.title); }
                     if (v.status === 'fallback' && !failed.has(id)) { failed.add(id); broken.push(v.title ?? id); }
-                }
+                });
                 if (fresh.length) messages.push(`${fresh.length === 1 ? 'Nowy element na stole' : 'Nowe elementy na stole'}: ${fresh.join(', ')}`);
                 if (broken.length) messages.push(`Nie można wyświetlić elementu: ${broken.join(', ')}`);
+            }
+            if (s.surfaces.hud !== p.surfaces.hud) {
                 const title = decisionTitle(s);
                 if (title && title !== decision) messages.push(`Decyzja do podjęcia: ${title}`);
                 decision = title;

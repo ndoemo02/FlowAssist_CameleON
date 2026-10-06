@@ -42,7 +42,7 @@ export default function Chart({ kind, title, series, density = 'screen' }: ViewP
     const yAt = (v: number) => PAD.t + innerH - (v / maxY) * innerH;
     const slot = innerW / xs.length, barW = (slot * 0.7) / series.length;
     // role="img" wymaga niepustej nazwy; `title` jest opcjonalny w katalogu (A11Y-2)
-    const name = title || `Wykres ${kind === 'bar' ? 'słupkowy' : 'liniowy'}: ${series.map((s) => s.label).join(', ')}`;
+    const name = title?.trim() || `Wykres ${kind === 'bar' ? 'słupkowy' : 'liniowy'}: ${series.map((s) => s.label).join(', ')}`;
 
     return (
         <figure className={`rounded-xl border border-white/10 bg-white/[0.03] ${density === 'card' ? 'p-2' : 'p-4'}`}>

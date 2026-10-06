@@ -22,6 +22,11 @@ export function alertAnnounce(text: string) {
     useAnnouncer.setState((s) => ({ alert: { text, seq: s.alert.seq + 1 } }));
 }
 
+/** Nowy przebieg: nieaktualny błąd nie zostaje w DOM (tryb przeglądania czytnika trafiłby na niego). */
+export function clearAlert() {
+    useAnnouncer.setState((s) => (s.alert.text ? { alert: { text: '', seq: s.alert.seq + 1 } } : s));
+}
+
 /** Testy: wyczyść komunikaty. */
 export function resetAnnouncer() {
     useAnnouncer.setState({ status: EMPTY, alert: EMPTY });

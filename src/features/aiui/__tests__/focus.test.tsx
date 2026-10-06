@@ -341,3 +341,36 @@ describe('bezpieczny cel fokusu, gdy fokusowany element znika', () => {
         expect(document.activeElement).toBe(document.body);
     });
 });
+
+// Review kroków 1–2 (A11Y-1): na desktopie klawiatura nie wprowadza karty w focus, więc kontrolki karty
+// („−/+”, „Ukryj”, „Na ekran”, „⋯”) muszą być dostępne, gdy fokus klawiatury jest w karcie.
+describe('kontrolki karty przy fokusie w karcie (desktop)', () => {
+    it('Tab na kartę (prezentacja card) pokazuje kontrolki; fokus poza kartą je chowa', () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        expect(useAiUi.getState().layout.m.presentation).toBe('card');
+        expect(button(article(r), 'Powiększ')).toBeUndefined();
+        act(() => article(r).focus());
+        expect(button(article(r), 'Powiększ')).toBeTruthy();
+        expect(button(article(r), 'Zmniejsz')).toBeTruthy();
+        const outside = document.createElement('button');
+        document.body.appendChild(outside);
+        act(() => outside.focus());
+        expect(button(article(r), 'Powiększ')).toBeUndefined();
+        outside.remove();
+    });
+
+    it('przejście fokusu z karty na jej przycisk nie chowa kontrolek', () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => article(r).focus());
+        act(() => button(article(r), 'Powiększ').focus());
+        expect(button(article(r), 'Powiększ')).toBeTruthy();
+        click(button(article(r), 'Powiększ'));
+        expect(useAiUi.getState().layout.m.scale).toBeGreaterThan(1);
+    });
+});

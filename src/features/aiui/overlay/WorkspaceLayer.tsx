@@ -76,6 +76,10 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
     const card = useRef<HTMLDivElement>(null);
     const menuButton = useRef<HTMLButtonElement>(null);
     const [menu, setMenu] = useState(false);
+    // A11Y-1 (review P0.5): klawiatura nie wprowadza karty w focus, więc kontrolki („−/+”, „Ukryj”, „Na ekran”, „⋯”)
+    // pokazujemy, gdy fokus KLAWIATURY jest w karcie (:focus-visible). Fokus myszą (klik, drag) nie zmienia wyglądu;
+    // kontrolki chowa dopiero wyjście fokusu z karty (klik myszą w kontrolkę ich nie chowa).
+    const [keyboardWithin, setKeyboardWithin] = useState(false);
     // ważność właściciela (P0.5): menu zamyka się, gdy stół przestaje być aktywny (visibility ≤ 0.6)
     const tableActive = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.back) > 0.6);
     useEffect(() => { if (!tableActive) setMenu(false); }, [tableActive]);
@@ -132,6 +136,8 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
             ref={card}
             {...bind()}
             tabIndex={0}
+            onFocus={(e) => { if (isKeyboardFocus(e.target)) setKeyboardWithin(true); }}
+            onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setKeyboardWithin(false); }}
             onKeyDown={(ev) => {
                 // otwarte menu ma pierwszeństwo przed skrótem Escape karty (zdjęcie focusu)
                 if (menu && ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeMenu(); return; }
@@ -161,7 +167,7 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
             >
                 <ItemBody view={view} density="card" />
             </div>
-            {(focused || compact) && controls}
+            {(focused || compact || keyboardWithin) && controls}
             {menu && view.status === 'ready' && (
                 <div data-nodrag className="border-t border-white/10 px-3 pb-2" onMouseLeave={() => setMenu(false)}>
                     <ActionBar
@@ -177,6 +183,11 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
         </article>
     );
 });
+
+/** Fokus z klawiatury (`:focus-visible`); bez wsparcia selektora (np. jsdom) — traktujemy jak klawiaturę. */
+function isKeyboardFocus(el: EventTarget) {
+    try { return (el as Element).matches(':focus-visible'); } catch { return true; }
+}
 
 function CardButton({ onClick, children, primary, label, expanded, buttonRef }: {
     onClick: () => void; children: React.ReactNode; primary?: boolean; label?: string; expanded?: boolean; buttonRef?: RefObject<HTMLButtonElement>;

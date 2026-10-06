@@ -18,7 +18,12 @@ export function smoothing(delta: number, k: number, reduced: boolean) {
     return reduced ? 1 : 1 - Math.exp(-delta * k);
 }
 
-/** Krok tweenu kąta dla `tickCamera`: ograniczony ruch kończy tween w jednej klatce. */
+/**
+ * Krok tweenu kąta dla `tickCamera`: ograniczony ruch kończy tween w jednej klatce.
+ * Kontrakt z kernelem (store.ts, I8): `tickCamera` używa `dt` wyłącznie do postępu tweenu (bez tweenu nic nie robi),
+ * a okres łaski ręcznego suwaka liczy z `performance.now()` — więc podawanie TWEEN_SECONDS w każdej klatce jest
+ * bezpieczne. Pilnuje tego `__tests__/motion.test.ts`.
+ */
 export function cameraTickSeconds(delta: number, reduced: boolean) {
     return reduced ? TWEEN_SECONDS : delta;
 }

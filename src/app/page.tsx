@@ -1067,6 +1067,16 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
             controlsRef.current.update();
         }
 
+        // e2e (P0.6): ślad pozy kamery (pozycja, target, FOV) na żądanie testu — tylko poza produkcją.
+        // Pozwala zmierzyć brak wygładzania kadru przy prefers-reduced-motion bez dotykania kernela.
+        if (process.env.NODE_ENV !== 'production') {
+            const trace = (window as unknown as { __cameraTrace?: number[][] }).__cameraTrace;
+            if (trace && controlsRef.current) {
+                const t = controlsRef.current.target, c = camera as THREE.PerspectiveCamera;
+                trace.push([c.position.x, c.position.y, c.position.z, t.x, t.y, t.z, c.fov]);
+            }
+        }
+
         // ─── ALWAYS: Update Debug Panel ───
         debugRef.current.pos.copy(camera.position);
         debugRef.current.rot.copy(camera.rotation);

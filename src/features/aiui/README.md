@@ -108,7 +108,7 @@ Logika gestów jest czysta i testowana w `overlay/gestureLogic.ts`.
 
 ## Ograniczony ruch (`motion.ts`, P0.6)
 
-Przy `prefers-reduced-motion: reduce` każda gałąź kamery osiąga stan końcowy bez wygładzania, a overlay nie animuje:
+Przy `prefers-reduced-motion: reduce` każda gałąź kamery osiąga stan końcowy bez wygładzania, a overlay ogranicza ruch:
 
 - **kąt orbity:** `page.tsx` woła `tickCamera(cameraTickSeconds(delta, reduced))` — przy ograniczonym ruchu cały
   czas tweenu (`TWEEN_SECONDS`), więc tween kończy się w jednej klatce; kąt i źródło `director` zachowują semantykę P3,
@@ -116,13 +116,21 @@ Przy `prefers-reduced-motion: reduce` każda gałąź kamery osiąga stan końco
 - **cinematic i orbita:** współczynniki `1 - e^(-delta·k)` (pozycja, target, FOV; dojazd z „close” do orbity) przez
   `smoothing(delta, k, reduced)` → 1; dojazd intro → wide (`entryProgress`) od razu 1. Mapowanie scrolla na kadr
   „close” zostaje (steruje nim użytkownik);
-- **Framer Motion:** `MotionConfig reducedMotion="user"` w `AiUiOverlay`;
-- **CSS:** `globals.css` — w `[data-aiui-overlay]` przejścia i animacje (opacity warstw, szuflada, pulsowanie) bez ruchu.
+- **Framer Motion:** `MotionConfig reducedMotion="user"` w `AiUiOverlay` — Framer wycisza wtedy tylko ruch pozycyjny
+  (transformy i `width`/`height`/`top`/`left`); przejścia `opacity` (pojawianie się napisów, HUD, staggery) i rysowanie
+  linii wykresu (`pathLength`, `Chart.tsx`) nadal się animują — zgodnie z planem („tylko komponenty Framer”); pełne
+  wyłączenie to osobna decyzja;
+- **CSS:** `globals.css` — w `[data-aiui-overlay]` przejścia i animacje CSS (opacity warstw, szuflada, pulsowanie) bez ruchu.
 
-Preferencja jest śledzona na żywo (`useReducedMotionRef`, odczyt w pętli klatek bez re-renderów).
-Testy: `__tests__/motion.test.ts` (współczynniki, tween w jednej klatce ze źródłem `director`), e2e `motion.spec.ts`
-(`reducedMotion: 'reduce'`: brak kątów pośrednich + rzeczywista aktywacja `ScreenAnchor`, ręczne przerwanie, scroll do
-„close” → Back → Front).
+Na żywo (zmiana preferencji w trakcie działania): kamera (`useReducedMotionRef`, odczyt w pętli klatek bez re-renderów)
+i CSS (media query). Framer ustala preferencję przy montażu elementu, więc obejmuje tylko elementy zamontowane później.
+Poza granicą P0.6 (strona pod overlayem) ruch zostaje: cząsteczki intro, obrót galaktyki i roju, StarField,
+„Scroll to Explore” — do decyzji właściciela.
+Testy: `__tests__/motion.test.ts` (współczynniki, tween w jednej klatce ze źródłem `director`, kontrakt `tickCamera`
+bez tweenu), e2e `motion.spec.ts` z `reducedMotion: 'reduce'`: brak kątów pośrednich i rzeczywista aktywacja
+`ScreenAnchor`; kadr (pozycja, target, FOV — dev-hook `window.__cameraTrace` w `page.tsx`) skacze zamiast dojeżdżać
+po Back → Front, po powrocie z „close” i po intro; okres łaski P3 przy ograniczonym ruchu (kamera i `stage.focus`
+bez zmian). Test kontrolny bez ograniczonego ruchu dowodzi, że pomiar wykrywa wygładzanie.
 
 ## Adapter sceny (`scene/`)
 

@@ -37,6 +37,13 @@ describe('ograniczony ruch a semantyka P3 (kernel bez zmian)', () => {
         expect(useAiUi.getState().camera).toMatchObject({ angle: FOCUS_ANGLE.back, source: 'director', tween: null });
     });
 
+    it('kontrakt z kernelem: tickCamera(TWEEN_SECONDS) bez tweenu nie zmienia stanu kamery', () => {
+        useAiUi.setState({ camera: { angle: 1.2, source: 'manual', tween: null } });
+        const before = useAiUi.getState().camera;
+        useAiUi.getState().tickCamera(cameraTickSeconds(1 / 60, true));
+        expect(useAiUi.getState().camera).toBe(before);
+    });
+
     it('zwykły ruch: po jednej klatce kąt pośredni (kontrola, że test powyżej coś mierzy)', () => {
         useAiUi.setState({ camera: { angle: 0, source: 'director', tween: { from: 0, to: FOCUS_ANGLE.back, t: 0 } } });
         useAiUi.getState().tickCamera(cameraTickSeconds(1 / 60, false));

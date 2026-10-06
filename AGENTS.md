@@ -139,12 +139,23 @@ Działają (desktop):
 
 Klawiatura:
 
-- Tab przechodzi po kartach stołu (tylko gdy stół jest widoczny),
+- Tab przechodzi po kartach stołu (tylko gdy stół jest widoczny); fokus klawiatury na karcie pokazuje jej
+  kontrolki („Na ekran”, „− / +”, „Ukryj”, „⋯”),
 - skróty działają, gdy fokus jest na samej karcie (nie na jej przycisku):
   - strzałki → przesunięcie karty,
   - Enter → screen,
   - Delete → ukryj,
-  - Escape → remove focus.
+  - Escape → remove focus,
+- Escape cofa o jeden poziom: z wnętrza karty wraca na kartę; otwarte menu „⋯” (karta, ekran) zamyka i oddaje
+  fokus „⋯”; rozwiniętą decyzję HUD zwija i wraca na pasek; otwartą listę tasków zamyka,
+- decyzja HUD: otwarcie przenosi fokus na „Zwiń” (nie na „Zatwierdź”),
+- fokus przenosi tylko działanie użytkownika, nigdy dane agenta; gdy element z fokusem znika, fokus trafia na
+  kontener aktywnej warstwy albo pasek decyzji (szczegóły: `src/features/aiui/README.md` → „Fokus i klawiatura”).
+
+Czytniki ekranu: stały region narracji agenta, osobny region komunikatów klienta (gesty, start/koniec przebiegu,
+nowy element, decyzja) i `role="alert"` tylko dla błędu przebiegu.
+
+Ograniczony ruch (`prefers-reduced-motion`): kamera bez wygładzania (kąt, cinematic, orbita), overlay bez animacji.
 
 Compact (telefon):
 
@@ -190,7 +201,14 @@ Checkpointy:
 - `2e2debc` — cleanup tekstur
 - `6e96223` — poprawki po review Astry + AGENTS.md
 
-Stan na `6e96223`:
+Stan v1.3 P0 (2026-10-06, lokalnie, przed pushem): P0.1–P0.7 zrealizowane (taksonomia stanów: ADR 0007;
+dostępność: regiony ogłoszeń, fokus i klawiatura, axe = zero naruszeń; ograniczony ruch), zmiana kernela ST-1(b)
+za zgodą właściciela. Testy: vitest 325/325; pełny tsc: 1 znany błąd (Lanyard); ostatni pełny e2e 27 passed /
+15 skipped / 0 failed na `af57706`, później celowane (`motion` 12/12, `surfaces` + `a11y` desktop 6/6).
+Review: recenzent Claude w świeżym kontekście dla każdego kroku (GO WITH FIXES → poprawione, ponowne sprawdzenie OK)
+zamiast Astry; zbiorcze review Astry (GPT-6 Astra przez inference.sh) do decyzji właściciela.
+
+Stan na `6e96223` (historyczny):
 
 - 106/106 testów PASS (10 plików w `src/features/aiui/__tests__/`)
 - TypeScript clean (zakres `src/features/aiui`, `src/app/page.tsx`)
@@ -233,6 +251,13 @@ Od v1.3 (P0.2, P0.3) dochodzą:
   `parseEvent` / `validateProps` / `validateContent` na korpusie i jego mutacjach. Ajv tylko w testach;
   autorytetem runtime pozostają guardy.
 
+Od P0.4–P0.6:
+
+- `itemStates` — taksonomia stanów elementu (ADR 0007): kategorie po `status` + `path`, raport z `scanSurfaces`;
+- `announcements`, `focus`, `a11yViews` (jsdom) — regiony ogłoszeń, fokus i klawiatura, nazwy dostępne;
+  strażnik statyczny: komendy układu z `overlay/` tylko przez `userLayoutCommand`;
+- `motion` — ograniczony ruch (współczynniki kamery, tween w jednej klatce ze źródłem `director`).
+
 ### Testy przeglądarkowe: Playwright + axe (od v1.3, P0.1)
 
 `npm run test:e2e` — deterministyczna regresja DOM w `e2e/` (autorytatywna; zastępuje dawne skrypty `agent-browser`).
@@ -245,6 +270,11 @@ Od v1.3 (P0.2, P0.3) dochodzą:
   Axe nie zastępuje testów fokusu, gestów ani czytnika ekranu.
 - WebGL headless = SwiftShader: logika i hit-testing tak, FPS nie.
 - Ustalenia harnessu (m.in. E2E-1: hit-testing kart w kontenerze 3D; baseline axe): `docs/adr/0006-browser-harness-findings.md`.
+- Testy podwójnego tapu mają strażnik FLAKE-2: odstęp tapów ≥ `DOUBLE_TAP_MS` (350 ms, `overlay/gestureConstants.ts`)
+  = błąd z etykietą INCONCLUSIVE (środowisko), nigdy PASS; w raporcie liczony jako błąd środowiskowy.
+- `motion.spec.ts` działa z `reducedMotion: 'reduce'` (kąt kamery mierzony subskrypcją store'u — SwiftShader rysuje
+  kilka klatek na sekundę).
+- Pamięć: pełny przebieg potrzebuje ok. 4 GB wolnego RAM; poniżej uruchamiaj tylko celowane specyfikacje.
 
 ### Eksploracja: agent-browser
 
@@ -329,14 +359,16 @@ v1.3 — wydanie utwardzające i adapterowe. Inwarianty kernela I1–I10 zamroż
 właściciela, zapisane w ADR 0001.
 Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
 
-- **P0 (hardening, start od razu):**
-  - Playwright + axe (tylko Chromium);
-  - korpus fixture'ów z replay (stan, efekty, komunikaty wychodzące);
-  - JSON Schema jako warstwowy test konformacji (Ajv tylko w testach);
-  - taksonomia stanów elementu;
-  - dostępność natywnym HTML (regiony ogłoszeń, Escape, fokus);
-  - reduced motion;
-  - ADR-y.
+- **P0 (hardening) — zrealizowane (2026-10-06, lokalnie, przed pushem):**
+  - ~~Playwright + axe (tylko Chromium)~~ — P0.1;
+  - ~~korpus fixture'ów z replay~~ — P0.2;
+  - ~~JSON Schema jako warstwowy test konformacji~~ — P0.3;
+  - ~~taksonomia stanów elementu~~ — P0.4, ADR 0007 (ST-1(b): zmiana kernela za zgodą właściciela; ST-2, ST-3 zostają;
+    ST-4 i pytania Q1–Q3 do decyzji);
+  - ~~dostępność natywnym HTML~~ — P0.5 (axe = zero naruszeń; regiony ogłoszeń; fokus i klawiatura; ważność
+    właściciela menu); do decyzji: LOW-1 (fokus po „Na ekran” z klawiatury trafia na pasek decyzji, nie na panel);
+  - ~~reduced motion~~ — P0.6;
+  - ~~ADR-y~~ — P0.7 (0001–0007).
 - **P1 (obowiązkowo):** handshake możliwości → jeden adapter AG-UI (dowód wymienności mocka na prawdziwy transport).
 - **Follow-upy przed P1.6** (review 2026-10-05, `docs/review/REVIEW_BRIEF.md`):
   - ~~**FU-1 (reszta #5)**~~ — zrealizowane: błędy struktury (komponent niedostępny w slocie, root `workspace`

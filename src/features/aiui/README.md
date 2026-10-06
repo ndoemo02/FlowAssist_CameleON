@@ -91,7 +91,8 @@ Logika gestów jest czysta i testowana w `overlay/gestureLogic.ts`.
   - **alert** (`data-region="alert"`, `role="alert"`): tylko błąd blokujący (przebieg w `error`).
 
   Komendy układu z UI idą przez `userLayoutCommand` (opakowanie `store.layoutCommand`, kernel bez zmian);
-  zmiany od agenta (hinty) nie są potwierdzane lokalnie — opisuje je narracja. Testy: `__tests__/announcements.test.tsx`.
+  zmiany od agenta (hinty) nie są potwierdzane lokalnie — opisuje je narracja. Komunikaty z jednego kroku JS (paczka
+  zdarzeń, np. dane + koniec przebiegu) są łączone w jeden, żeby się nie nadpisały. Testy: `__tests__/announcements.test.tsx`.
 - **Fokus i klawiatura (P0.5)** — fokus przenosi wyłącznie działanie użytkownika, nigdy dane od agenta;
   Escape cofa o jeden poziom:
   - karta: Escape z wnętrza (treść, przyciski) wraca na kartę, na samej karcie zdejmuje focus; otwarte menu akcji
@@ -102,7 +103,12 @@ Logika gestów jest czysta i testowana w `overlay/gestureLogic.ts`.
     otwarcie przenosi fokus na „Zwiń” (pierwszy przycisk panelu, nie „Zatwierdź”); Escape / „Zwiń” wracają na pasek;
   - szuflada tasków: przycisk `aria-expanded`, lista „Lista tasków” osiągalna z klawiatury, Escape zamyka i oddaje
     fokus przyciskowi; na compact zamknięta szuflada (tylko przesunięta) jest `inert`;
-  - `focusTarget.canTakeFocus`: fokus wraca tylko do elementu w DOM i poza warstwą nieaktywną.
+  - `focusTarget.canTakeFocus`: fokus wraca tylko do elementu w DOM i poza warstwą nieaktywną;
+  - zamknięcie menu (Escape, kliknięcie akcji, zjechanie myszą z fokusem w menu) oddaje fokus „⋯”;
+  - ratunek fokusu (`useFocusRescue`): kontener aktywnej warstwy → panel ekranu → pasek decyzji → w ostateczności
+    korzeń overlayu (`role="group"` „Asystent CameleON”, `tabIndex=-1`); nigdy nie zabiera fokusu żyjącego gdzie indziej;
+  - „Na ekran” od UŻYTKOWNIKA z fokusem w overlayu (LOW-1): intencja fokusu na ekranie (8 s) — ratunek nie idzie na
+    pasek decyzji, a aktywny panel ekranu sam przejmuje fokus; komendy i hinty agenta intencji nie tworzą.
 
   Testy: `__tests__/focus.test.tsx`.
 
@@ -124,8 +130,9 @@ Przy `prefers-reduced-motion: reduce` każda gałąź kamery osiąga stan końco
 
 Na żywo (zmiana preferencji w trakcie działania): kamera (`useReducedMotionRef`, odczyt w pętli klatek bez re-renderów)
 i CSS (media query). Framer ustala preferencję przy montażu elementu, więc obejmuje tylko elementy zamontowane później.
-Poza granicą P0.6 (strona pod overlayem) ruch zostaje: cząsteczki intro, obrót galaktyki i roju, StarField,
-„Scroll to Explore” — do decyzji właściciela.
+Poza overlayem (decyzja właściciela 2026-10-06): galaktyka w tle (`StarField`, `motion.ts: galaxyPose`) przy
+ograniczonym ruchu stoi — bez obrotu i „oddychania” skali. Napis z cząstek (`SwarmLogo`), intro powitalne,
+„Scroll to Explore” i inne elementy strony — później.
 Testy: `__tests__/motion.test.ts` (współczynniki, tween w jednej klatce ze źródłem `director`, kontrakt `tickCamera`
 bez tweenu), e2e `motion.spec.ts` z `reducedMotion: 'reduce'`: brak kątów pośrednich i rzeczywista aktywacja
 `ScreenAnchor`; kadr (pozycja, target, FOV — dev-hook `window.__cameraTrace` w `page.tsx`) skacze zamiast dojeżdżać

@@ -1,6 +1,6 @@
 # ADR 0007: Taksonomia stanów elementu (P0.4)
 
-- **Status:** taksonomia zaakceptowana w zakresie planu v1.3.2 (P0.4). Review Astry (2026-10-06): trzy doprecyzowania uwzględnione, ponowne sprawdzenie OK. Decyzje właściciela 2026-10-06: **ST-1 — (b), zrealizowane** (zmiana kernela w `resolveItem`); **ST-2, ST-3 — zostają**. **ST-4: do decyzji.**
+- **Status:** taksonomia zaakceptowana w zakresie planu v1.3.2 (P0.4). Review Astry (2026-10-06): trzy doprecyzowania uwzględnione, ponowne sprawdzenie OK. Decyzje właściciela 2026-10-06: **ST-1 — (b), zrealizowane** (zmiana kernela w `resolveItem`); **ST-2, ST-3 — zostają**. **ST-4 — (a), decyzja właściciela 2026-10-06.** Q1–Q3 do decyzji.
 - **Kontekst:** plan v1.3.2 (P0.4) wymaga dokumentu i testów **obecnych** stanów `WorkspaceItemView` bez zmiany kodu. Audyt chciał statusów `unsupported` i `failed`. Nowy status byłby zmianą `workspace.ts`, czyli pliku kernela (ADR 0001).
   - Taksonomię zapisano na kodzie z `33d3b06` (P0.4 bez zmian kodu). Tabela poniżej opisuje stan **po** ST-1(b); stan sprzed poprawki opisuje sekcja ST-1.
   - Testy: `src/features/aiui/__tests__/itemStates.test.ts` (dalej `itemStates`) oraz testy wskazane w tabelach.
@@ -143,6 +143,8 @@ Komponent katalogu bez widoku w slocie (`TREE_VIEWS`) resolver zwraca jako `comp
   - (b) `workspaceMeta` rozwiązuje bindingi tych propsów. Hint zmieniałby się wtedy razem z danymi, czyli zmiana danych mogłaby przenieść kartę na ekran. To zmiana semantyki P4/P5 (kernel);
   - (c) binding `presentation`/`priority` jako błąd walidacji z raportem. Zmiana kernela i kontraktu.
 - **Rekomendacja:** (a) w v1.3. Hint to polecenie układu, nie dana; (b) otwiera nową klasę zmian układu sterowanych danymi.
+- **Decyzja (właściciel, 2026-10-06):** (a). W v1.3 `presentation` i `priority` tylko dosłownie, bez bindingów; opisać w profilu
+  transportowym przy P1.7. Kod bez zmian (binding nadal wstrzymuje gotowość i jest walidowany, układ go ignoruje).
 
 ## Otwarte po review ST-1(b) (do decyzji właściciela)
 

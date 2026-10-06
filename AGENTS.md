@@ -149,13 +149,15 @@ Klawiatura:
 - Escape cofa o jeden poziom: z wnętrza karty wraca na kartę; otwarte menu „⋯” (karta, ekran) zamyka i oddaje
   fokus „⋯”; rozwiniętą decyzję HUD zwija i wraca na pasek; otwartą listę tasków zamyka,
 - decyzja HUD: otwarcie przenosi fokus na „Zwiń” (nie na „Zatwierdź”),
+- „Na ekran” z klawiatury (Enter na karcie, przycisk): po przejściu na Front fokus trafia na panel ekranu,
 - fokus przenosi tylko działanie użytkownika, nigdy dane agenta; gdy element z fokusem znika, fokus trafia na
   kontener aktywnej warstwy albo pasek decyzji (szczegóły: `src/features/aiui/README.md` → „Fokus i klawiatura”).
 
 Czytniki ekranu: stały region narracji agenta, osobny region komunikatów klienta (gesty, start/koniec przebiegu,
 nowy element, decyzja) i `role="alert"` tylko dla błędu przebiegu.
 
-Ograniczony ruch (`prefers-reduced-motion`): kamera bez wygładzania (kąt, cinematic, orbita), overlay bez animacji.
+Ograniczony ruch (`prefers-reduced-motion`): kamera bez wygładzania (kąt, cinematic, orbita), overlay bez animacji CSS
+i ruchu pozycyjnego Framer, galaktyka w tle stoi. Napis z cząstek, intro powitalne i reszta strony — później.
 
 Compact (telefon):
 
@@ -205,8 +207,9 @@ Stan v1.3 P0 (2026-10-06, lokalnie, przed pushem): P0.1–P0.7 zrealizowane (tak
 dostępność: regiony ogłoszeń, fokus i klawiatura, axe = zero naruszeń; ograniczony ruch), zmiana kernela ST-1(b)
 za zgodą właściciela. Testy: vitest 325/325; pełny tsc: 1 znany błąd (Lanyard); ostatni pełny e2e 27 passed /
 15 skipped / 0 failed na `af57706`, później celowane (`motion` 12/12, `surfaces` + `a11y` desktop 6/6).
-Review: recenzent Claude w świeżym kontekście dla każdego kroku (GO WITH FIXES → poprawione, ponowne sprawdzenie OK)
-zamiast Astry; zbiorcze review Astry (GPT-6 Astra przez inference.sh) do decyzji właściciela.
+Review: recenzent Claude w świeżym kontekście dla każdego kroku (GO WITH FIXES → poprawione, ponowne sprawdzenie OK);
+po pushu (`4e0f766`) zbiorcze review Astry (GPT-6 Astra przez inference.sh, `belt`, koszt łącznie $2): ST-1(b) GO,
+P0.5 i P0.6 GO WITH FIXES → poprawione.
 
 Stan na `6e96223` (historyczny):
 
@@ -364,10 +367,10 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
   - ~~korpus fixture'ów z replay~~ — P0.2;
   - ~~JSON Schema jako warstwowy test konformacji~~ — P0.3;
   - ~~taksonomia stanów elementu~~ — P0.4, ADR 0007 (ST-1(b): zmiana kernela za zgodą właściciela; ST-2, ST-3 zostają;
-    ST-4 i pytania Q1–Q3 do decyzji);
+    ST-4: `presentation` i `priority` tylko dosłownie — opisać w profilu P1.7; pytania Q1–Q3 do decyzji);
   - ~~dostępność natywnym HTML~~ — P0.5 (axe = zero naruszeń; regiony ogłoszeń; fokus i klawiatura; ważność
-    właściciela menu); do decyzji: LOW-1 (fokus po „Na ekran” z klawiatury trafia na pasek decyzji, nie na panel);
-  - ~~reduced motion~~ — P0.6;
+    właściciela menu; LOW-1: fokus po „Na ekran” z klawiatury na panel ekranu);
+  - ~~reduced motion~~ — P0.6 (+ galaktyka w tle; napis z cząstek i intro — później);
   - ~~ADR-y~~ — P0.7 (0001–0007).
 - **P1 (obowiązkowo):** handshake możliwości → jeden adapter AG-UI (dowód wymienności mocka na prawdziwy transport).
 - **Follow-upy przed P1.6** (review 2026-10-05, `docs/review/REVIEW_BRIEF.md`):

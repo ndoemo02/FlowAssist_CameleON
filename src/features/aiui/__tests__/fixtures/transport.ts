@@ -8,5 +8,6 @@ export const fakeTransport = (overrides: Partial<AgentTransport> = {}): AgentTra
     send() {},
     subscribe: () => () => {},
     stop() {},
+    serverCapabilities: () => null,
     ...overrides,
 });

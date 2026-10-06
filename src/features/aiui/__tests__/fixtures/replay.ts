@@ -47,6 +47,7 @@ class RecordingTransport implements AgentTransport {
     send(message: ClientMessage) { this.sent.push(message); }
     subscribe() { return () => {}; }
     stop() {}
+    serverCapabilities() { return null; }
 }
 
 /**

@@ -92,6 +92,13 @@ Ochrona jest w store, niezależnie od transportu.
 - **Testy:** `loop.test.ts`: „trwałe zakończenie przebiegu”, „restart odcina zdarzenia starego przebiegu”;
   `runIsolation.test.ts` (bieżący / stary / po terminalnym, brak `runId`, `devDispatch` w produkcji, skan `transport/`).
 - **Uwaga:** chwilowa utrata połączenia nie może prowadzić do `done`/`error` (decyzja v1.3.2; adapter P1.6).
+- **Handshake (P1.7a, zmiana niekernelowa, decyzja właściciela D1 2026-10-06):** `startScenario` (realizuje P7,
+  współdzieli I6, ale nie jest funkcją kernela) dokłada do `StartRequest` wymagane `capabilities` — zamrożony snapshot
+  liczony raz na przebieg; transport go nie buduje, tylko dołącza do wywołań backendu. Druga warstwa izolacji jest
+  w transporcie: zgoda na wysyłkę per przebieg (`transport/runPermission.ts`) — ustanawia ją tylko udana negocjacja,
+  resetuje każdy `start` i `stop`. Dzięki temu błąd kontraktu z efektu (`runEffects` → `send`, niestrzeżony statusem)
+  po nieudanej negocjacji albo po `stop` nie trafia do backendu (ADR 0002, „Handshake możliwości”).
+  Testy: `storeCapabilities.test.ts`, `runPermission.test.ts`, `mockTransport.test.ts` (wspólny test zgodności).
 
 ### I7: tożsamość gestu
 Gest zapamiętuje `instance` i `rev` wpisu przy starcie. `rev` rośnie przy każdej zmianie spoza gestu: hint agenta, przeliczenie siatki, zrzucenie z focusu lub ekranu. Gest nieaktualny jest anulowany bez zapisu.

@@ -19,6 +19,7 @@ import { FOCUS_ANGLE, normalizeAngle, shortestDelta, smoothstep01 } from './slot
 import { speak, stopSpeaking } from './tts';
 import type { AgentTransport, RunStatus } from './transport/types';
 import { MockTransport } from './transport/mockTransport';
+import { clientCapabilities } from './transport/capabilities';
 import { SCENARIOS } from './scenarios';
 
 export const TWEEN_SECONDS = 1.6;
@@ -248,7 +249,8 @@ export const useAiUi = create<AiUiState>()((set, get) => {
             const runId = get().scenario.runId + 1;
             set({ ...initialCoreState(), layout: {}, scenario: { status: 'running', id, runId } }); // P7
             tweenTo(FOCUS_ANGLE.front);
-            t.start(runId, { scenario: id, prompt });
+            // P1.7a (D1): capabilities = zamrożony snapshot dla tego przebiegu; transport tylko go dołącza
+            t.start(runId, { scenario: id, prompt, capabilities: clientCapabilities() });
             return true;
         },
 

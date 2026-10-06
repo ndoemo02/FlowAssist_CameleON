@@ -41,7 +41,8 @@
 
 - Jeden raz w pełnym przebiegu `gestures.spec` drugi klik zarejestrował się jako pojedynczy tap (focus zamiast screen). Okno podwójnego tapu to 350 ms (`DOUBLE_TAP_MS`), a test wykonuje dwa sekwencyjne `mouse.click` z rundami do przeglądarki. Ponowienie 3/3 i pełny `gestures.spec` 5/5 zielone.
 - Prawdopodobnie artefakt testu pod obciążeniem, nie aplikacji. Bez zmian; jeśli wróci, rozważyć sprawdzenie odstępu między klikami w teście.
-- **Nawrót (2026-10-06, P0.5):** pełny przebieg (9,6 min zamiast typowych 7) — „podwójny tap wysyła kartę na ekran” dał `focus`, zaraz po 120-sekundowym timeoucie poprzedniego testu (błąd selektora uchwytu po A11Y-1, poprawiony). Kontrolny `gestures.spec` desktop: 8/8. Zmieniony kod nie dotyka ścieżki tapu na desktopie. Warunek z punktu wyżej spełniony: kandydat na strażnik ważności (pomiar odstępu klików w stronie, jak w teście przycisków po NEW-1) — do decyzji właściciela.
+- **Nawrót (2026-10-06, P0.5):** pełny przebieg (9,6 min zamiast typowych 7) — „podwójny tap wysyła kartę na ekran” dał `focus`, zaraz po 120-sekundowym timeoucie poprzedniego testu (błąd selektora uchwytu po A11Y-1, poprawiony). Kontrolny `gestures.spec` desktop: 8/8. Zmieniony kod nie dotyka ścieżki tapu na desktopie. Warunek z punktu wyżej spełniony.
+- **Strażnik ważności (decyzja właściciela 2026-10-06, zrealizowany):** `e2e/helpers.ts: recordPointerUps` + `requireDoubleTapWindow` mierzą odstęp `pointerup` w stronie. Odstęp ≥ `DOUBLE_TAP_MS` (350 ms, ten sam warunek co `overlay/gestures.ts`) kończy test błędem z etykietą **INCONCLUSIVE (środowisko, FLAKE-2)** i adnotacją — nigdy PASS. Próg bez poszerzania. Używają go oba testy podwójnego tapu w `gestures.spec.ts` (sprawdzenie przed asercją wyniku). Weryfikacja: tymczasowa sonda z odstępem 500 ms dała INCONCLUSIVE; `gestures.spec` desktop 8/8. W raportach taki wynik liczy się jako błąd środowiskowy, nie wynik testu.
 
 
 

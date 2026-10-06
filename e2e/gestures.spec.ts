@@ -1,7 +1,7 @@
 // Gesty kart na stole (desktop): zapisy tylko na końcu gestu, anulowanie przy zmianie od agenta (ADR 0001, I7).
 // Regresja E2E-1 (docs/adr/0006): kontener stołu bez `preserve-3d`, więc pointerdown trafia w kartę.
 import { expect, test } from '@playwright/test';
-import { BACK, countLayoutWrites, dispatch, hittablePoint, item, layout, layoutCommand, openApp, seedWorkspace, setAngle } from './helpers';
+import { BACK, countLayoutWrites, dispatch, hittablePoint, item, layout, layoutCommand, openApp, recordPointerUps, requireDoubleTapWindow, seedWorkspace, setAngle } from './helpers';
 
 test.describe('gesty kart (desktop)', () => {
     test.beforeEach(async ({ page }, info) => {
@@ -119,19 +119,12 @@ test.describe('gesty kart (desktop)', () => {
         const plus = page.getByRole('article', { name: 'Element kpis' }).getByRole('button', { name: 'Powiększ' });
         const before = (await layout(page)).kpis;
         const center = async () => { const b = (await plus.boundingBox())!; return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; };
-        // odstęp między tapami mierzony w stronie (to on decyduje o podwójnym tapie, nie czas po stronie testu)
-        await page.evaluate(() => {
-            const w = window as unknown as { __ups: number[] };
-            w.__ups = [];
-            document.addEventListener('pointerup', () => w.__ups.push(performance.now()), { capture: true });
-        });
+        await recordPointerUps(page);
         const p1 = await center();
         await page.mouse.click(p1.x, p1.y);
         const p2 = await center(); // skala karty zmienia położenie przycisku
         await page.mouse.click(p2.x, p2.y);
-        const ups = await page.evaluate(() => (window as unknown as { __ups: number[] }).__ups);
-        expect(ups).toHaveLength(2);
-        expect(ups[1] - ups[0]).toBeLessThan(350); // inaczej test nie sprawdza okna podwójnego tapu
+        await requireDoubleTapWindow(page); // inaczej test nie sprawdza okna podwójnego tapu (FLAKE-2: INCONCLUSIVE)
         await page.waitForTimeout(400);
         const after = (await layout(page)).kpis;
         expect(after.presentation).toBe('focus');
@@ -140,8 +133,11 @@ test.describe('gesty kart (desktop)', () => {
 
     test('podwójny tap wysyła kartę na ekran', async ({ page }) => {
         const p = await hittablePoint(page, 'Element kpis');
+        await recordPointerUps(page);
         await page.mouse.click(p.x, p.y);
         await page.mouse.click(p.x, p.y);
+        // FLAKE-2 (ADR 0006): odstęp ≥ 350 ms w stronie = INCONCLUSIVE (środowisko), sprawdzane przed asercją wyniku
+        await requireDoubleTapWindow(page);
         await expect.poll(async () => (await layout(page)).kpis.presentation).toBe('screen');
     });
 });

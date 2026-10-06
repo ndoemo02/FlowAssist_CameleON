@@ -1,7 +1,7 @@
 // Wspólne kroki e2e: gotowość sceny, seed stołu przez window.__aiui (bez mocka i jego osi czasu),
 // sterowanie kamerą i odczyt stanu. Testy czytają stan i DOM — nie posiadają stanu aplikacji.
 
-import type { Page } from '@playwright/test';
+import { test, type Page } from '@playwright/test';
 
 type Layout = Record<string, { presentation: string; x: number; y: number; z: number; scale: number; rev: number; instance: number }>;
 
@@ -105,4 +105,34 @@ export async function countLayoutWrites(page: Page) {
         w.__unsubWrites = w.__aiui.subscribe((s, p) => { if (s.layout !== p.layout) w.__layoutWrites++; });
     });
     return () => page.evaluate(() => (window as unknown as { __layoutWrites: number }).__layoutWrites);
+}
+
+/** Okno podwójnego tapu aplikacji: `overlay/gestures.ts: DOUBLE_TAP_MS` (podwójny tap ⇔ odstęp < 350 ms). */
+export const DOUBLE_TAP_MS = 350;
+
+/** Zaczyna zapisywać czasy `pointerup` w stronie — to odstęp w stronie decyduje o podwójnym tapie, nie czas po stronie testu. */
+export async function recordPointerUps(page: Page) {
+    await page.evaluate(() => {
+        const w = window as unknown as { __ups: number[]; __upsListener?: () => void };
+        w.__ups = [];
+        if (!w.__upsListener) {
+            w.__upsListener = () => w.__ups.push(performance.now());
+            document.addEventListener('pointerup', w.__upsListener, { capture: true });
+        }
+    });
+}
+
+/**
+ * Strażnik ważności FLAKE-2 (ADR 0006): gdy odstęp dwóch tapów w stronie wyszedł ≥ DOUBLE_TAP_MS, test NIE sprawdził
+ * okna podwójnego tapu — wynik jest jawnie INCONCLUSIVE (środowisko), nigdy PASS. Próg tylko z aplikacji, bez poszerzania.
+ */
+export async function requireDoubleTapWindow(page: Page) {
+    const ups = await page.evaluate(() => (window as unknown as { __ups: number[] }).__ups);
+    if (ups.length !== 2) throw new Error(`INCONCLUSIVE (środowisko, FLAKE-2): oczekiwano 2 zdarzeń pointerup, jest ${ups.length}`);
+    const gap = ups[1] - ups[0];
+    test.info().annotations.push({ type: 'tap-gap-ms', description: gap.toFixed(1) });
+    if (gap >= DOUBLE_TAP_MS) {
+        test.info().annotations.push({ type: 'INCONCLUSIVE', description: 'środowisko (FLAKE-2)' });
+        throw new Error(`INCONCLUSIVE (środowisko, FLAKE-2): odstęp tapów ${gap.toFixed(0)} ms ≥ ${DOUBLE_TAP_MS} ms — test nie sprawdził okna podwójnego tapu; to nie jest PASS ani błąd aplikacji`);
+    }
 }

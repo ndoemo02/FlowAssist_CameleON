@@ -4,10 +4,10 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import Ajv2020 from 'ajv/dist/2020';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { buildAction, buildError, CATALOG_ID } from '../contract';
+import { buildAction, buildError, CATALOG_ID, type ClientMessage } from '../contract';
 import { clientCapabilities, negotiate, type ServerCapabilities } from '../transport/capabilities';
 import { MOCK_SERVER_CAPABILITIES, MockTransport, type ScenarioScript } from '../transport/mockTransport';
-import type { BackendCall } from '../transport/types';
+import type { AgentTransport, BackendCall, StartRequest } from '../transport/types';
 import { SCENARIOS } from '../scenarios';
 import { describeTransportConformance } from './transportConformance';
 
@@ -31,15 +31,46 @@ class ConfigurableMock extends MockTransport {
     override serverCapabilities() { return this.server(); }
 }
 
-describeTransportConformance('MockTransport', {
-    make: ({ serverCapabilities, onBackendCall }) => new ConfigurableMock(serverCapabilities, onBackendCall),
+const harness = {
     compatibleServer: MOCK_SERVER_CAPABILITIES,
     incompatibleServer: { ...MOCK_SERVER_CAPABILITIES, a2uiServerCapabilities: { 'v0.9': { supportedCatalogIds: ['basic/v1'] } } },
     scenario: 'conf',
     actionName: 'ping',
-    flush: () => vi.advanceTimersByTime(1000),
+    terminalActionName: 'approve',
+    flush: async () => { await vi.advanceTimersByTimeAsync(1000); },
     setup: () => { vi.useFakeTimers(); vi.spyOn(console, 'warn').mockImplementation(() => {}); },
     teardown: () => { vi.useRealTimers(); vi.restoreAllMocks(); },
+};
+
+describeTransportConformance('MockTransport', {
+    ...harness,
+    make: ({ serverCapabilities, onBackendCall }) => new ConfigurableMock(serverCapabilities, onBackendCall),
+});
+
+/**
+ * Dowód, że wspólny zestaw przyjmuje transport ASYNCHRONICZNY (jak adapter fetch/SSE w P1.6): wywołania backendu,
+ * zdarzenia, statusy i samo `send` dochodzą w mikrozadaniach, a nie synchronicznie (review P1.7a, M1).
+ */
+class AsyncMock implements AgentTransport {
+    private readonly inner: ConfigurableMock;
+    constructor(server: () => ServerCapabilities | null, onBackendCall: (c: BackendCall) => void) {
+        this.inner = new ConfigurableMock(server, (c) => queueMicrotask(() => onBackendCall(c)));
+    }
+    start(runId: number, request: StartRequest) { this.inner.start(runId, request); }
+    send(message: ClientMessage) { queueMicrotask(() => this.inner.send(message)); }
+    subscribe(onEvent: Parameters<AgentTransport['subscribe']>[0], onStatus: Parameters<AgentTransport['subscribe']>[1]) {
+        return this.inner.subscribe(
+            (runId, raw) => queueMicrotask(() => onEvent(runId, raw)),
+            (runId, status, error) => queueMicrotask(() => onStatus(runId, status, error)),
+        );
+    }
+    stop() { this.inner.stop(); }
+    serverCapabilities() { return this.inner.serverCapabilities(); }
+}
+
+describeTransportConformance('MockTransport opakowany asynchronicznie (mikrozadania)', {
+    ...harness,
+    make: ({ serverCapabilities, onBackendCall }) => new AsyncMock(serverCapabilities, onBackendCall),
 });
 
 describe('MockTransport — reguły mocka (P1.7a)', () => {
@@ -143,9 +174,11 @@ describe('skrypty mocka mieszczą się w wynikowych kinds negocjacji (A2b)', () 
 });
 
 describe('transport nie buduje capabilities sam (D1)', () => {
-    it('żaden plik w transport/ poza capabilities.ts nie odwołuje się do clientCapabilities', () => {
+    it('żaden plik w transport/ (rekurencyjnie) poza capabilities.ts nie odwołuje się do clientCapabilities', () => {
         const dir = fileURLToPath(new URL('../transport/', import.meta.url));
-        const files = readdirSync(dir).filter((f) => f !== 'capabilities.ts');
+        const files = (readdirSync(dir, { recursive: true }) as string[])
+            .map((f) => f.replace(/\\/g, '/'))
+            .filter((f) => /\.tsx?$/.test(f) && f !== 'capabilities.ts');
         expect(files).toContain('mockTransport.ts');
         for (const f of files) expect(readFileSync(dir + f, 'utf-8'), f).not.toMatch(/\bclientCapabilities\b/);
     });

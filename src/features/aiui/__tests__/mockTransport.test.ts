@@ -53,6 +53,29 @@ describe('MockTransport — reguły mocka (P1.7a)', () => {
         expect(new Ajv2020({ strict: true, strictTypes: false }).compile(schema)(MOCK_SERVER_CAPABILITIES.a2uiServerCapabilities)).toBe(true);
     });
 
+    it('nieznany scenariusz: error, potem brak zdarzeń i statusów (przebieg zamknięty); zgoda zostaje do start/stop', () => {
+        const order: string[] = [];
+        const t = new MockTransport({ conf: script }, { onBackendCall: (c) => calls.push(c) });
+        t.subscribe((runId) => order.push(`event:${runId}`), (runId, s) => order.push(`status:${runId}:${s}`));
+        t.start(1, { scenario: 'nope', capabilities: clientCapabilities() });
+        t.send(buildAction('ping', 'hud', 'x', {}));
+        vi.advanceTimersByTime(1000);
+        expect(order).toEqual(['status:1:error']);
+        expect(calls.map((c) => c.kind)).toEqual(['start', 'continue']);
+        t.stop();
+    });
+
+    it('odrzucona wysyłka ostrzega tylko poza produkcją', () => {
+        const warn = vi.mocked(console.warn);
+        const t = new MockTransport({ conf: script });
+        vi.stubEnv('NODE_ENV', 'production');
+        t.send(buildAction('ping', 'hud', 'x', {}));
+        expect(warn).not.toHaveBeenCalled();
+        vi.unstubAllEnvs();
+        t.send(buildAction('ping', 'hud', 'x', {}));
+        expect(warn).toHaveBeenCalledTimes(1);
+    });
+
     it('jawne `serverCapabilities: null` w opcjach = nieznane (krok 0), nie wartość domyślna', () => {
         expect(new MockTransport({}, { serverCapabilities: null }).serverCapabilities()).toBeNull();
         expect(new MockTransport({}).serverCapabilities()).toBe(MOCK_SERVER_CAPABILITIES);

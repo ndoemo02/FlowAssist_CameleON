@@ -9,7 +9,7 @@ import { parsePointer } from './jsonPointer';
 export const A2UI_VERSION = 'v0.9.1' as const;
 export const CATALOG_ID = 'flowassist/v2' as const;
 /** Wersje koperty przyjmowane na wejściu (OBS-3, ADR 0002 oś 1); wychodzące zawsze A2UI_VERSION. Reguła profilu (P1.7a). */
-export const ACCEPTED_VERSIONS = ['v0.9', 'v0.9.1'] as const;
+export const ACCEPTED_VERSIONS = Object.freeze(['v0.9', 'v0.9.1'] as const);
 const ACCEPTED = new Set<string>(ACCEPTED_VERSIONS);
 
 /**

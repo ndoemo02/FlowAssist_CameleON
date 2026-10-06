@@ -37,6 +37,16 @@ describe('RunPermission', () => {
         expect(p.active).toBeNull();
     });
 
+    it('wyjątek W TRAKCIE negocjacji (getter w capabilities) = jawna porażka INVALID, nie wyjątek; zgoda cofnięta', () => {
+        const p = new RunPermission();
+        p.begin(1, request(), ok);
+        const hostile = { get transportProfiles(): string[] { throw new Error('boom'); } };
+        let n: ReturnType<RunPermission['begin']> | undefined;
+        expect(() => { n = p.begin(2, request(), () => hostile); }).not.toThrow();
+        expect(n).toEqual({ ok: false, reason: 'SERVER_CAPABILITIES_INVALID' });
+        expect(p.active).toBeNull();
+    });
+
     it('udany begin B zastępuje A (runId i capabilities B)', () => {
         const p = new RunPermission();
         p.begin(1, request(), ok);

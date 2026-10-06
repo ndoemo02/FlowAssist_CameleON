@@ -6,10 +6,20 @@ import { A2UI_VERSION, ACCEPTED_VERSIONS, PRESENTATIONS, PROTOCOL_LIMITS, RESERV
 
 export const TRANSPORT_PROFILE = 'flowassist-transport/1' as const;
 
-export const PROFILE_RULES = {
+// Zamrożone także w runtime (`as const` działa tylko na typach): mutacja reguły rozjechałaby profil z guardami.
+// Zamraża też współdzielone stałe kontraktu (PRESENTATIONS, PROTOCOL_LIMITS, ACCEPTED_VERSIONS) — są tylko do odczytu.
+const freezeDeep = <T>(v: T): T => {
+    if (v !== null && typeof v === 'object') {
+        Object.freeze(v);
+        for (const x of Object.values(v)) freezeDeep(x);
+    }
+    return v;
+};
+
+export const PROFILE_RULES = freezeDeep({
     profile: TRANSPORT_PROFILE,
     envelope: { send: A2UI_VERSION, accept: ACCEPTED_VERSIONS },
     presentations: PRESENTATIONS,
     limits: PROTOCOL_LIMITS,
     reservedKeys: Array.from(RESERVED_KEYS),
-} as const;
+} as const);

@@ -40,6 +40,7 @@ export type Negotiation =
     | { readonly ok: true; readonly profile: typeof TRANSPORT_PROFILE; readonly catalogId: string; readonly kinds: CatalogKinds }
     | { readonly ok: false; readonly reason: NegotiationFailure };
 
+// Wejścia są zawsze świeże (nowe obiekty), więc obiekt już zamrożony nie wymaga schodzenia w głąb.
 function deepFreeze<T>(value: T): T {
     if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
         Object.freeze(value);
@@ -60,9 +61,19 @@ export function clientCapabilities(): ClientCapabilities {
     });
 }
 
-const isObj = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+// Wejście pochodzi spoza klienta: tylko zwykłe obiekty (jak z JSON.parse), pola wyłącznie WŁASNE, tablice bez dziur.
+const isObj = (v: unknown): v is Record<string, unknown> => {
+    if (v === null || typeof v !== 'object' || Array.isArray(v)) return false;
+    const proto = Object.getPrototypeOf(v);
+    return proto === Object.prototype || proto === null;
+};
 const own = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k);
-const isStrArray = (v: unknown): v is string[] => Array.isArray(v) && v.every((x) => typeof x === 'string');
+const field = (o: Record<string, unknown>, k: string): unknown => (own(o, k) ? o[k] : undefined);
+const isStrArray = (v: unknown): v is string[] => {
+    if (!Array.isArray(v)) return false;
+    for (let i = 0; i < v.length; i++) if (!own(v, String(i)) || typeof v[i] !== 'string') return false; // dziura = błąd
+    return true;
+};
 const fail = (reason: NegotiationFailure): Negotiation => ({ ok: false, reason });
 
 /**
@@ -75,25 +86,26 @@ export function negotiate(server: unknown, client: ClientCapabilities): Negotiat
     // 0
     if (server === null || server === undefined) return fail('SERVER_CAPABILITIES_UNKNOWN');
     // 1
-    const profiles = isObj(server) ? server.transportProfiles : undefined;
-    if (!Array.isArray(profiles) || !profiles.includes(client.flowassist.profile)) return fail('PROFILE_UNSUPPORTED');
+    const profiles = isObj(server) ? field(server, 'transportProfiles') : undefined;
+    if (!isStrArray(profiles) || !profiles.includes(client.flowassist.profile)) return fail('PROFILE_UNSUPPORTED');
     const caps = server as Record<string, unknown>;
     // 2
-    const a2ui = caps.a2uiServerCapabilities;
-    if (!isObj(a2ui) || !own(a2ui, 'v0.9') || !isObj(a2ui['v0.9'])) return fail('SERVER_CAPABILITIES_INVALID');
-    const v09 = a2ui['v0.9'];
-    if (v09.supportedCatalogIds !== undefined && !isStrArray(v09.supportedCatalogIds)) return fail('SERVER_CAPABILITIES_INVALID');
-    if (v09.acceptsInlineCatalogs !== undefined && typeof v09.acceptsInlineCatalogs !== 'boolean') return fail('SERVER_CAPABILITIES_INVALID');
+    const a2ui = field(caps, 'a2uiServerCapabilities');
+    const v09 = isObj(a2ui) ? field(a2ui, 'v0.9') : undefined;
+    if (!isObj(v09)) return fail('SERVER_CAPABILITIES_INVALID');
+    const serverCatalogs = field(v09, 'supportedCatalogIds');
+    const inline = field(v09, 'acceptsInlineCatalogs');
+    if (serverCatalogs !== undefined && !isStrArray(serverCatalogs)) return fail('SERVER_CAPABILITIES_INVALID');
+    if (inline !== undefined && typeof inline !== 'boolean') return fail('SERVER_CAPABILITIES_INVALID');
     // 3 (katalogów inline nie wysyłamy — I10 — więc acceptsInlineCatalogs nie wpływa na wynik)
-    const serverCatalogs = v09.supportedCatalogIds;
     if (serverCatalogs === undefined) return fail('SERVER_CATALOGS_UNDECLARED');
     const catalogId = client.a2uiClientCapabilities['v0.9'].supportedCatalogIds.find((id) => serverCatalogs.includes(id));
     if (catalogId === undefined) return fail('NO_COMMON_CATALOG');
     // 4
-    if (!own(caps, 'flowassist') || caps.flowassist === undefined) return fail('FLOWASSIST_CAPABILITIES_MISSING');
-    const ext = caps.flowassist;
-    if (!isObj(ext) || !isObj(ext.kinds)) return fail('FLOWASSIST_CAPABILITIES_INVALID');
-    const serverKinds = ext.kinds;
+    const ext = field(caps, 'flowassist');
+    if (ext === undefined) return fail('FLOWASSIST_CAPABILITIES_MISSING');
+    const serverKinds = isObj(ext) ? field(ext, 'kinds') : undefined;
+    if (!isObj(serverKinds)) return fail('FLOWASSIST_CAPABILITIES_INVALID');
     for (const [kind, reps] of Object.entries(serverKinds)) {
         if (RESERVED_KEYS.has(kind) || !isStrArray(reps) || reps.some((r) => RESERVED_KEYS.has(r))) {
             return fail('FLOWASSIST_CAPABILITIES_INVALID');

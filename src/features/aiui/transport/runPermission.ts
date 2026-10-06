@@ -17,7 +17,8 @@ export class RunPermission {
 
     /**
      * Nowy przebieg: NAJPIERW cofa zgodę poprzedniego (także gdy dalsze kroki rzucą), potem pobiera capabilities
-     * serwera i negocjuje. Wyjątek przy pobieraniu capabilities = capabilities nieznane (krok 0), nie zgoda.
+     * serwera i negocjuje. Wyjątek przy pobieraniu capabilities = capabilities nieznane (krok 0); wyjątek w trakcie
+     * negocjacji = SERVER_CAPABILITIES_INVALID. Nigdy zgoda i nigdy wyjątek z begin.
      */
     begin(runId: number, request: StartRequest, serverCapabilities: () => unknown): Negotiation {
         this.run = null;
@@ -27,7 +28,13 @@ export class RunPermission {
         } catch {
             server = null;
         }
-        const negotiation = negotiate(server, request.capabilities);
+        let negotiation: Negotiation;
+        try {
+            negotiation = negotiate(server, request.capabilities);
+        } catch {
+            // np. getter albo Proxy w capabilities spoza JSON: porażka musi być jawna (krok 6), nie wyjątek w start
+            negotiation = { ok: false, reason: 'SERVER_CAPABILITIES_INVALID' };
+        }
         if (negotiation.ok) this.run = { runId, capabilities: request.capabilities, negotiation };
         return negotiation;
     }

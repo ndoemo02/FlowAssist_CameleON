@@ -30,6 +30,14 @@ describe('strażnik dryfu profilu flowassist-transport/1', () => {
         });
     });
 
+    it('PROFILE_RULES i ACCEPTED_VERSIONS są zamrożone także w runtime', () => {
+        expect(Object.isFrozen(PROFILE_RULES)).toBe(true);
+        expect(Object.isFrozen(PROFILE_RULES.envelope.accept)).toBe(true);
+        expect(Object.isFrozen(PROFILE_RULES.limits)).toBe(true);
+        expect(Object.isFrozen(PROFILE_RULES.reservedKeys)).toBe(true);
+        expect(() => { (PROFILE_RULES.envelope.accept as unknown as string[]).push('v1.0'); }).toThrow(TypeError);
+    });
+
     it('PROFILE_RULES — reguły stałe dla profilu (nie wysyłane)', () => {
         expect(PROFILE_RULES).toEqual({
             profile: 'flowassist-transport/1',
@@ -209,7 +217,45 @@ describe('negotiate(): kroki 0–5', () => {
         expect(negotiate(inline, client)).toEqual(negotiate(SERVER, client));
     });
 
-    it('wiele katalogów serwera i wiele profili: wybór wspólnego, niezależnie od kolejności serwera', () => {
+    it('krok 1: transportProfiles z nie-stringiem albo dziurą → PROFILE_UNSUPPORTED (zły typ)', () => {
+        expect(reason({ ...SERVER, transportProfiles: [42, TRANSPORT_PROFILE] })).toBe('PROFILE_UNSUPPORTED');
+        // eslint-disable-next-line no-sparse-arrays
+        expect(reason({ ...SERVER, transportProfiles: [, TRANSPORT_PROFILE] })).toBe('PROFILE_UNSUPPORTED');
+    });
+
+    it('wejście spoza JSON: tylko zwykłe obiekty i pola własne; Map i tablice z dziurami to zły kształt', () => {
+        // obiekt z niestandardowym prototypem (np. pola tylko dziedziczone) nie jest zwykłym obiektem → odpada w kroku 1
+        expect(reason(Object.create(SERVER))).toBe('PROFILE_UNSUPPORTED');
+        const noExt = { ...SERVER } as Record<string, unknown>;
+        delete noExt.flowassist;
+        expect(reason(Object.assign(Object.create({ flowassist: SERVER.flowassist }), noExt))).toBe('PROFILE_UNSUPPORTED');
+        // pole dziedziczone po Object.prototype nie liczy się jako własne
+        const proto = Object.prototype as Record<string, unknown>;
+        proto.flowassist = SERVER.flowassist;
+        try { expect(reason(noExt)).toBe('FLOWASSIST_CAPABILITIES_MISSING'); } finally { delete proto.flowassist; }
+        expect(reason({ ...SERVER, flowassist: { kinds: new Map([['chart', ['chart2d']]]) } })).toBe('FLOWASSIST_CAPABILITIES_INVALID');
+        // eslint-disable-next-line no-sparse-arrays
+        expect(reason({ ...SERVER, a2uiServerCapabilities: { 'v0.9': { supportedCatalogIds: [, 'flowassist/v2'] } } })).toBe('SERVER_CAPABILITIES_INVALID');
+        // eslint-disable-next-line no-sparse-arrays
+        expect(reason({ ...SERVER, flowassist: { kinds: { chart: [, 'chart2d'] } } })).toBe('FLOWASSIST_CAPABILITIES_INVALID');
+        const nullProto = Object.assign(Object.create(null), SERVER);
+        expect(reason(nullProto)).toBe('OK'); // obiekt bez prototypu jest zwykłym obiektem
+    });
+
+    it('kolejność klienta: pierwszy wspólny katalog z listy KLIENTA; przecięcie w kolejności KLIENTA', () => {
+        const synthetic = {
+            a2uiClientCapabilities: { 'v0.9': { supportedCatalogIds: ['cat/a', 'cat/b'] } },
+            flowassist: { profile: TRANSPORT_PROFILE, kinds: { chart: ['chart2d', 'ribbon3d'] } },
+        } as unknown as typeof client;
+        const reversed = {
+            ...SERVER,
+            a2uiServerCapabilities: { 'v0.9': { supportedCatalogIds: ['cat/b', 'cat/a'] } },
+            flowassist: { kinds: { chart: ['ribbon3d', 'chart2d'] } },
+        };
+        expect(negotiate(reversed, synthetic)).toEqual({ ok: true, profile: TRANSPORT_PROFILE, catalogId: 'cat/a', kinds: { chart: ['chart2d', 'ribbon3d'] } });
+    });
+
+    it('wiele katalogów serwera i wiele profili: wybór wspólnego katalogu i profilu', () => {
         const many = { ...SERVER, transportProfiles: ['a2ui-baseline/1', TRANSPORT_PROFILE], a2uiServerCapabilities: { 'v0.9': { supportedCatalogIds: ['basic/v1', 'flowassist/v2'] } } };
         const r = negotiate(many, client);
         expect(r.ok && r.catalogId).toBe('flowassist/v2');

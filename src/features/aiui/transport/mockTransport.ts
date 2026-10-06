@@ -80,6 +80,7 @@ export class MockTransport implements AgentTransport {
         this.script = this.scripts[request.scenario] ?? null;
         if (!this.script) {
             this.emitStatus(runId, 'error', `Nieznany scenariusz "${request.scenario}"`);
+            this.closedRunId = runId; // przebieg zakończony błędem: agent nie odpowiada już na akcje (zgoda zostaje do start/stop)
             return;
         }
         this.play(runId, this.script.timeline, 'awaiting_action');
@@ -89,7 +90,9 @@ export class MockTransport implements AgentTransport {
         // bramka PRZED rozgałęzieniem: błędy renderera też są wywołaniem backendu (P1.7a)
         const run = this.permission.active;
         if (!run) {
-            console.warn('[aiui/mock] wysyłka pominięta — brak zgody przebiegu (nieudana negocjacja albo po stop).', message);
+            if (process.env.NODE_ENV !== 'production') {
+                console.warn('[aiui/mock] wysyłka pominięta — brak zgody przebiegu (nieudana negocjacja albo po stop).', message);
+            }
             return;
         }
         this.opts.onBackendCall?.({ kind: 'continue', runId: run.runId, capabilities: run.capabilities, body: message });

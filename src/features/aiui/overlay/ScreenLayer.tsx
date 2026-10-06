@@ -9,6 +9,7 @@ import type { AnchorState } from '../scene/anchorRegistry';
 import ActionBar from '../components/ActionBar';
 import { useScreenPinch } from './gestures';
 import { setLayerInert } from './inert';
+import { userLayoutCommand } from './userCommand';
 import { ItemBody, KIND_LABEL, useItemView } from './ItemContent';
 
 // Ekran (Front 0°, deep view — plan v1.2.1 II.2, wariant hybrydowy po spike #2):
@@ -62,7 +63,7 @@ function ScreenPanel({ id }: { id: string }) {
     // tryb centered: aktywny tylko, gdy kamera patrzy na Front
     useLayoutEffect(() => { if (mode === 'centered') setLayerInert(panel.current, frontVisible <= 0.6); }, [mode, frontVisible]);
 
-    const cmd = useAiUi.getState().layoutCommand;
+    const cmd = userLayoutCommand; // komendy użytkownika: potwierdzenie zmiany prezentacji (P0.5)
     const title = view.status !== 'pending' || view.title ? view.title ?? id : 'Ładowanie…';
     const centered = mode === 'centered';
 

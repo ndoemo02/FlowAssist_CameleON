@@ -11,6 +11,7 @@ import type { RefObject } from 'react';
 import { useAiUi } from '../store';
 import { SCALE_MAX, SCALE_MIN } from '../layout';
 import { dragEndCommand, gestureToken, isGestureStale, keyCommand, type GestureToken } from './gestureLogic';
+import { userLayoutCommand } from './userCommand';
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const DOUBLE_TAP_MS = 350;
@@ -52,7 +53,7 @@ export interface CardGestureOptions {
 
 /** Gesty karty na stole roboczym (desktop). */
 export function useCardGestures({ id, cardRef, containerRef, baseTransform, enabled }: CardGestureOptions) {
-    const cmd = useAiUi.getState().layoutCommand;
+    const cmd = userLayoutCommand; // komendy użytkownika: potwierdzenie zmiany prezentacji (P0.5)
     const entry = () => useAiUi.getState().layout[id];
     const restore = () => { if (cardRef.current) cardRef.current.style.transform = baseTransform(); };
 
@@ -126,7 +127,7 @@ export function useCardGestures({ id, cardRef, containerRef, baseTransform, enab
 
 /** Uchwyt zmiany rozmiaru w rogu karty (desktop). */
 export function useResizeHandle(id: string, cardRef: RefObject<HTMLElement>, baseTransform: () => string) {
-    const cmd = useAiUi.getState().layoutCommand;
+    const cmd = userLayoutCommand; // komendy użytkownika: potwierdzenie zmiany prezentacji (P0.5)
     const restore = () => { if (cardRef.current) cardRef.current.style.transform = baseTransform(); };
     return useGesture({
         onDrag: ({ last, movement: [mx, my], memo, cancel, canceled, event }) => {
@@ -156,7 +157,7 @@ export function cardKeyHandler(id: string) {
         const command = keyCommand(ev.key, id, s.layout[id], ev.target === ev.currentTarget);
         if (!command) return;
         ev.preventDefault();
-        s.layoutCommand(command);
+        userLayoutCommand(command);
     };
 }
 

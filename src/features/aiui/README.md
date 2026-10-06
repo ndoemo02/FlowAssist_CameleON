@@ -81,6 +81,17 @@ Logika gestów jest czysta i testowana w `overlay/gestureLogic.ts`.
 - `OrbitSlider` — suwak 360°, jedyny subskrybent kąta kamery.
 - `gestures` / `gestureLogic` — tap, double tap, drag, resize, pinch, flick w dół, klawiatura.
 - `inert` — nieaktywna warstwa dostaje `inert` + `aria-hidden`, a fokus z niej jest zdejmowany.
+- `LiveRegions` + `announcer` + `userCommand` — regiony ogłoszeń dla czytników ekranu (P0.5), zawsze zamontowane,
+  zmienia się tylko treść; ogłoszenia nigdy nie przenoszą fokusu:
+  - **narracja agenta** (`data-region="narration"`, `role="status"`): jedyny region tekstu `store.narration.text`;
+    wizualny napis `NarrationCaption` jest `aria-hidden`;
+  - **lokalny status** (`data-region="status"`, polite): komunikaty klienta, osobno od narracji — potwierdzenia
+    gestów użytkownika (`userLayoutCommand`: ukryto, przywrócono, na ekranie, na stole), start i koniec przebiegu,
+    nowy element `ready` (raz w przebiegu), element nie do wyświetlenia (`fallback`, raz do naprawy), decyzja w HUD;
+  - **alert** (`data-region="alert"`, `role="alert"`): tylko błąd blokujący (przebieg w `error`).
+
+  Komendy układu z UI idą przez `userLayoutCommand` (opakowanie `store.layoutCommand`, kernel bez zmian);
+  zmiany od agenta (hinty) nie są potwierdzane lokalnie — opisuje je narracja. Testy: `__tests__/announcements.test.tsx`.
 
 ## Adapter sceny (`scene/`)
 

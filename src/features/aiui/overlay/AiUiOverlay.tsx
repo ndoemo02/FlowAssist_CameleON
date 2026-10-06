@@ -9,6 +9,7 @@ import { FOCUS_ANGLE, slotVisibility } from '../slots';
 import { useAiUi, type ScenarioStatus } from '../store';
 import { startValidationReporting } from '../validationReporting';
 import HudLayer from './HudLayer';
+import { ClientRegions, NarrationRegion, useClientAnnouncements } from './LiveRegions';
 import ScreenLayer from './ScreenLayer';
 import { useCompact } from './useCompact';
 import WorkspaceLayer from './WorkspaceLayer';
@@ -25,9 +26,12 @@ export default function AiUiOverlay() {
     useDemoAutostart();
     // VALIDATION_FAILED do agenta: ze stanu, raz na wystąpienie problemu (review #5)
     useEffect(() => startValidationReporting(), []);
+    useClientAnnouncements(); // P0.5: komunikaty klienta dla czytników ekranu (bez przenoszenia fokusu)
 
     return (
         <div className="pointer-events-none absolute inset-0 z-20">
+            <NarrationRegion />
+            <ClientRegions />
             <WorkspaceLayer compact={compact} />
             <ScreenLayer />
             <AgentStatus compact={compact} />
@@ -164,8 +168,7 @@ function NarrationCaption({ compact }: { compact: boolean }) {
                 {text && !hidden && (
                     <motion.p
                         key={text}
-                        role="status"
-                        aria-live="polite"
+                        aria-hidden="true" // czytnikom tekst ogłasza stały NarrationRegion (P0.5); tu tylko obraz
                         initial={{ opacity: 0, y: 8 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -4 }}

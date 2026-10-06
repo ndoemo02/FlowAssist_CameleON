@@ -10,6 +10,7 @@ import { cardKeyHandler, useCardGestures, useResizeHandle, visualScale } from '.
 import { ItemBody, KIND_LABEL, useItemView } from './ItemContent';
 import { useZones } from './zones';
 import { setLayerInert } from './inert';
+import { userLayoutCommand } from './userCommand';
 
 // Stół roboczy (Back 180°, plan v1.2.1 II.2/II.6): karty 2.5D w DOM.
 // Każda karta subskrybuje WŁASNY wpis układu — zmiana jednego elementu nie renderuje pozostałych.
@@ -34,7 +35,7 @@ export default function WorkspaceLayer({ compact }: { compact: boolean }) {
     if (ids.length === 0) return null;
 
     const blurOnBackground = (e: React.MouseEvent) => {
-        if (e.target === e.currentTarget) useAiUi.getState().layoutCommand({ type: 'blur' });
+        if (e.target === e.currentTarget) userLayoutCommand({ type: 'blur' });
     };
 
     return (
@@ -83,7 +84,7 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
     const resize = useResizeHandle(id, card, baseTransform);
 
     if (!entry || entry.presentation === 'dismissed') return null;
-    const cmd = useAiUi.getState().layoutCommand;
+    const cmd = userLayoutCommand; // komendy użytkownika: potwierdzenie zmiany prezentacji (P0.5)
     const title = view.status !== 'pending' || view.title ? view.title ?? id : 'Ładowanie…';
 
     if (entry.presentation === 'screen') {
@@ -190,7 +191,7 @@ function HiddenItems({ compact }: { compact: boolean }) {
                     {hidden.map((id, i) => (
                         <li key={id} className="flex items-center justify-between gap-3 text-[11px] text-white/70">
                             <span className="truncate">{titles[i]}</span>
-                            <button onClick={() => useAiUi.getState().layoutCommand({ type: 'restore', id })} className="rounded-full border border-white/15 px-2 py-0.5 text-white/80 hover:bg-white/10">
+                            <button onClick={() => userLayoutCommand({ type: 'restore', id })} className="rounded-full border border-white/15 px-2 py-0.5 text-white/80 hover:bg-white/10">
                                 Przywróć
                             </button>
                         </li>

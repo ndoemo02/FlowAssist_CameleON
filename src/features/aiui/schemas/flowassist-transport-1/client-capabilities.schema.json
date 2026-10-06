@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-transport-1/client-capabilities.schema.json",
+  "title": "flowassist-transport/1 — capabilities klienta (StartRequest.capabilities)",
+  "description": "Pochodna specyfikacja P1.7a (ADR 0002, „Handshake możliwości”). Obiekt a2uiClientCapabilities jest walidowany osobno, normatywnym schematem upstream (schemas/a2ui-v0.9/client_capabilities.json). Rozszerzenie flowassist niesie tylko to, co różni klientów; reguły stałe dla profilu (wersje koperty, limity, klucze zarezerwowane) nie są wysyłane, więc nie ma na nie miejsca w schemacie.",
+  "type": "object",
+  "required": ["a2uiClientCapabilities", "flowassist"],
+  "additionalProperties": false,
+  "properties": {
+    "a2uiClientCapabilities": { "type": "object" },
+    "flowassist": {
+      "type": "object",
+      "required": ["profile", "kinds"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": { "const": "flowassist-transport/1" },
+        "kinds": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "chart": { "$ref": "#/$defs/chart" },
+            "kpi": { "$ref": "#/$defs/kpi" },
+            "table": { "$ref": "#/$defs/table" },
+            "map": { "$ref": "#/$defs/map" },
+            "slides": { "$ref": "#/$defs/slides" }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "chart": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["chart2d", "ribbon3d", "liquid3d"] } },
+    "kpi": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["cards2d", "kpi3d"] } },
+    "table": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["table2d"] } },
+    "map": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["map2d"] } },
+    "slides": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "enum": ["slides2d"] } }
+  }
+}

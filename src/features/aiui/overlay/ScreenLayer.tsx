@@ -10,6 +10,7 @@ import ActionBar from '../components/ActionBar';
 import { useScreenPinch } from './gestures';
 import { setLayerInert } from './inert';
 import { userLayoutCommand } from './userCommand';
+import { canTakeFocus } from './focusTarget';
 import { ItemBody, KIND_LABEL, useItemView } from './ItemContent';
 
 // Ekran (Front 0°, deep view — plan v1.2.1 II.2, wariant hybrydowy po spike #2):
@@ -28,6 +29,9 @@ function ScreenPanel({ id }: { id: string }) {
     const [mode, setMode] = useState<AnchorMode>('anchor');
     const frontVisible = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.front));
     const [menu, setMenu] = useState(false);
+    const menuButton = useRef<HTMLButtonElement>(null);
+    // Escape zamyka menu i oddaje fokus „⋯” (P0.5)
+    const closeMenu = () => { setMenu(false); if (canTakeFocus(menuButton.current)) menuButton.current.focus(); };
     const [zoom, setZoom] = useState(1);
     const zoomRef = useRef(1);
     zoomRef.current = zoom;
@@ -71,6 +75,7 @@ function ScreenPanel({ id }: { id: string }) {
         <section
             ref={panel}
             aria-label={`Ekran: ${title}`}
+            onKeyDown={(ev) => { if (menu && ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeMenu(); } }}
             className={`absolute flex flex-col overflow-hidden border text-white transition-opacity duration-150 ${
                 centered
                     ? 'left-1/2 top-[14%] max-h-[62%] w-[calc(100%-32px)] max-w-[560px] -translate-x-1/2 rounded-2xl border-cyan-400/40 bg-[#07040f]/95'
@@ -88,7 +93,7 @@ function ScreenPanel({ id }: { id: string }) {
                 </div>
                 <div className="flex shrink-0 items-center gap-1.5">
                     {zoom > 1 && <ScreenButton onClick={() => setZoom(1)}>100%</ScreenButton>}
-                    {view.status === 'ready' && view.actions.length > 0 && <ScreenButton onClick={() => setMenu((m) => !m)}>⋯</ScreenButton>}
+                    {view.status === 'ready' && view.actions.length > 0 && <ScreenButton onClick={() => setMenu((m) => !m)} label="Akcje" expanded={menu} buttonRef={menuButton}>⋯</ScreenButton>}
                     <ScreenButton onClick={() => cmd({ type: 'toCard', id })}>Na stół</ScreenButton>
                     <ScreenButton onClick={() => cmd({ type: 'dismiss', id })}>Ukryj</ScreenButton>
                 </div>
@@ -109,9 +114,11 @@ function ScreenPanel({ id }: { id: string }) {
     );
 }
 
-function ScreenButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+function ScreenButton({ onClick, children, label, expanded, buttonRef }: {
+    onClick: () => void; children: React.ReactNode; label?: string; expanded?: boolean; buttonRef?: React.RefObject<HTMLButtonElement>;
+}) {
     return (
-        <button onClick={onClick} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-[11px] text-white/80 hover:bg-white/10">
+        <button ref={buttonRef} aria-label={label} aria-expanded={expanded} onClick={onClick} className="rounded-full border border-white/15 bg-white/5 px-2.5 py-0.5 text-[11px] text-white/80 hover:bg-white/10">
             {children}
         </button>
     );

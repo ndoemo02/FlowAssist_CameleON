@@ -92,6 +92,19 @@ Logika gestów jest czysta i testowana w `overlay/gestureLogic.ts`.
 
   Komendy układu z UI idą przez `userLayoutCommand` (opakowanie `store.layoutCommand`, kernel bez zmian);
   zmiany od agenta (hinty) nie są potwierdzane lokalnie — opisuje je narracja. Testy: `__tests__/announcements.test.tsx`.
+- **Fokus i klawiatura (P0.5)** — fokus przenosi wyłącznie działanie użytkownika, nigdy dane od agenta;
+  Escape cofa o jeden poziom:
+  - karta: Escape z wnętrza (treść, przyciski) wraca na kartę, na samej karcie zdejmuje focus; otwarte menu akcji
+    ma pierwszeństwo — Escape je zamyka i oddaje fokus „⋯” (albo karcie, gdy otwarto je prawym klikiem);
+  - przewijana treść karty (compact, karta z focusem) i panelu ekranu: `tabIndex=0`, `role="group"`, „Treść: <tytuł>”;
+  - panel ekranu: „⋯” (nazwa „Akcje”, `aria-expanded`), Escape zamyka menu i oddaje fokus „⋯”;
+  - decyzja w HUD: jeden stały landmark „Decyzja” (bez remountu przy rozwinięciu); pasek `aria-expanded`;
+    otwarcie przenosi fokus na „Zwiń” (pierwszy przycisk panelu, nie „Zatwierdź”); Escape / „Zwiń” wracają na pasek;
+  - szuflada tasków: przycisk `aria-expanded`, lista „Lista tasków” osiągalna z klawiatury, Escape zamyka i oddaje
+    fokus przyciskowi; na compact zamknięta szuflada (tylko przesunięta) jest `inert`;
+  - `focusTarget.canTakeFocus`: fokus wraca tylko do elementu w DOM i poza warstwą nieaktywną.
+
+  Testy: `__tests__/focus.test.tsx`.
 
 ## Adapter sceny (`scene/`)
 

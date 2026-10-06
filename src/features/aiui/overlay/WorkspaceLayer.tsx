@@ -11,6 +11,7 @@ import { ItemBody, KIND_LABEL, useItemView } from './ItemContent';
 import { useZones } from './zones';
 import { setLayerInert } from './inert';
 import { userLayoutCommand } from './userCommand';
+import { canTakeFocus } from './focusTarget';
 
 // Stół roboczy (Back 180°, plan v1.2.1 II.2/II.6): karty 2.5D w DOM.
 // Każda karta subskrybuje WŁASNY wpis układu — zmiana jednego elementu nie renderuje pozostałych.
@@ -71,7 +72,14 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
     const entry = useAiUi((s) => s.layout[id]);
     const view = useItemView(id);
     const card = useRef<HTMLDivElement>(null);
+    const menuButton = useRef<HTMLButtonElement>(null);
     const [menu, setMenu] = useState(false);
+    // Escape zamyka menu i oddaje fokus „⋯” (albo karcie, gdy menu otwarto prawym klikiem i „⋯” nie ma) — P0.5
+    const closeMenu = () => {
+        setMenu(false);
+        const target = canTakeFocus(menuButton.current) ? menuButton.current : card.current;
+        if (canTakeFocus(target)) target.focus();
+    };
 
     const focused = entry?.presentation === 'focus';
     const scale = visualScale(entry?.scale ?? 1, focused);
@@ -109,7 +117,7 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
             <CardButton onClick={() => cmd({ type: 'resize', id, scale: (useAiUi.getState().layout[id]?.scale ?? 1) * 1.15 })} label="Powiększ">+</CardButton>
             <CardButton onClick={() => cmd({ type: 'dismiss', id })}>Ukryj</CardButton>
             {view.status === 'ready' && view.actions.length > 0 && (
-                <CardButton onClick={() => setMenu((m) => !m)} label="Akcje">⋯</CardButton>
+                <CardButton onClick={() => setMenu((m) => !m)} label="Akcje" expanded={menu} buttonRef={menuButton}>⋯</CardButton>
             )}
         </div>
     );
@@ -119,7 +127,13 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
             ref={card}
             {...bind()}
             tabIndex={0}
-            onKeyDown={cardKeyHandler(id)}
+            onKeyDown={(ev) => {
+                // otwarte menu ma pierwszeństwo przed skrótem Escape karty (zdjęcie focusu)
+                if (menu && ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeMenu(); return; }
+                // Escape z wnętrza karty (treść, przyciski) wraca na kartę; dopiero na samej karcie zdejmuje focus
+                if (ev.key === 'Escape' && ev.target !== ev.currentTarget) { ev.preventDefault(); ev.stopPropagation(); card.current?.focus(); return; }
+                cardKeyHandler(id)(ev);
+            }}
             onContextMenu={(e) => { e.preventDefault(); setMenu(true); }}
             onClick={(e) => { if (compact && entry.presentation === 'card' && !(e.target as HTMLElement).closest('[data-nodrag]')) cmd({ type: 'focus', id }); }}
             aria-label={title}
@@ -134,11 +148,11 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
                 <h3 className="truncate text-[13px] font-medium text-white/90">{title}</h3>
                 {view.status === 'ready' && <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[10px] text-white/50">{KIND_LABEL[view.kind]}</span>}
             </header>
-            {/* compact: przewijana treść osiągalna z klawiatury (A11Y-3) */}
+            {/* przewijana treść (compact, karta z focusem) osiągalna z klawiatury (A11Y-3, P0.5); bez focusu przycięta */}
             <div
                 className={`p-3 ${compact ? 'min-h-0 flex-1 overflow-auto' : focused ? 'max-h-[340px] overflow-auto' : 'max-h-[200px] overflow-hidden'}`}
                 data-nodrag={focused ? true : undefined}
-                {...(compact ? { tabIndex: 0, role: 'group', 'aria-label': `Treść: ${title}` } : {})}
+                {...(compact || focused ? { tabIndex: 0, role: 'group', 'aria-label': `Treść: ${title}` } : {})}
             >
                 <ItemBody view={view} density="card" />
             </div>
@@ -159,11 +173,15 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
     );
 });
 
-function CardButton({ onClick, children, primary, label }: { onClick: () => void; children: React.ReactNode; primary?: boolean; label?: string }) {
+function CardButton({ onClick, children, primary, label, expanded, buttonRef }: {
+    onClick: () => void; children: React.ReactNode; primary?: boolean; label?: string; expanded?: boolean; buttonRef?: RefObject<HTMLButtonElement>;
+}) {
     return (
         <button
+            ref={buttonRef}
             data-nodrag
             aria-label={label}
+            aria-expanded={expanded}
             onClick={(e) => { e.stopPropagation(); onClick(); }}
             className={`rounded-full px-3 py-1 text-[11px] font-medium transition ${primary ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white' : 'border border-white/15 bg-white/5 text-white/80 hover:bg-white/10'}`}
         >

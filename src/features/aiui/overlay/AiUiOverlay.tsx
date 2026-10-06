@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import SurfaceRenderer from '../SurfaceRenderer';
 import type { Surface } from '../reducer';
 import { resolveTree, type ResolvedNode } from '../resolveTree';
@@ -9,6 +9,7 @@ import { FOCUS_ANGLE, slotVisibility } from '../slots';
 import { useAiUi, type ScenarioStatus } from '../store';
 import { startValidationReporting } from '../validationReporting';
 import HudLayer from './HudLayer';
+import { setLayerInert } from './inert';
 import { ClientRegions, NarrationRegion, useClientAnnouncements } from './LiveRegions';
 import ScreenLayer from './ScreenLayer';
 import { useCompact } from './useCompact';
@@ -103,11 +104,24 @@ function TasksDrawer({ compact }: { compact: boolean }) {
     const setDrawer = useAiUi((s) => s.setDrawer);
     const reserve = useZones(compact);
     const counts = useMemo(() => (tasks ? countTasks(tasks) : null), [tasks]);
+    const tabRef = useRef<HTMLButtonElement>(null);
+    const sheet = useRef<HTMLElement>(null);
+    // compact: zamknięta szuflada jest tylko przesunięta poza ekran — bez inert byłaby w kolejności Tab (P0.5)
+    useLayoutEffect(() => { if (compact) setLayerInert(sheet.current, !open); }, [compact, open, Boolean(counts)]);
     if (!tasks || !counts) return null;
 
+    // Escape w liście zamyka szufladę i oddaje fokus przyciskowi (P0.5)
+    const closeOnEscape = (e: React.KeyboardEvent) => {
+        if (e.key !== 'Escape') return;
+        e.stopPropagation();
+        setDrawer('closed');
+        tabRef.current?.focus();
+    };
     const { done, all } = counts;
     const tab = (
         <button
+            ref={tabRef}
+            aria-expanded={open}
             onClick={() => setDrawer(open ? 'closed' : 'open')}
             className="pointer-events-auto rounded-full border border-white/10 bg-black/70 px-3 py-1.5 text-[11px] text-white/70 hover:text-white"
         >
@@ -120,6 +134,10 @@ function TasksDrawer({ compact }: { compact: boolean }) {
             <>
                 <div className="absolute right-3 z-10" style={{ bottom: open ? 'calc(45% + 8px)' : 12 }}>{tab}</div>
                 <aside
+                    ref={sheet}
+                    aria-label="Lista tasków"
+                    tabIndex={0}
+                    onKeyDown={closeOnEscape}
                     className="pointer-events-auto absolute inset-x-0 bottom-0 max-h-[45%] overflow-y-auto rounded-t-2xl border-t border-white/10 bg-[#07040f]/95 p-3 transition-transform duration-300"
                     style={{ transform: open ? 'translateY(0)' : 'translateY(105%)' }}
                 >
@@ -142,6 +160,10 @@ function TasksDrawer({ compact }: { compact: boolean }) {
                         animate={{ x: 0, opacity: 1 }}
                         exit={{ x: 48, opacity: 0 }}
                         transition={{ duration: 0.3, ease: 'easeOut' }}
+                        role="group"
+                        aria-label="Lista tasków"
+                        tabIndex={0}
+                        onKeyDown={closeOnEscape}
                         className="pointer-events-auto min-h-0 w-full overflow-y-auto rounded-2xl border border-white/10 bg-[#07040f]/80 p-4 backdrop-blur-md"
                     >
                         <SurfaceRenderer surfaceId="tasks-drawer" />

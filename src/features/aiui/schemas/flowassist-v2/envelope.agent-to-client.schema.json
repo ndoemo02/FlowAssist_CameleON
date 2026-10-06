@@ -189,7 +189,7 @@
             },
             "path": {
               "type": "string",
-              "description": "FU-3 / ADR 0002: limit zasobów — ≤ 512 znaków i ≤ 32 segmenty (contract.ts: PROTOCOL_LIMITS)",
+              "description": "FU-3 / ADR 0002: limit zasobów — ≤ 512 punktów kodowych Unicode (jednostka maxLength) i ≤ 32 segmenty (contract.ts: PROTOCOL_LIMITS)",
               "maxLength": 512,
               "pattern": "^(/[^/]*){0,32}$"
             },

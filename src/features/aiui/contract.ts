@@ -12,6 +12,7 @@ const ACCEPTED_VERSIONS = new Set(['v0.9', 'v0.9.1']);
 
 /**
  * Limity zasobów protokołu (FU-3, ADR 0002): niezaufane zdarzenie musi mieć rozsądny rozmiar, ZANIM dotknie stanu.
+ * Długość w PUNKTACH KODOWYCH Unicode — ta sama jednostka co `maxLength` w JSON Schema.
  * Scenariusz research używa 2–3 segmentów i ścieżek < 40 znaków; limit zostawia duży zapas, a odcina ścieżki,
  * które przepełniały stos w rekurencyjnym setAt (~10 tys. segmentów).
  */
@@ -98,9 +99,29 @@ export const isBinding = (v: unknown): v is Binding =>
 
 const isPointer = (v: unknown) => typeof v === 'string' && (v === '' || v.startsWith('/'));
 
-/** Ścieżka data modelu w limitach: najpierw długość (O(1)), dopiero potem liczenie segmentów krótkiego napisu. */
+/**
+ * Długość w punktach kodowych ≤ max (para surogatów = 1, jak `maxLength` w JSON Schema), z wczesnym wyjściem:
+ * ≤ max jednostek UTF-16 → na pewno mieści się; > 2·max → na pewno nie (punkt kodowy to najwyżej 2 jednostki);
+ * liczenie tylko pomiędzy, więc pętla ma ograniczoną długość niezależnie od rozmiaru wejścia.
+ */
+function codePointsAtMost(s: string, max: number): boolean {
+    if (s.length <= max) return true;
+    if (s.length > 2 * max) return false;
+    let n = 0;
+    for (let i = 0; i < s.length; i++) {
+        const c = s.charCodeAt(i);
+        if (c >= 0xd800 && c <= 0xdbff && i + 1 < s.length) {
+            const d = s.charCodeAt(i + 1);
+            if (d >= 0xdc00 && d <= 0xdfff) i++; // para surogatów = jeden punkt kodowy
+        }
+        if (++n > max) return false;
+    }
+    return true;
+}
+
+/** Ścieżka data modelu w limitach: najpierw długość (ograniczona), dopiero potem segmenty krótkiego napisu. */
 const isBoundedPointer = (v: unknown): v is string =>
-    isPointer(v) && (v as string).length <= PROTOCOL_LIMITS.dataModelPathMaxLength
+    isPointer(v) && codePointsAtMost(v as string, PROTOCOL_LIMITS.dataModelPathMaxLength)
     && parsePointer(v as string).length <= PROTOCOL_LIMITS.dataModelPathMaxSegments;
 
 const isComponent = (v: unknown): v is A2Component =>

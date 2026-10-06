@@ -23,6 +23,14 @@ describe('parseEvent: limity ścieżki updateDataModel', () => {
         expect(parseEvent(udm('/' + 'x'.repeat(512)))).toBeNull();
     });
 
+    // Weryfikacja Astry (FU-3): jednostką długości są punkty kodowe Unicode — jak maxLength w JSON Schema
+    // (😀 = 1 punkt kodowy = 2 jednostki UTF-16).
+    it('długość liczona w punktach kodowych Unicode, nie w jednostkach UTF-16', () => {
+        expect(parseEvent(udm('/' + '😀'.repeat(256)))).not.toBeNull(); // 257 punktów kodowych (513 jednostek UTF-16)
+        expect(parseEvent(udm('/' + '😀'.repeat(511)))).not.toBeNull(); // dokładnie 512 punktów kodowych
+        expect(parseEvent(udm('/' + '😀'.repeat(512)))).toBeNull();     // 513 punktów kodowych
+    });
+
     it('zwykłe ścieżki scenariusza research przechodzą', () => {
         for (const path of ['/', '/items/chart-q', '/items/chart-q/series', '/tasks/scout']) expect(parseEvent(udm(path))).not.toBeNull();
     });

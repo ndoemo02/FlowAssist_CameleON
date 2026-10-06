@@ -76,16 +76,20 @@ miejscu: `contract.ts: PROTOCOL_LIMITS`, sprawdzane w `parseEvent` (przed reduce
 
 | Limit | Wartość | Uzasadnienie |
 |---|---|---|
-| `updateDataModel.path` — długość | ≤ 512 znaków | scenariusz research: < 40 znaków |
+| `updateDataModel.path` — długość | ≤ 512 punktów kodowych Unicode | scenariusz research: < 40 znaków |
 | `updateDataModel.path` — segmenty | ≤ 32 | scenariusz research: 2–3; ~10 tys. segmentów przepełniało stos w rekurencyjnym `setAt` |
 
-- Długość sprawdzana najpierw (O(1)); segmenty liczone dopiero dla krótkiego napisu.
+- **Jednostka długości: punkty kodowe Unicode** — ta sama co `maxLength` w JSON Schema (para surogatów UTF-16 = 1),
+  żeby guard i schemat miały ten sam kontrakt (weryfikacja Astry: ścieżka z emoji o 513 jednostkach UTF-16 i 257 punktach
+  kodowych była odrzucana przez runtime, a przyjmowana przez schemat).
+- Długość sprawdzana najpierw, z wczesnym wyjściem (≤ 512 jednostek UTF-16 → mieści się; > 1024 → nie mieści się;
+  liczenie tylko pomiędzy); segmenty liczone dopiero dla krótkiego napisu.
 - Zdarzenie ponad limitem jest odrzucane w całości: brak (częściowej) zmiany stanu, brak wyjątku, kolejne zdarzenia
   obsługiwane normalnie (`__tests__/dataModelLimits.test.ts`, także próg i próg + 1).
 - JSON Schema: `maxLength: 512` i `pattern: ^(/[^/]*){0,32}$`; parytet z guardem w `schema.test.ts`.
-- **Odrzucenie jest dziś ciche** (ostrzeżenie w konsoli), tak jak każda niezgodna koperta: odpowiedź `VALIDATION_FAILED`
-  na odrzuconą kopertę należy do adaptera P1.6 (OBS-1, ADR 0005). Wysłanie jej już teraz tylko dla limitów
-  (most `setTransport`) byłoby niespójne z resztą odrzuceń — do osobnej decyzji.
+- **Odrzucenie jest ciche** (ostrzeżenie w konsoli), tak jak każda niezgodna koperta. **Decyzja właściciela
+  (2026-10-06):** zostaje ciche do P1.6; odpowiedź `VALIDATION_FAILED` na odrzucone koperty (także przekroczenie
+  limitów) implementujemy dopiero w adapterze P1.6 (OBS-1, ADR 0005).
 
 ## Otwarte
 

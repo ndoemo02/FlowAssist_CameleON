@@ -63,6 +63,10 @@ const ENVELOPE_EDGES: unknown[] = [
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + 'x'.repeat(511), value: 1 } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + 'x'.repeat(512), value: 1 } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a'.repeat(10_000), value: 1 } },
+    // FU-3: jednostka długości = punkty kodowe Unicode (jak maxLength w JSON Schema); 😀 = 2 jednostki UTF-16
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + '😀'.repeat(256), value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + '😀'.repeat(511), value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + '😀'.repeat(512), value: 1 } },
     { version: 'v0.9.1', deleteSurface: { surfaceId: 'nieznany' } },
     // OBS-4: mieszane koperty odrzucane w całości
     { stage: { drawer: 'open' }, version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } },

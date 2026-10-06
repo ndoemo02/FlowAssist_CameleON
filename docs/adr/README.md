@@ -11,6 +11,7 @@ zależności w v1.3+ jest oceniana względem tych dokumentów.
 | [0004](0004-library-adapter-rules.md) | Reguły adapterów bibliotek | Zaakceptowany (v1.3) |
 | [0005](0005-observed-behaviors.md) | Zachowania ujawnione przez korpus fixture'ów (OBS-1 do OBS-6) | Zaakceptowany; decyzje 2026-10-05 |
 | [0006](0006-browser-harness-findings.md) | Ustalenia harnessu przeglądarkowego (E2E-1, E2E-2, FLAKE-1/2, A11Y-1..3) | Zaakceptowany; E2E-1, E2E-2 zrealizowane; FLAKE-1 OPEN |
+| [0007](0007-item-state-taxonomy.md) | Taksonomia stanów elementu (P0.4; ST-1..ST-3) | Taksonomia zaakceptowana (plan v1.3.2); ST-1..ST-3 do decyzji |
 
 ## Zasady
 

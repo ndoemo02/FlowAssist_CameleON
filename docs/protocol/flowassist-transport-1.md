@@ -125,8 +125,10 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - wstrzykuje katalog do `context` (sprzeczne z I10).
 - **4.7 Replay historii** [P1.6]: klient stosuje ramki, lifecycle i kontrolę wersji **wyłącznie z biegu, o który prosił** (`RUN_STARTED.runId` = `RunAgentInput.runId`). Biegi poprzedzające go w tym samym strumieniu pomija w całości, łącznie z ich spóźnionymi `RUN_ERROR` (§6.3).
 - **4.8 Tożsamość biegu żądanego** (N3) [P1.6]. `agui:PROTOCOL_VIOLATION`, terminalnie i bez resync, gdy:
-  - strumień zawierał biegi, ale żaden nie miał `RUN_STARTED.runId` = `RunAgentInput.runId` (AG-UI: bieg żądany powtarza `runId` wejścia);
-  - po biegu żądanym pojawia się kolejny bieg (AG-UI: bieg żądany jest ostatni w odpowiedzi);
+  - strumień zawierał biegi, ale żaden nie miał `RUN_STARTED.runId` = `RunAgentInput.runId` (AG-UI: bieg żądany powtarza `runId` wejścia), a odpowiedź skończyła się **czystym końcem body**.
+    - Zerwanie połączenia przed `RUN_STARTED` biegu żądanego, np. w trakcie długiego replayu, pozostaje awarią transportu i prowadzi do resync (§7.1, D14);
+  - po biegu żądanym pojawia się kolejny bieg.
+    - To **reguła profilu, świadome zaostrzenie AG-UI**: AG-UI dopuszcza kolejny `RUN_STARTED` w tym samym strumieniu, ale w profilu/1 bieg żądany jest ostatni, bo klient nie ma czego stosować z biegów po nim;
   - `RUN_FINISHED` biegu żądanego ma inny `runId` niż jego `RUN_STARTED`;
   - zdarzenie brzegowe biegu żądanego ma `threadId` inny niż wejście.
 
@@ -264,7 +266,7 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
     - interrupt z tego wyniku ma `id` równe `expectedInterruptId`;
     - surface `surfaceId` istnieje, a komponent `sourceComponentId` istnieje na tym surface;
     - jeśli `context.itemId` jest podany, element jest nadal członkiem `Workspace.children` z **tą samą tożsamością wpisu układu** (`instance` z `layout.ts`, P6: ponowne dodanie = nowy wpis = nowa tożsamość).
-      - `rev` się **nie** liczy, bo rośnie także przy lokalnych zmianach formy (I7);
+      - `rev` się **nie** liczy. Rośnie przy zmianach spoza gestu, także niezwiązanych z decyzją (przeliczenie siatki po dodaniu innego elementu, hint agenta, zrzucenie z focusu albo ekranu, `layout.ts`), więc dawałby fałszywe porzucenia;
       - odcisku propsów nie ma (decyzja właściciela).
 
     Zgodność oznacza nowy bieg akcji (akcja w locie). Niezgodność dowolnego warunku oznacza **porzucenie z lokalnym komunikatem**, bez wysyłki.
@@ -425,7 +427,8 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | resync, gdy klient trzyma niepokryty interrupt (invocation akcji padła przed `RUN_STARTED`) | `resume` z wpisem `cancelled` bez `payload` | bez zmian | `reconnecting` | — | 7.4, 7.5 |
 | `RUN_STARTED` żądanego biegu, `protocolVersion` `1.x` | potwierdza akcję i raporty | `running` | `connected` | — | 6.1, 8.2, 11.4 |
 | `RUN_STARTED` żądanego biegu bez wersji / inny major | przerwanie | `error` `profile:AGUI_VERSION` | — | — | 2.4 |
-| biegi w strumieniu, ale żaden z żądanym `runId`; bieg po żądanym; niezgodny `runId` / `threadId` biegu żądanego | przerwanie, bez resync | `error` `agui:PROTOCOL_VIOLATION` | — | — | 4.8, 7.1 |
+| czysty koniec body: biegi w strumieniu, ale żaden z żądanym `runId`; bieg po żądanym (zaostrzenie profilu); niezgodny `runId` / `threadId` biegu żądanego | przerwanie, bez resync | `error` `agui:PROTOCOL_VIOLATION` | — | — | 4.8, 7.1 |
+| zerwanie połączenia przed `RUN_STARTED` biegu żądanego (np. w trakcie replayu) | resync | bez zmian | `reconnecting` | — | 4.8, 7.1 |
 | biegi replayu (inny `runId`), także ich spóźnione `RUN_ERROR` i brak wersji | pominięte w całości | — | — | — | 4.7, 6.3 |
 | `CUSTOM flowassist.frame` poprawna | round-trip → `transportDispatch` | — | — | — | 4.5, 10.9 |
 | ramka: zły kształt / profil / typ `seq` / nieznany klucz w `value` | przerwanie | `error` `profile:FRAME_INVALID` | — | — | 5.4 |
@@ -535,7 +538,7 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
 | D12 + M1 | jedno miejsce na akcję: akcja w locie zajmuje je do końca swojej invocation; kolejne odrzucane lokalnie; brak replay (właściciel) | §8.3–8.4 |
 | N1 | w trakcie aktywnej invocation i bez połączenia nic nie jest wysyłane; akcja może jedynie zająć wolne miejsce jako oczekująca, gdy jest bieżący interrupt; walidacja i nowa invocation dopiero po końcu poprzedniej (właściciel) | §8.3 |
 | N2 | akcja oczekująca przechowuje `expectedInterruptId`; przed wysyłką zgodność `interruptId`, komponentu źródłowego i tożsamości wpisu (`instance`), bez odcisku propsów; nowa decyzja = nowe `id` interruptu (właściciel) | §6.4, §8.3 |
-| N3 | nieprawidłowy albo brakujący wymagany `runId` = `agui:PROTOCOL_VIOLATION`, terminalnie, bez resync (właściciel) | §4.8, §7.1 |
+| N3 | nieprawidłowy albo brakujący wymagany `runId` (przy czystym końcu body) = `agui:PROTOCOL_VIOLATION`, terminalnie, bez resync (właściciel); bieg po żądanym = świadome zaostrzenie AG-UI w profilu/1 | §4.8, §7.1 |
 | D13 | raporty doklejane do następnego biegu (zmienia przypadek 2 testu zgodności i mock w P1.6) | §11.4 |
 | D14 | resync 1/2/4 s; potem `offline`, przebieg wznawialny, bez `error` z sieci, także dla startu (właściciel) | §7.3 |
 | H1 | keep-alive ≤ 15 s; 45 s bez ruchu SSE = zerwanie; 30 s na nagłówki; 5 s po zdarzeniu terminalnym; komentarz SSE to ruch (właściciel) | §6.2, §7.2 |

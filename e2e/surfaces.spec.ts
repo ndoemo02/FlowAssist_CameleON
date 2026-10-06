@@ -108,3 +108,22 @@ test('fokus klawiatury na karcie pokazuje kontrolki „−/+”; zmiana rozmiaru
         (window as unknown as { __aiui: { getState(): { layout: Record<string, { scale: number; presentation: string }> } } }).__aiui.getState().layout.kpis))).toMatchObject({ presentation: 'card' });
     expect((await page.evaluate(() => (window as unknown as { __aiui: { getState(): { layout: Record<string, { scale: number }> } } }).__aiui.getState().layout.kpis.scale))).toBeGreaterThan(1);
 });
+
+// LOW-1 (decyzja właściciela 2026-10-06): „Na ekran” z klawiatury — fokus trafia na panel ekranu, nie na pasek decyzji.
+test('Enter na karcie (klawiatura): po przejściu na Front fokus na panelu ekranu', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'skróty klawiatury karty na desktopie');
+    await openApp(page);
+    await seedWorkspace(page);
+    await waitScreenMeshes(page);
+    await dispatch(page, { version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+    await dispatch(page, { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [
+        { id: 'root', component: 'Approval', title: 'Pilotaż', summary: 'Opis decyzji' },
+    ] } });
+    await setAngle(page, BACK);
+    const card = page.getByRole('article', { name: 'Element kpis' });
+    await card.focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => (await anchorState(page))?.active, { timeout: 30_000 }).toBe(true);
+    await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.focusLayer ?? null),
+        { timeout: 15_000 }).toBe('screen');
+});

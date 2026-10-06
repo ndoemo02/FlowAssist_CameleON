@@ -14,7 +14,17 @@ interface AnnouncerState { status: Message; alert: Message }
 const EMPTY: Message = { text: '', seq: 0 };
 export const useAnnouncer = create<AnnouncerState>(() => ({ status: EMPTY, alert: EMPTY }));
 
+// Komunikaty z jednego kroku JS (kilka zmian store'u w tej samej paczce, np. dane + koniec przebiegu) łączymy w jeden —
+// inaczej ostatni nadpisałby wcześniejsze przed renderem (Astra P0.5). Nowy krok (zdarzenie) zaczyna nowy komunikat.
+let batchOpen = false;
+
 export function announce(text: string) {
+    if (batchOpen) {
+        useAnnouncer.setState((s) => ({ status: { text: s.status.text ? `${s.status.text}. ${text}` : text, seq: s.status.seq } }));
+        return;
+    }
+    batchOpen = true;
+    queueMicrotask(() => { batchOpen = false; });
     useAnnouncer.setState((s) => ({ status: { text, seq: s.status.seq + 1 } }));
 }
 
@@ -29,5 +39,6 @@ export function clearAlert() {
 
 /** Testy: wyczyść komunikaty. */
 export function resetAnnouncer() {
+    batchOpen = false;
     useAnnouncer.setState({ status: EMPTY, alert: EMPTY });
 }

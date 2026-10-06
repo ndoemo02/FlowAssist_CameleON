@@ -175,10 +175,15 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
             </div>
             {(focused || compact || keyboardWithin) && controls}
             {menu && view.status === 'ready' && (
-                <div data-nodrag className="border-t border-white/10 px-3 pb-2" onMouseLeave={() => setMenu(false)}>
+                <div
+                    data-nodrag
+                    className="border-t border-white/10 px-3 pb-2"
+                    // zjechanie myszą: fokus z wnętrza menu wraca do „⋯” (Astra P0.5), inaczej samo zamknięcie
+                    onMouseLeave={(e) => { if (e.currentTarget.contains(document.activeElement)) closeMenu(); else setMenu(false); }}
+                >
                     <ActionBar
                         actions={view.actions}
-                        onAction={(name) => { setMenu(false); useAiUi.getState().sendAction(name, 'workspace', id, { itemId: id }); }}
+                        onAction={(name) => { closeMenu(); useAiUi.getState().sendAction(name, 'workspace', id, { itemId: id }); }}
                     />
                 </div>
             )}

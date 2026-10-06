@@ -10,7 +10,7 @@ import ActionBar from '../components/ActionBar';
 import { useScreenPinch } from './gestures';
 import { setLayerInert } from './inert';
 import { userLayoutCommand } from './userCommand';
-import { canTakeFocus } from './focusTarget';
+import { canTakeFocus, clearScreenFocusIntent, hasScreenFocusIntent } from './focusTarget';
 import { ItemBody, KIND_LABEL, useItemView } from './ItemContent';
 
 // Ekran (Front 0°, deep view — plan v1.2.1 II.2, wariant hybrydowy po spike #2):
@@ -72,6 +72,12 @@ function ScreenPanel({ id }: { id: string }) {
     // ważność właściciela (P0.5): menu zamyka się, gdy panel przestaje być aktywny (kotwica / Front w trybie centered)
     const layerActive = mode === 'centered' ? frontVisible > 0.6 : anchorActive;
     useEffect(() => { if (!layerActive) setMenu(false); }, [layerActive]);
+    // LOW-1: aktywny panel przejmuje fokus, gdy użytkownik sam wysłał element na ekran (intencja, nie dane agenta)
+    useEffect(() => {
+        if (!layerActive || !hasScreenFocusIntent()) return;
+        clearScreenFocusIntent();
+        panel.current?.focus({ preventScroll: true });
+    }, [layerActive]);
 
     const cmd = userLayoutCommand; // komendy użytkownika: potwierdzenie zmiany prezentacji (P0.5)
     const title = view.status !== 'pending' || view.title ? view.title ?? id : 'Ładowanie…';
@@ -108,7 +114,7 @@ function ScreenPanel({ id }: { id: string }) {
             </header>
             {menu && view.status === 'ready' && (
                 <div className="shrink-0 border-b border-white/10 px-3 pb-2">
-                    <ActionBar actions={view.actions} onAction={(name) => { setMenu(false); useAiUi.getState().sendAction(name, 'workspace', id, { itemId: id }); }} />
+                    <ActionBar actions={view.actions} onAction={(name) => { closeMenu(); useAiUi.getState().sendAction(name, 'workspace', id, { itemId: id }); }} />
                 </div>
             )}
             {/* pinch tylko na treści ekranu; touch-action pozwala przewijać, a pinch trafia do nas */}

@@ -25,6 +25,8 @@ const agent = (raw: unknown) => act(() => useAiUi.getState().transportDispatch(r
 
 const narrationRegion = (r: Rendered) => r.container.querySelector<HTMLElement>('[data-region="narration"]')!;
 const statusRegion = (r: Rendered) => r.container.querySelector<HTMLElement>('[data-region="status"]')!;
+/** Granica kroku JS — kolejne zdarzenie (komunikaty z jednego kroku announcer łączy, Astra P0.5). */
+const step = () => act(async () => { await Promise.resolve(); });
 const alertRegion = (r: Rendered) => r.container.querySelector<HTMLElement>('[data-region="alert"]')!;
 
 function startRun() {
@@ -134,26 +136,32 @@ describe('lokalny status (komunikaty klienta)', () => {
         expect(statusRegion(r).textContent).toBe(before);
     });
 
-    it('nowy element gotowy ogłaszany raz w przebiegu; aktualizacja danych nie ogłasza ponownie', () => {
+    it('nowy element gotowy ogłaszany raz w przebiegu; aktualizacja danych nie ogłasza ponownie', async () => {
         const r = mount();
         startRun();
         workspaceItem(false);
         expect(statusRegion(r).textContent).not.toContain('Nowy element');
+        await step();
         agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: chartData } });
         expect(statusRegion(r).textContent).toContain('Nowy element na stole: Zapytania');
+        await step();
         act(() => userLayoutCommand({ type: 'dismiss', id: 'm' })); // inny komunikat w regionie
+        await step();
         agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: { ...chartData, kind: 'bar' } } });
         expect(statusRegion(r).textContent).not.toContain('Nowy element');
     });
 
-    it('element, którego nie da się wyświetlić: uprzejmy komunikat (błąd nieblokujący), raz w przebiegu', () => {
+    it('element, którego nie da się wyświetlić: uprzejmy komunikat (błąd nieblokujący), raz w przebiegu', async () => {
         const r = mount();
         startRun();
         workspaceItem(false);
+        await step();
         agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: { ...chartData, kind: 'pie' } } });
         expect(statusRegion(r).textContent).toContain('Nie można wyświetlić elementu: Zapytania');
         expect(alertRegion(r).textContent).toBe('');
+        await step();
         act(() => userLayoutCommand({ type: 'dismiss', id: 'm' }));
+        await step();
         agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: { ...chartData, kind: 'area' } } });
         expect(statusRegion(r).textContent).not.toContain('Nie można wyświetlić');
     });
@@ -215,16 +223,16 @@ describe('cykl ogłoszeń w przebiegu (review kroków 1–2)', () => {
         expect(statusRegion(r).textContent).toContain('Nowy element na stole: Zapytania');
     });
 
-    it('fallback → ready → fallback: nawrót błędu jest ogłaszany ponownie', () => {
+    it('fallback → ready → fallback: nawrót błędu jest ogłaszany ponownie', async () => {
         const r = mount();
         startRun();
         workspaceItem(false);
-        const data = (kind: string) => agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: { ...chartData, kind } } });
-        data('pie');
+        const data = async (kind: string) => { await step(); agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: { ...chartData, kind } } }); };
+        await data('pie');
         expect(statusRegion(r).textContent).toContain('Nie można wyświetlić elementu: Zapytania');
-        data('line');
+        await data('line');
         expect(statusRegion(r).textContent).not.toContain('Nie można wyświetlić');
-        data('pie');
+        await data('pie');
         expect(statusRegion(r).textContent).toContain('Nie można wyświetlić elementu: Zapytania');
     });
 
@@ -257,5 +265,30 @@ describe('strażnik statyczny: komendy układu z overlayu idą przez userLayoutC
             .filter((f) => /\.(ts|tsx)$/.test(f) && f !== 'userCommand.ts')
             .filter((f) => /layoutCommand\b/.test(readFileSync(dir + f, 'utf-8').replace(/userLayoutCommand/g, '')));
         expect(offenders).toEqual([]);
+    });
+});
+
+// Review Astry P0.5 (A3): komunikaty z jednej paczki zdarzeń (ten sam krok JS) nie mogą się nadpisać
+describe('Astra P0.5: paczka zdarzeń w jednym kroku', () => {
+    it('element ready i koniec przebiegu w jednym kroku → oba komunikaty w regionie', async () => {
+        const r = mount();
+        startRun();
+        workspaceItem(false);
+        await act(async () => { await Promise.resolve(); });
+        act(() => {
+            useAiUi.getState().transportDispatch({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/items/m', value: chartData } }, runId());
+            useAiUi.getState().receiveStatus(runId(), 'done');
+        });
+        expect(statusRegion(r).textContent).toContain('Nowy element na stole: Zapytania');
+        expect(statusRegion(r).textContent).toContain('Przebieg zakończony');
+    });
+
+    it('kolejny krok (osobne zdarzenie użytkownika) zaczyna nowy komunikat', async () => {
+        const r = mount();
+        startRun();
+        workspaceItem();
+        await act(async () => { await Promise.resolve(); });
+        act(() => userLayoutCommand({ type: 'dismiss', id: 'm' }));
+        expect(statusRegion(r).textContent).toBe('Ukryto: Zapytania');
     });
 });

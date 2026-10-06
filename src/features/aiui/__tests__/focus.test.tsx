@@ -7,10 +7,11 @@
 
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { setTransport, useAiUi } from '../store';
+import { resetManualInteraction, setTransport, TWEEN_SECONDS, useAiUi } from '../store';
 import AiUiOverlay from '../overlay/AiUiOverlay';
 import { resetAnnouncer } from '../overlay/announcer';
 import { publishAnchor, type AnchorState } from '../scene/anchorRegistry';
+import { clearScreenFocusIntent } from '../overlay/focusTarget';
 import { installDomStubs, render, type Rendered } from './fixtures/render';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
@@ -41,6 +42,7 @@ beforeEach(() => {
     installDomStubs();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     resetAnnouncer();
+    clearScreenFocusIntent();
 });
 
 afterEach(() => {
@@ -448,5 +450,105 @@ describe('kontrolki karty przy fokusie w karcie (desktop)', () => {
         expect(button(article(r), 'Powiększ')).toBeTruthy();
         click(button(article(r), 'Powiększ'));
         expect(useAiUi.getState().layout.m.scale).toBeGreaterThan(1);
+    });
+});
+
+// LOW-1 (decyzja właściciela 2026-10-06): po „Na ekran” wydanym przez użytkownika fokus idzie na panel ekranu,
+// nie na pasek decyzji. Dotyczy tylko komend użytkownika; obrót / hint agenta zachowuje dotychczasowy ratunek.
+describe('LOW-1: fokus po „Na ekran” od użytkownika', () => {
+    // stan kotwicy (anchorRegistry) jest modułowy i przechodzi między testami — każdy test zaczyna od nieaktywnej
+    const anchorInactive = () => act(() => publishAnchor({ mode: 'anchor', active: false, reason: 'angle', outer: null, inner: null,
+        panel: { x: 0, y: 0, w: 600, h: 300 }, coverage: 0, visibleFraction: 0, angleDeg: 180, pointCount: 0, computeMs: 0 } as unknown as AnchorState));
+
+    it('Enter na karcie: podczas przejścia fokus nie trafia na pasek decyzji; po aktywacji panelu — na panel ekranu', async () => {
+        anchorInactive();
+        const r = mount();
+        startRun();
+        itemWithActions();
+        decision();
+        toBack();
+        act(() => article(r).focus());
+        key(article(r), 'Enter'); // skrót karty: na ekran
+        expect(useAiUi.getState().layout.m.presentation).toBe('screen');
+        act(() => useAiUi.getState().tickCamera(TWEEN_SECONDS)); // tween director kończy się na Froncie → stół inert
+        await flush();
+        expect(document.activeElement).not.toBe(button(r.container, 'Szczegóły'));
+        anchorActive();
+        await flush();
+        expect(document.activeElement).toBe(screen(r));
+    });
+
+    it('strażnik: hint agenta „screen” (bez działania użytkownika) nie tworzy intencji — fokus jak dotąd na pasku decyzji', async () => {
+        anchorInactive();
+        const r = mount();
+        startRun();
+        itemWithActions();
+        decision();
+        // Back bez ręcznego suwaka: inaczej okres łaski P3 zatrzymałby obrót kamery po hincie agenta
+        act(() => useAiUi.setState({ camera: { angle: Math.PI, source: 'director', tween: null } }));
+        resetManualInteraction();
+        act(() => article(r).focus());
+        await flush();
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [
+            { id: 'm', component: 'WorkspaceItem', kind: 'chart', title: 'Zapytania', representations: ['chart2d'], content: { path: '/items/m' },
+                presentation: 'screen', actions: [{ name: 'deep', label: 'Pogłęb' }] },
+        ] } });
+        act(() => useAiUi.getState().tickCamera(TWEEN_SECONDS));
+        await flush();
+        expect(document.activeElement).toBe(button(r.container, 'Szczegóły'));
+        anchorActive();
+        await flush();
+        expect(document.activeElement).toBe(button(r.container, 'Szczegóły'));
+    });
+});
+
+// Review Astry P0.5 (2026-10-06)
+describe('Astra P0.5: zamknięcie menu i ostateczny cel fokusu', () => {
+    it('A1: kliknięcie akcji zamyka menu i oddaje fokus „⋯” (nie kontenerowi stołu)', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => useAiUi.getState().layoutCommand({ type: 'focus', id: 'm' }));
+        const more = button(article(r), 'Akcje');
+        click(more);
+        const action = button(article(r), 'Pogłęb');
+        act(() => action.focus());
+        click(action);
+        await flush();
+        expect(button(article(r), 'Pogłęb')).toBeUndefined();
+        expect(document.activeElement).toBe(more);
+    });
+
+    it('A1: zjechanie myszą z menu z fokusem w środku oddaje fokus „⋯”', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => useAiUi.getState().layoutCommand({ type: 'focus', id: 'm' }));
+        const more = button(article(r), 'Akcje');
+        click(more);
+        const action = button(article(r), 'Pogłęb');
+        act(() => action.focus());
+        const menu = action.closest('[data-nodrag]')!;
+        act(() => { menu.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, relatedTarget: document.body })); });
+        await flush();
+        expect(button(article(r), 'Pogłęb')).toBeUndefined();
+        expect(document.activeElement).toBe(more);
+    });
+
+    it('A2: agent usuwa ostatnią kartę z fokusem w środku (brak stołu, ekranu i decyzji) → korzeń overlayu', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => article(r).focus());
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: [] }] } });
+        await flush();
+        expect(r.container.querySelector('article')).toBeNull();
+        const root = r.container.querySelector<HTMLElement>('[data-aiui-overlay]')!;
+        expect(document.activeElement).toBe(root);
+        expect(root.getAttribute('role')).toBe('group');
+        expect(root.getAttribute('aria-label')).toBeTruthy();
     });
 });

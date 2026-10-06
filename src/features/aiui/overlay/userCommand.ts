@@ -8,6 +8,7 @@ import type { LayoutCommand, LocalPresentation } from '../layout';
 import { useAiUi } from '../store';
 import { resolveItem } from '../workspace';
 import { announce } from './announcer';
+import { requestScreenFocus } from './focusTarget';
 
 /** Tytuł elementu do komunikatu: rozwiązany, a gdy brak — id. */
 export function itemTitle(id: string): string {
@@ -32,6 +33,9 @@ export function userLayoutCommand(cmd: LayoutCommand) {
     if (!id) return;
     const after = useAiUi.getState().layout[id]?.presentation;
     if (!after || after === before) return;
+    // LOW-1: „Na ekran” od użytkownika z fokusem w overlayu — fokus pójdzie za elementem na panel ekranu
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    if (after === 'screen' && active && active !== document.body && active.closest('[data-aiui-overlay]')) requestScreenFocus();
     const message = confirmation(before, after, itemTitle(id));
     if (message) announce(message);
 }

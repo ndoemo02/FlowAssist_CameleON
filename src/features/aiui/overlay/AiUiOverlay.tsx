@@ -35,7 +35,15 @@ export default function AiUiOverlay() {
     return (
         // P0.6: Framer Motion szanuje prefers-reduced-motion (transformy bez animacji); przejścia CSS — globals.css
         <MotionConfig reducedMotion="user">
-            <div ref={root} data-aiui-overlay className="pointer-events-none absolute inset-0 z-20">
+            <div
+                ref={root}
+                data-aiui-overlay
+                data-focus-layer="root"
+                role="group"
+                aria-label="Asystent CameleON"
+                tabIndex={-1} // ostateczny cel ratunku fokusu (tylko programowo)
+                className="pointer-events-none absolute inset-0 z-20 outline-none"
+            >
                 <NarrationRegion />
                 <ClientRegions />
                 <WorkspaceLayer compact={compact} />

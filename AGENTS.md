@@ -261,6 +261,13 @@ Od P0.4–P0.6:
   strażnik statyczny: komendy układu z `overlay/` tylko przez `userLayoutCommand`;
 - `motion` — ograniczony ruch (współczynniki kamery, tween w jednej klatce ze źródłem `director`).
 
+Od P1.7a (handshake możliwości, ADR 0002):
+
+- `transportCapabilities` — strażnik dryfu profilu (ręczne literały, bez snapshotów), schematy upstream A2UI
+  (`schemas/a2ui-v0.9/`, Ajv 2020) i profilu (`schemas/flowassist-transport-1/`), każdy krok negocjacji;
+- `mockTransport` — wspólny test zgodności `AgentTransport` (`__tests__/transportConformance.ts`; ten sam zestaw musi
+  przejść adapter P1.6) + reguły mocka; `runPermission`, `storeCapabilities`, `catalogCapabilities`.
+
 ### Testy przeglądarkowe: Playwright + axe (od v1.3, P0.1)
 
 `npm run test:e2e` — deterministyczna regresja DOM w `e2e/` (autorytatywna; zastępuje dawne skrypty `agent-browser`).
@@ -389,8 +396,14 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
   - ~~**FU-4 (ADR 0007 Q3)**~~ — zrealizowane: `parseEvent` odrzuca zarezerwowane klucze własne `__proto__`,
     `constructor`, `prototype` na dowolnym poziomie ładunku oraz te nazwy jako `id`, wpis `children` i segment ścieżki
     (ADR 0002, `contract.ts: RESERVED_KEYS`).
-- **P1.7 (następny etap):** handshake możliwości i profil transportowy; w nim opis ST-4 (`presentation`, `priority`
-  tylko dosłownie), Q1 (bindingi tylko w propsach katalogu) i kernel cleanup Q2. P1.6 dopiero po zamknięciu P1.7.
+- **P1.7 — podzielone (decyzja właściciela 2026-10-06), plan `C:\Develop\Flow Assist\PLAN_P1.7_capabilities.md` (v2.2):**
+  - ~~**Q2**~~ — zrealizowane: martwe `hint`/`priority` usunięte z widoku `ready` (kernel, ADR 0001/0007);
+  - ~~**P1.7a — capabilities w kodzie**~~ — zrealizowane lokalnie: D2 (obsługiwane reprezentacje = capabilities, nie
+    katalog; ADR 0002), `clientCapabilities()` w kształcie upstream A2UI, `negotiate()` (kolejność 0–5), zgoda na wysyłkę
+    per przebieg (reset przy każdym `start`/`stop`), mock egzekwuje te same reguły, wspólny test zgodności transportu;
+  - **P1.7b — zamknięcie profilu `flowassist-transport/1`** (następny etap): wiązanie AG-UI (research), ramka, lifecycle,
+    raportowanie bez surface, reguły danych dla adaptera (Q1, ST-4), polityka wersji koperty, akcje, `stage`/`narration`.
+  - P1.6 dopiero po zamknięciu P1.7b.
 - **P1 (warunkowo):** Radix albo React Aria, tylko jeśli po P0 natywna mechanika menu i fokusu okaże się krucha.
 - **Poza v1.3:** spike'i gestów, wykresów i tabel. Eksperymenty P2 (MCP Apps, Drei Html, graph2d, Vega-Lite, MapLibre) w v1.4.
 

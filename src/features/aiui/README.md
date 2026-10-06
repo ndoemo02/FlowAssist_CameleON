@@ -159,8 +159,21 @@ jego materiał (kolor liniowy 0,07). Robi to też przy rejestracji meshy.
 ## Transport i scenariusze
 
 - `transport/types.ts` — interfejs `AgentTransport`, statusy runu
-  (`running`, `awaiting_action`, `done`, `error`).
-- `transport/mockTransport.ts` — deterministyczne odtwarzanie scenariusza, mnożnik `?speed=N`.
+  (`running`, `awaiting_action`, `done`, `error`), `StartRequest` (z wymaganymi `capabilities`), `BackendCall`.
+- `transport/mockTransport.ts` — deterministyczne odtwarzanie scenariusza, mnożnik `?speed=N`; egzekwuje negocjację
+  i zgodę na wysyłkę tak samo jak przyszły adapter (`MOCK_SERVER_CAPABILITIES`).
+- **Handshake możliwości (P1.7a, ADR 0002):**
+  - `transport/profile.ts` — `TRANSPORT_PROFILE = 'flowassist-transport/1'` i `PROFILE_RULES` (reguły stałe dla profilu,
+    niewysyłane: wersje koperty, prezentacje, limity, klucze zarezerwowane);
+  - `transport/capabilities.ts` — `clientCapabilities()` (zamrożony snapshot: `a2uiClientCapabilities` pod kluczem
+    `"v0.9"` + rozszerzenie `flowassist: { profile, kinds }`), `ServerCapabilities`, `negotiate()` w stałej kolejności
+    0–5 z zamkniętą listą przyczyn porażki;
+  - `transport/runPermission.ts` — zgoda na wywołania backendu **per przebieg**: tylko po udanej negocjacji, reset przy
+    każdym `start` i `stop` (decyzja terminalna nie resetuje);
+  - `catalog.ts: catalogCapabilities()` (obsługiwane reprezentacje per rodzaj) i `CATALOG_PROPS`;
+  - `startScenario` liczy snapshot raz na przebieg; transport nigdy nie buduje capabilities sam.
+  - Porażka negocjacji = status `error` z komunikatem `negotiation:<przyczyna>` przed pierwszym zdarzeniem.
+  - Ramka zdarzeń, lifecycle, reconnect, wiązanie AG-UI: profil P1.7b, adapter P1.6.
 - `scenarios/researchDemo.ts` — scenariusz `research` (`?demo=research`).
 - Prawdziwy transport (SSE / inference.sh) jest odłożony.
 
@@ -174,5 +187,9 @@ jego materiał (kolor liniowy 0,07). Robi to też przy rejestracji meshy.
   (`fixtures/replay.ts`); ślady baseline w `fixtures/traces/`.
 - `schema` — parytet schematów `schemas/flowassist-v2/` (koperta, propsy po rozwiązaniu bindingów,
   treść reprezentacji) z guardami runtime, na korpusie i mutacjach.
+- Od P1.7a: `catalogCapabilities` (pochodne z katalogu, parytet `CATALOG_PROPS` ze schematem komponentów),
+  `transportCapabilities` (strażnik dryfu jako ręczne literały, schematy upstream `schemas/a2ui-v0.9/` przez Ajv 2020,
+  schemat `schemas/flowassist-transport-1/`, wszystkie kroki negocjacji), `runPermission`, `mockTransport`
+  (wspólny test zgodności `transportConformance.ts` — ten sam zestaw musi przejść adapter P1.6), `storeCapabilities`.
 
 Inwarianty i reguły: [`docs/adr/`](../../../docs/adr/). Kontrole przeglądarkowe opisuje `AGENTS.md` → „Testowanie”.

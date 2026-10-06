@@ -190,5 +190,71 @@ export function describeTransportConformance(name: string, h: ConformanceHarness
             expect(log.calls[before].capabilities).toBe(c);
             t.stop();
         }));
+
+        // Reentrancja i przeploty (review Astry P1.7a): zgoda i praca przebiegu wiążą się z przebiegiem w chwili
+        // przyjęcia wywołania, a nie w chwili jego asynchronicznego wykonania.
+
+        it('10: stop wewnątrz onStatus(running) — przebieg nie emituje już zdarzeń ani statusów', run(async () => {
+            const { t, log } = setup();
+            let stoppedAt = -1;
+            t.subscribe(() => {}, (runId, status) => {
+                if (runId === 1 && status === 'running' && stoppedAt < 0) { stoppedAt = log.order.length; t.stop(); }
+            });
+            t.start(1, { scenario: h.scenario, capabilities: frozen(caps()) });
+            await flush();
+            await flush();
+            expect(stoppedAt).toBeGreaterThanOrEqual(0);
+            expect(log.order.slice(stoppedAt).filter((x) => x.startsWith('event:') || (x.startsWith('status:1:') && x !== 'status:1:running'))).toEqual([]);
+        }));
+
+        it('11: nieudany start(2) wewnątrz onStatus(1, running) — przebieg 1 nie emituje już zdarzeń', run(async () => {
+            let server: ServerCapabilities | null = h.compatibleServer;
+            const { t, log } = setup(() => server);
+            let restartedAt = -1;
+            t.subscribe(() => {}, (runId, status) => {
+                if (runId === 1 && status === 'running' && restartedAt < 0) {
+                    restartedAt = log.order.length;
+                    server = null;
+                    t.start(2, { scenario: h.scenario, capabilities: frozen(caps()) });
+                }
+            });
+            t.start(1, { scenario: h.scenario, capabilities: frozen(caps()) });
+            await flush();
+            await flush();
+            expect(restartedAt).toBeGreaterThanOrEqual(0);
+            const after = log.order.slice(restartedAt);
+            expect(after.filter((x) => x.startsWith('event:1') || (x.startsWith('status:1:') && x !== 'status:1:running'))).toEqual([]);
+            expect(log.statuses.filter((x) => x.runId === 2).map((x) => x.status)).toEqual(['error']);
+            t.stop();
+        }));
+
+        it('12: nieudany start → send (bez opróżnienia kolejki) → udany start — komunikat NIE przechodzi do nowego przebiegu', run(async () => {
+            let server: ServerCapabilities | null = null;
+            const { t, log } = setup(() => server);
+            t.start(1, { scenario: h.scenario, capabilities: frozen(caps()) });
+            t.send(error());
+            t.send(action());
+            server = h.compatibleServer;
+            t.start(2, { scenario: h.scenario, capabilities: frozen(caps()) });
+            await flush();
+            await flush();
+            expect(log.calls.filter((x) => x.kind === 'continue')).toEqual([]);
+            t.stop();
+        }));
+
+        it('13: send w A → restart B (bez opróżnienia kolejki) — wywołanie należy do A (runId i capabilities A), nigdy do B', run(async () => {
+            const { t, log } = setup();
+            const a = frozen(caps());
+            const b = frozen(caps());
+            t.start(1, { scenario: h.scenario, capabilities: a });
+            await flush();
+            t.send(error());
+            t.start(2, { scenario: h.scenario, capabilities: b });
+            await flush();
+            await flush();
+            const cont = log.calls.filter((x) => x.kind === 'continue');
+            expect(cont.every((x) => x.runId === 1 && x.capabilities === a)).toBe(true);
+            t.stop();
+        }));
     });
 }

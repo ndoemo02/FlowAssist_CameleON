@@ -49,6 +49,12 @@ export class MockTransport implements AgentTransport {
     private closedRunId: number | null = null; // przebieg zamknięty decyzją terminalną
     private script: ScenarioScript | null = null;
     private readonly permission = new RunPermission();
+    /**
+     * Generacja pracy przebiegu: każdy `stop` (także wewnątrz `start`) ją podbija. Praca zaplanowana albo dokończana
+     * po wywołaniu zwrotnym (subskrybent, obserwator) sprawdza generację, więc reentrantny `stop`/`start` w callbacku
+     * nie pozwala dokończyć starego przebiegu (review Astry P1.7a, MEDIUM 1).
+     */
+    private generation = 0;
 
     constructor(
         private readonly scripts: Record<string, ScenarioScript>,
@@ -76,7 +82,9 @@ export class MockTransport implements AgentTransport {
             this.emitStatus(runId, 'error', `negotiation:${negotiation.reason}`);
             return;
         }
+        const gen = this.generation;
         this.opts.onBackendCall?.({ kind: 'start', runId, capabilities: request.capabilities, body: { scenario: request.scenario, prompt: request.prompt } });
+        if (gen !== this.generation) return; // obserwator zatrzymał albo zrestartował transport
         this.script = this.scripts[request.scenario] ?? null;
         if (!this.script) {
             this.emitStatus(runId, 'error', `Nieznany scenariusz "${request.scenario}"`);
@@ -95,7 +103,9 @@ export class MockTransport implements AgentTransport {
             }
             return;
         }
+        const gen = this.generation;
         this.opts.onBackendCall?.({ kind: 'continue', runId: run.runId, capabilities: run.capabilities, body: message });
+        if (gen !== this.generation) return; // obserwator zatrzymał albo zrestartował transport
         if ('error' in message) {
             console.warn('[aiui/mock] błąd zgłoszony przez renderer:', message.error);
             return;
@@ -118,6 +128,7 @@ export class MockTransport implements AgentTransport {
     }
 
     stop() {
+        this.generation++;
         this.clearTimers();
         this.permission.revoke();
     }
@@ -129,13 +140,16 @@ export class MockTransport implements AgentTransport {
 
     private play(runId: number, steps: ScenarioStep[], endStatus: RunStatus) {
         const speed = this.opts.speed && this.opts.speed > 0 ? this.opts.speed : 1;
+        const gen = this.generation;
         this.emitStatus(runId, 'running');
+        if (gen !== this.generation) return; // subskrybent zatrzymał albo zrestartował transport w onStatus
+        const live = (fn: () => void) => () => { if (gen === this.generation) fn(); };
         let last = 0;
         for (const step of steps) {
             last = Math.max(last, step.at);
-            this.schedule(step.at / speed, () => this.listeners.forEach((l) => l.onEvent(runId, step.event)));
+            this.schedule(step.at / speed, live(() => this.listeners.forEach((l) => l.onEvent(runId, step.event))));
         }
-        this.schedule((last + END_PADDING_MS) / speed, () => this.emitStatus(runId, endStatus));
+        this.schedule((last + END_PADDING_MS) / speed, live(() => this.emitStatus(runId, endStatus)));
     }
 
     private schedule(ms: number, fn: () => void) {

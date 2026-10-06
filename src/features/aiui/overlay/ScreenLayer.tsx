@@ -29,6 +29,7 @@ function ScreenPanel({ id }: { id: string }) {
     const [mode, setMode] = useState<AnchorMode>('anchor');
     const frontVisible = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.front));
     const [menu, setMenu] = useState(false);
+    const [anchorActive, setAnchorActive] = useState(false);
     const menuButton = useRef<HTMLButtonElement>(null);
     // Escape zamyka menu i oddaje fokus „⋯” (P0.5)
     const closeMenu = () => { setMenu(false); if (canTakeFocus(menuButton.current)) menuButton.current.focus(); };
@@ -61,11 +62,16 @@ function ScreenPanel({ id }: { id: string }) {
     useEffect(() => subscribeAnchor((s) => {
         anchor.current = s;
         setMode((m) => (m === s.mode ? m : s.mode));
+        setAnchorActive((a) => (a === s.active ? a : s.active));
         apply();
     }), []);
     useLayoutEffect(apply);
     // tryb centered: aktywny tylko, gdy kamera patrzy na Front
     useLayoutEffect(() => { if (mode === 'centered') setLayerInert(panel.current, frontVisible <= 0.6); }, [mode, frontVisible]);
+
+    // ważność właściciela (P0.5): menu zamyka się, gdy panel przestaje być aktywny (kotwica / Front w trybie centered)
+    const layerActive = mode === 'centered' ? frontVisible > 0.6 : anchorActive;
+    useEffect(() => { if (!layerActive) setMenu(false); }, [layerActive]);
 
     const cmd = userLayoutCommand; // komendy użytkownika: potwierdzenie zmiany prezentacji (P0.5)
     const title = view.status !== 'pending' || view.title ? view.title ?? id : 'Ładowanie…';
@@ -75,6 +81,8 @@ function ScreenPanel({ id }: { id: string }) {
         <section
             ref={panel}
             aria-label={`Ekran: ${title}`}
+            data-focus-layer="screen"
+            tabIndex={-1} // bezpieczny cel fokusu (tylko programowo, P0.5)
             onKeyDown={(ev) => { if (menu && ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeMenu(); } }}
             className={`absolute flex flex-col overflow-hidden border text-white transition-opacity duration-150 ${
                 centered

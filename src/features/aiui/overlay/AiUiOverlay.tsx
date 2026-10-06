@@ -10,6 +10,7 @@ import { useAiUi, type ScenarioStatus } from '../store';
 import { startValidationReporting } from '../validationReporting';
 import HudLayer from './HudLayer';
 import { setLayerInert } from './inert';
+import { useFocusRescue } from './focusTarget';
 import { ClientRegions, NarrationRegion, useClientAnnouncements } from './LiveRegions';
 import ScreenLayer from './ScreenLayer';
 import { useCompact } from './useCompact';
@@ -28,9 +29,11 @@ export default function AiUiOverlay() {
     // VALIDATION_FAILED do agenta: ze stanu, raz na wystąpienie problemu (review #5)
     useEffect(() => startValidationReporting(), []);
     useClientAnnouncements(); // P0.5: komunikaty klienta dla czytników ekranu (bez przenoszenia fokusu)
+    const root = useRef<HTMLDivElement>(null);
+    useFocusRescue(root); // P0.5: fokus znikającego elementu trafia na bezpieczny cel, nie na <body>
 
     return (
-        <div className="pointer-events-none absolute inset-0 z-20">
+        <div ref={root} className="pointer-events-none absolute inset-0 z-20">
             <NarrationRegion />
             <ClientRegions />
             <WorkspaceLayer compact={compact} />

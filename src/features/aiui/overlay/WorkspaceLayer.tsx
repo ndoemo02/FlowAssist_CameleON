@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useCallback, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useAiUi } from '../store';
 import { FOCUS_ANGLE, slotVisibility } from '../slots';
@@ -43,7 +43,9 @@ export default function WorkspaceLayer({ compact }: { compact: boolean }) {
         <section
             ref={section}
             aria-label="Stół roboczy"
-            className="absolute inset-x-0 transition-opacity duration-200"
+            data-focus-layer="table"
+            tabIndex={-1} // bezpieczny cel fokusu (tylko programowo, P0.5)
+            className="absolute inset-x-0 outline-none transition-opacity duration-200"
             style={{
                 top: zones.top, bottom: zones.panel, opacity: visibility,
                 visibility: visibility === 0 ? 'hidden' : 'visible',
@@ -74,6 +76,9 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
     const card = useRef<HTMLDivElement>(null);
     const menuButton = useRef<HTMLButtonElement>(null);
     const [menu, setMenu] = useState(false);
+    // ważność właściciela (P0.5): menu zamyka się, gdy stół przestaje być aktywny (visibility ≤ 0.6)
+    const tableActive = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.back) > 0.6);
+    useEffect(() => { if (!tableActive) setMenu(false); }, [tableActive]);
     // Escape zamyka menu i oddaje fokus „⋯” (albo karcie, gdy menu otwarto prawym klikiem i „⋯” nie ma) — P0.5
     const closeMenu = () => {
         setMenu(false);

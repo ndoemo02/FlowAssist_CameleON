@@ -39,6 +39,7 @@ export default function HudLayer({ compact }: { compact: boolean }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
                     aria-label="Decyzja"
+                    data-focus-layer="hud"
                     onKeyDown={(e) => { if (e.key === 'Escape' && expanded) { e.stopPropagation(); collapse(); } }}
                     className="pointer-events-auto absolute inset-x-0 z-30 flex justify-center px-3"
                     style={{ bottom: zones.caption + (compact ? 56 : 72) }}

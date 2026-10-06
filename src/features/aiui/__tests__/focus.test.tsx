@@ -226,3 +226,118 @@ describe('szuflada tasków', () => {
         }
     });
 });
+
+// Krok 4: ważność właściciela menu i bezpieczny cel fokusu (plan v1.3.2 P0.5, R7).
+const flush = () => act(async () => { await Promise.resolve(); await Promise.resolve(); });
+const tableLayer = (r: Rendered) => r.container.querySelector<HTMLElement>('[data-focus-layer="table"]')!;
+
+describe('menu zamyka się, gdy jego warstwa przestaje być aktywna', () => {
+    it('karta: obrót kamery z Back na Front zamyka menu akcji', () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => useAiUi.getState().layoutCommand({ type: 'focus', id: 'm' }));
+        click(button(article(r), 'Akcje'));
+        expect(button(article(r), 'Pogłęb')).toBeTruthy();
+        act(() => useAiUi.getState().setAngle(0, 'manual'));
+        expect(button(article(r), 'Pogłęb')).toBeUndefined();
+    });
+
+    it('panel ekranu: nieaktywna kotwica zamyka menu akcji', () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        act(() => useAiUi.getState().layoutCommand({ type: 'toScreen', id: 'm' }));
+        anchorActive();
+        click(button(screen(r), 'Akcje'));
+        expect(button(screen(r), 'Pogłęb')).toBeTruthy();
+        act(() => publishAnchor({ mode: 'anchor', active: false, reason: 'angle', outer: null, inner: null, panel: { x: 0, y: 0, w: 600, h: 300 },
+            coverage: 0.5, visibleFraction: 0.5, angleDeg: 40, pointCount: 0, computeMs: 0 } as unknown as AnchorState));
+        expect(button(screen(r), 'Pogłęb')).toBeUndefined();
+    });
+
+    it('restart przebiegu zamyka menu (karty i panel znikają) bez błędu', () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => useAiUi.getState().layoutCommand({ type: 'focus', id: 'm' }));
+        click(button(article(r), 'Akcje'));
+        startRun();
+        expect(r.container.querySelector('article')).toBeNull();
+        expect(r.escaped).toEqual([]);
+    });
+});
+
+describe('bezpieczny cel fokusu, gdy fokusowany element znika', () => {
+    it('„Ukryj” na karcie z fokusem: karta znika, fokus na kontener aktywnego stołu', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => useAiUi.getState().layoutCommand({ type: 'focus', id: 'm' }));
+        const hide = button(article(r), 'Ukryj');
+        hide.focus();
+        click(hide);
+        await flush();
+        expect(article(r)).toBeNull();
+        expect(document.activeElement).toBe(tableLayer(r));
+    });
+
+    it('agent usuwa element z Workspace.children, gdy fokus jest w jego karcie → kontener stołu', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        // drugi element zostaje, więc stół (bezpieczny cel) nadal istnieje; pusty stół WorkspaceLayer odmontowuje
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [
+            { id: 'root', component: 'Workspace', children: ['m', 'n'] },
+            { id: 'n', component: 'WorkspaceItem', kind: 'chart', title: 'Inne', representations: ['chart2d'], content: { path: '/items/m' }, presentation: 'card' },
+        ] } });
+        toBack();
+        article(r).focus();
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: ['n'] }] } });
+        await flush();
+        expect(article(r)).toBeNull();
+        expect(document.activeElement).toBe(tableLayer(r));
+    });
+
+    it('stół staje się nieaktywny (obrót na Front) z fokusem na karcie → pasek decyzji HUD', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        decision();
+        toBack();
+        article(r).focus();
+        act(() => useAiUi.getState().setAngle(0, 'manual'));
+        await flush();
+        expect(document.activeElement).toBe(button(r.container, 'Szczegóły'));
+    });
+
+    it('decyzja znika z fokusem na „Zatwierdź” → kontener aktywnego stołu', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        decision();
+        toBack();
+        click(button(r.container, 'Szczegóły'));
+        const approve = button(r.container, 'Zatwierdź');
+        approve.focus();
+        agent({ version: V, deleteSurface: { surfaceId: 'hud' } });
+        await flush();
+        expect(document.activeElement).toBe(tableLayer(r));
+    });
+
+    it('fokus zdjęty przez użytkownika (body) nie wraca sam przy późniejszych zmianach', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        article(r).focus();
+        act(() => article(r).blur()); // np. klik w scenę 3D
+        await flush();
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: [] }] } });
+        await flush();
+        expect(document.activeElement).toBe(document.body);
+    });
+});

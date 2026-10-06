@@ -75,3 +75,18 @@ test('HUD: decyzja widoczna niezależnie od kąta kamery', async ({ page }) => {
         await expect(hud).toContainText('Pilotaż');
     }
 });
+
+// P0.5 krok 4: fokus znikającego elementu trafia na bezpieczny cel (kontener aktywnej warstwy), nie na <body>.
+test('„Ukryj” z klawiatury na karcie z focusem: fokus na kontenerze stołu (Chromium, MutationObserver)', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'klawiatura i focus karty na desktopie; compact: przewijanie paska zmienia kadr');
+    await openApp(page);
+    await seedWorkspace(page);
+    await setAngle(page, BACK);
+    await layoutCommand(page, { type: 'focus', id: 'kpis' });
+    const hide = page.getByRole('article', { name: 'Element kpis' }).getByRole('button', { name: 'Ukryj' });
+    await hide.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('article', { name: 'Element kpis' })).toHaveCount(0);
+    await expect.poll(() => page.evaluate(() => (document.activeElement as HTMLElement | null)?.dataset.focusLayer ?? null)).toBe('table');
+    await expect(page.getByRole('status').filter({ hasText: 'Ukryto: Element kpis' })).toHaveCount(1);
+});

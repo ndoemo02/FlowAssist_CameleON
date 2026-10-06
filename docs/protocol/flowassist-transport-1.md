@@ -427,7 +427,8 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | resync, gdy klient trzyma niepokryty interrupt (invocation akcji padła przed `RUN_STARTED`) | `resume` z wpisem `cancelled` bez `payload` | bez zmian | `reconnecting` | — | 7.4, 7.5 |
 | `RUN_STARTED` żądanego biegu, `protocolVersion` `1.x` | potwierdza akcję i raporty | `running` | `connected` | — | 6.1, 8.2, 11.4 |
 | `RUN_STARTED` żądanego biegu bez wersji / inny major | przerwanie | `error` `profile:AGUI_VERSION` | — | — | 2.4 |
-| czysty koniec body: biegi w strumieniu, ale żaden z żądanym `runId`; bieg po żądanym (zaostrzenie profilu); niezgodny `runId` / `threadId` biegu żądanego | przerwanie, bez resync | `error` `agui:PROTOCOL_VIOLATION` | — | — | 4.8, 7.1 |
+| czysty koniec body, biegi w strumieniu, ale żaden z żądanym `runId` | bez resync | `error` `agui:PROTOCOL_VIOLATION` | — | — | 4.8, 7.1 |
+| w trakcie strumienia: bieg po żądanym (zaostrzenie profilu); niezgodny `runId` / `threadId` biegu żądanego | przerwanie, bez resync | `error` `agui:PROTOCOL_VIOLATION` | — | — | 4.8, 7.1 |
 | zerwanie połączenia przed `RUN_STARTED` biegu żądanego (np. w trakcie replayu) | resync | bez zmian | `reconnecting` | — | 4.8, 7.1 |
 | biegi replayu (inny `runId`), także ich spóźnione `RUN_ERROR` i brak wersji | pominięte w całości | — | — | — | 4.7, 6.3 |
 | `CUSTOM flowassist.frame` poprawna | round-trip → `transportDispatch` | — | — | — | 4.5, 10.9 |

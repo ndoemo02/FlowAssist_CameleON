@@ -91,6 +91,24 @@ miejscu: `contract.ts: PROTOCOL_LIMITS`, sprawdzane w `parseEvent` (przed reduce
   (2026-10-06):** zostaje ciche do P1.6; odpowiedź `VALIDATION_FAILED` na odrzucone koperty (także przekroczenie
   limitów) implementujemy dopiero w adapterze P1.6 (OBS-1, ADR 0005).
 
+## Klucze zarezerwowane (FU-4)
+
+**Decyzja (2026-10-06, właściciel):** granica protokołu odrzuca nazwy `__proto__`, `constructor`, `prototype`
+(`contract.ts: RESERVED_KEYS`), sprawdzane w `parseEvent` przed reducerem, dla każdej ścieżki wejścia:
+
+- jako **klucz własny na dowolnym poziomie ładunku** (koperta, `stage`, `narration`, propsy komponentów, wartość
+  `updateDataModel` — także głęboko w obiektach i tablicach). `JSON.parse` tworzy własne `__proto__`, które przy
+  kopiowaniu do zwykłego obiektu zmienia jego prototyp (dziedziczone pola trafiałyby do walidatorów, ADR 0007 Q3);
+- jako **wartość, która później staje się kluczem**: `id` komponentu (`reducer.ts`: `next[c.id] = c` — mapa
+  komponentów), wpis `children`, segment ścieżki data modelu.
+
+Skan jest iteracyjny (ładunki bywają bardzo głębokie — 12 000 poziomów bez przepełnienia stosu) i pomija cykle.
+Odrzucenie jest ciche, jak każda niezgodna koperta (OBS-1: odpowiedź `VALIDATION_FAILED` w adapterze P1.6); stan
+bez zmian, kolejne zdarzenia obsługiwane, `Object.prototype` nietknięty (`__tests__/reservedKeys.test.ts`).
+JSON Schema: `$defs.noReservedKeys` (rekurencyjnie `propertyNames` + `additionalProperties` + `items`), `not enum` dla
+`id` i `children`, wykluczenie segmentu w `pattern` ścieżki; parytet z guardem w `schema.test.ts`.
+Nazwy podobne (`constructorName`, `proto`, `__proto`) i wartości tekstowe `"__proto__"` są przyjmowane.
+
 ## Otwarte
 
 1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie.

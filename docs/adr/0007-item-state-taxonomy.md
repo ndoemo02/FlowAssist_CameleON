@@ -1,6 +1,6 @@
 # ADR 0007: Taksonomia stanów elementu (P0.4)
 
-- **Status:** taksonomia zaakceptowana w zakresie planu v1.3.2 (P0.4). Review Astry (2026-10-06): trzy doprecyzowania uwzględnione, ponowne sprawdzenie OK. Decyzje właściciela 2026-10-06: **ST-1 — (b), zrealizowane** (zmiana kernela w `resolveItem`); **ST-2, ST-3 — zostają**. **ST-4 — (a), decyzja właściciela 2026-10-06.** Q1–Q3 do decyzji.
+- **Status:** taksonomia zaakceptowana w zakresie planu v1.3.2 (P0.4). Review Astry (2026-10-06): trzy doprecyzowania uwzględnione, ponowne sprawdzenie OK. Decyzje właściciela 2026-10-06: **ST-1 — (b), zrealizowane** (zmiana kernela w `resolveItem`); **ST-2, ST-3 — zostają**. **ST-4 — (a), decyzja właściciela 2026-10-06.** Q1–Q3 rozstrzygnięte 2026-10-06 (niżej).
 - **Kontekst:** plan v1.3.2 (P0.4) wymaga dokumentu i testów **obecnych** stanów `WorkspaceItemView` bez zmiany kodu. Audyt chciał statusów `unsupported` i `failed`. Nowy status byłby zmianą `workspace.ts`, czyli pliku kernela (ADR 0001).
   - Taksonomię zapisano na kodzie z `33d3b06` (P0.4 bez zmian kodu). Tabela poniżej opisuje stan **po** ST-1(b); stan sprzed poprawki opisuje sekcja ST-1.
   - Testy: `src/features/aiui/__tests__/itemStates.test.ts` (dalej `itemStates`) oraz testy wskazane w tabelach.
@@ -146,12 +146,18 @@ Komponent katalogu bez widoku w slocie (`TREE_VIEWS`) resolver zwraca jako `comp
 - **Decyzja (właściciel, 2026-10-06):** (a). W v1.3 `presentation` i `priority` tylko dosłownie, bez bindingów; opisać w profilu
   transportowym przy P1.7. Kod bez zmian (binding nadal wstrzymuje gotowość i jest walidowany, układ go ignoruje).
 
-## Otwarte po review ST-1(b) (do decyzji właściciela)
+## Otwarte po review ST-1(b) — rozstrzygnięte 2026-10-06
 
 Recenzja niezależna w świeżym kontekście (2026-10-06), werdykt GO WITH FIXES; poprawki w kodzie, ADR i testach wprowadzone. Bez decyzji zostają:
 - **Q1: zawęzić `pending` do bindingów propsów z katalogu?** Dziś (jak w drzewie slotu) binding na polu spoza katalogu, np. `x` albo `source: {path: 'report.pdf'}`, wstrzymuje element; binding, którego dane nigdy nie dojdą, maskuje dosłowny błąd bez raportu. Zawężenie usuwa pierwszy przypadek (nie drugi) i łamie parytet z `resolveTree`. To nowa decyzja kernelowa.
+  **Decyzja:** bez zmiany kernela. Profil transportowy (P1.7) dopuszcza bindingi tylko w propsach katalogu; adapter
+  (P1.6) odrzuca binding w nieznanym polu z `VALIDATION_FAILED` (ścieżka OBS-1). Dane, które nigdy nie dochodzą —
+  temat lifecycle P1.6.
 - **Q2 (ST-4):** pola `hint` i `priority` widoku `ready` nie są nigdzie czytane, układ korzysta z `workspaceMeta`. Usunąć je z `WorkspaceItemView` albo oznaczyć jako nieautorytatywne, zanim ktoś zacznie ich używać (zmiana `workspace.ts`).
+  **Decyzja:** usunąć jako osobny kernel cleanup w P1.7 (razem z opisem ST-4 w profilu).
 - **Q3 (przed P1.6, istniejące wcześniej):** `resolveItem` i `resolveTree` budują propsy w zwykłym obiekcie, więc klucz `__proto__` od agenta zmienia jego prototyp (dziedziczone pola trafiają do walidatorów). Nie dotyczy `Object.prototype` (brak globalnego skażenia). Kandydat na utwardzenie granicy danych razem z adapterem: `Object.create(null)` albo odrzucenie klucza w `parseEvent`.
+  **Decyzja → FU-4, zrealizowane:** granica protokołu odrzuca zarezerwowane klucze własne `__proto__`, `constructor`,
+  `prototype` na każdym poziomie ładunku oraz te nazwy jako `id`, wpis `children` i segment ścieżki (ADR 0002).
 
 ## Poza zakresem
 

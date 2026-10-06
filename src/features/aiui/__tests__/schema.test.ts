@@ -68,6 +68,16 @@ const ENVELOPE_EDGES: unknown[] = [
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + '😀'.repeat(511), value: 1 } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/' + '😀'.repeat(512), value: 1 } },
     { version: 'v0.9.1', deleteSurface: { surfaceId: 'nieznany' } },
+    // FU-4: zarezerwowane klucze własne (JSON.parse: własne __proto__) na dowolnym poziomie, id, children, segment ścieżki
+    JSON.parse('{"version":"v0.9.1","updateDataModel":{"surfaceId":"hud","path":"/x","value":{"a":[{"__proto__":1}]}}}'),
+    JSON.parse('{"version":"v0.9.1","updateComponents":{"surfaceId":"hud","components":[{"id":"r","component":"Approval","m":{"constructor":{}}}]}}'),
+    JSON.parse('{"version":"v0.9.1","deleteSurface":{"surfaceId":"hud"},"prototype":1}'),
+    JSON.parse('{"stage":{"focus":"back","__proto__":{}}}'),
+    { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'constructor', component: 'Approval' }] } },
+    { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'r', component: 'Workspace', children: ['prototype'] }] } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a/__proto__/b', value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/constructor', value: 1 } },
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/constructorName', value: { prototypes: 1, label: '__proto__' } } },
     // OBS-4: mieszane koperty odrzucane w całości
     { stage: { drawer: 'open' }, version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } },
     { narration: { text: 'a' }, version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/x', value: 1 } },

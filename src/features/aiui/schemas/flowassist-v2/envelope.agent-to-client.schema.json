@@ -96,6 +96,11 @@
       "$ref": "#/$defs/a2ui"
     }
   },
+  "allOf": [
+    {
+      "$ref": "#/$defs/noReservedKeys"
+    }
+  ],
   "$defs": {
     "component": {
       "type": "object",
@@ -106,7 +111,15 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "minLength": 1,
+          "not": {
+            "enum": [
+              "__proto__",
+              "constructor",
+              "prototype"
+            ]
+          },
+          "description": "FU-4: id staje się kluczem mapy komponentów — nazwy zarezerwowane odrzucane"
         },
         "component": {
           "type": "string",
@@ -115,7 +128,14 @@
         "children": {
           "type": "array",
           "items": {
-            "type": "string"
+            "type": "string",
+            "not": {
+              "enum": [
+                "__proto__",
+                "constructor",
+                "prototype"
+              ]
+            }
           }
         }
       }
@@ -189,9 +209,9 @@
             },
             "path": {
               "type": "string",
-              "description": "FU-3 / ADR 0002: limit zasobów — ≤ 512 punktów kodowych Unicode (jednostka maxLength) i ≤ 32 segmenty (contract.ts: PROTOCOL_LIMITS)",
+              "description": "FU-3 / ADR 0002: limit zasobów — ≤ 512 punktów kodowych Unicode (jednostka maxLength) i ≤ 32 segmenty (contract.ts: PROTOCOL_LIMITS); FU-4: segment o nazwie zarezerwowanej odrzucany",
               "maxLength": 512,
-              "pattern": "^(/[^/]*){0,32}$"
+              "pattern": "^(?!.*/(?:__proto__|constructor|prototype)(?:/|$))(/[^/]*){0,32}$"
             },
             "value": {}
           }
@@ -234,6 +254,24 @@
           ]
         }
       ]
+    },
+    "noReservedKeys": {
+      "description": "FU-4 (contract.ts: RESERVED_KEYS): zarezerwowane klucze własne odrzucane na każdym poziomie ładunku",
+      "propertyNames": {
+        "not": {
+          "enum": [
+            "__proto__",
+            "constructor",
+            "prototype"
+          ]
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/noReservedKeys"
+      },
+      "items": {
+        "$ref": "#/$defs/noReservedKeys"
+      }
     }
   }
 }

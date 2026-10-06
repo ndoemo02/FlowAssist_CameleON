@@ -386,6 +386,11 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
     w kontrakcie (adapter / `parseEvent`) albo przepisać `setAt` iteracyjnie. **Kryterium akceptacji** (weryfikacja
     Astry, runda 2): przed podłączeniem niezaufanego transportu test, że ekstremalna ścieżka jest odrzucana
     bez zmiany stanu i bez przerwania obsługi następnych zdarzeń.
+  - ~~**FU-4 (ADR 0007 Q3)**~~ — zrealizowane: `parseEvent` odrzuca zarezerwowane klucze własne `__proto__`,
+    `constructor`, `prototype` na dowolnym poziomie ładunku oraz te nazwy jako `id`, wpis `children` i segment ścieżki
+    (ADR 0002, `contract.ts: RESERVED_KEYS`).
+- **P1.7 (następny etap):** handshake możliwości i profil transportowy; w nim opis ST-4 (`presentation`, `priority`
+  tylko dosłownie), Q1 (bindingi tylko w propsach katalogu) i kernel cleanup Q2. P1.6 dopiero po zamknięciu P1.7.
 - **P1 (warunkowo):** Radix albo React Aria, tylko jeśli po P0 natywna mechanika menu i fokusu okaże się krucha.
 - **Poza v1.3:** spike'i gestów, wykresów i tabel. Eksperymenty P2 (MCP Apps, Drei Html, graph2d, Vega-Lite, MapLibre) w v1.4.
 

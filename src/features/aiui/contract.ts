@@ -119,16 +119,43 @@ function codePointsAtMost(s: string, max: number): boolean {
     return true;
 }
 
+/**
+ * FU-4 (decyzja właściciela 2026-10-06): nazwy zarezerwowane. Klucz własny o takiej nazwie (JSON.parse tworzy
+ * własne `__proto__`) albo wartość, która później staje się kluczem obiektu (id komponentu, wpis children, segment
+ * ścieżki data modelu), mogłaby zmienić prototyp map stanu (np. `reducer.ts`: `next[c.id] = c`) albo dać walidatorom
+ * pola dziedziczone. Granica protokołu odrzuca cały komunikat — po cichu, jak OBS-1 (raport w adapterze P1.6).
+ */
+export const RESERVED_KEYS: ReadonlySet<string> = new Set(['__proto__', 'constructor', 'prototype']);
+const isReserved = (k: string) => RESERVED_KEYS.has(k);
+
+/** Zarezerwowany klucz własny gdziekolwiek w ładunku. Iteracyjnie (ładunki bywają bardzo głębokie), cykle pomijane. */
+function hasReservedKey(root: unknown): boolean {
+    const stack: unknown[] = [root];
+    const seen = new Set<object>();
+    while (stack.length) {
+        const v = stack.pop();
+        if (v === null || typeof v !== 'object' || seen.has(v)) continue;
+        seen.add(v);
+        if (Array.isArray(v)) { for (const item of v) stack.push(item); continue; }
+        for (const k of Object.keys(v)) {
+            if (isReserved(k)) return true;
+            stack.push((v as Record<string, unknown>)[k]);
+        }
+    }
+    return false;
+}
+
 /** Ścieżka data modelu w limitach: najpierw długość (ograniczona), dopiero potem segmenty krótkiego napisu. */
 const isBoundedPointer = (v: unknown): v is string =>
     isPointer(v) && codePointsAtMost(v as string, PROTOCOL_LIMITS.dataModelPathMaxLength)
-    && parsePointer(v as string).length <= PROTOCOL_LIMITS.dataModelPathMaxSegments;
+    && parsePointer(v as string).length <= PROTOCOL_LIMITS.dataModelPathMaxSegments
+    && !parsePointer(v as string).some(isReserved); // FU-4: segment staje się kluczem w data modelu
 
 const isComponent = (v: unknown): v is A2Component =>
     isObj(v) &&
-    typeof v.id === 'string' && v.id.length > 0 &&
+    typeof v.id === 'string' && v.id.length > 0 && !isReserved(v.id) && // FU-4: id staje się kluczem mapy komponentów
     typeof v.component === 'string' && v.component.length > 0 &&
-    (v.children === undefined || (Array.isArray(v.children) && v.children.every((c) => typeof c === 'string')));
+    (v.children === undefined || (Array.isArray(v.children) && v.children.every((c) => typeof c === 'string' && !isReserved(c))));
 
 const A2UI_KEYS = ['createSurface', 'updateComponents', 'updateDataModel', 'deleteSurface'] as const;
 const PAYLOAD_KEYS = ['stage', 'narration', ...A2UI_KEYS] as const;
@@ -136,6 +163,7 @@ const PAYLOAD_KEYS = ['stage', 'narration', ...A2UI_KEYS] as const;
 /** Waliduje surowy komunikat od agenta. Zwraca null dla wszystkiego, czego renderer nie obsłuży. */
 export function parseEvent(raw: unknown): AiUiEvent | null {
     if (!isObj(raw)) return null;
+    if (hasReservedKey(raw)) return null; // FU-4: zarezerwowany klucz własny na dowolnym poziomie ładunku
     // Dokładnie jeden payload: mieszana koperta (np. stage + createSurface) jest odrzucana w całości,
     // a nie częściowo konsumowana (ADR 0005, OBS-4).
     if (PAYLOAD_KEYS.filter((k) => k in raw).length !== 1) return null;

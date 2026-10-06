@@ -70,13 +70,16 @@ test.describe('ograniczony ruch (prefers-reduced-motion: reduce)', () => {
         expect(await page.evaluate(() => (window as unknown as { __aiui: AiUi }).__aiui.getState().stage.focus)).toBe(before);
     });
 
-    test('scroll do „close” → Back → Front → powrót na górę: kadr skacze (≤ 2 zmiany), kotwica aktywna', async ({ page }) => {
+    test('scroll do „close” → Back (orbita) → Front → powrót na górę: kadr skacze (≤ 2 zmiany) w obu przejściach, kotwica aktywna', async ({ page }) => {
         await openApp(page);
         await seedWorkspace(page);
         await waitScreenMeshes(page);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-        await setAngle(page, BACK);
+        await page.waitForTimeout(500); // kadr „close” ustalony
+        await startTrace(page);
+        await setAngle(page, BACK); // powrót z „close” do orbity (gałąź orbit)
+        expect(await traceChanges(page, FRAMES)).toBeLessThanOrEqual(2);
         await layoutCommand(page, { type: 'toScreen', id: 'chart' });
         await expect.poll(async () => (await camera(page)).tween, { timeout: 30_000 }).toBeNull();
         await startTrace(page);

@@ -13,6 +13,7 @@ import { resetAnnouncer } from '../overlay/announcer';
 import { publishAnchor, type AnchorState } from '../scene/anchorRegistry';
 import { clearScreenFocusIntent } from '../overlay/focusTarget';
 import { installDomStubs, render, type Rendered } from './fixtures/render';
+import { fakeTransport } from './fixtures/transport';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
 
@@ -27,7 +28,7 @@ const key = (el: Element, k: string) => act(() => { el.dispatchEvent(new Keyboar
 const click = (el: HTMLElement) => act(() => el.click());
 
 function startRun() {
-    setTransport({ start() {}, send() {}, subscribe: () => () => {}, stop() {} });
+    setTransport(fakeTransport());
     act(() => { useAiUi.getState().setSceneReady(); useAiUi.getState().startScenario('test'); });
 }
 function decision() {

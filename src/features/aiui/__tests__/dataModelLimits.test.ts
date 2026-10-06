@@ -5,6 +5,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseEvent } from '../contract';
 import { setTransport, useAiUi } from '../store';
+import { fakeTransport } from './fixtures/transport';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
 
@@ -40,7 +41,7 @@ describe('ekstremalna ścieżka przez ścieżkę transportową (kryterium akcept
     let warn: ReturnType<typeof vi.spyOn>;
     beforeEach(() => {
         warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-        setTransport({ start() {}, send() {}, subscribe: () => () => {}, stop() {} });
+        setTransport(fakeTransport());
         useAiUi.getState().setSceneReady();
         useAiUi.getState().startScenario('test');
     });

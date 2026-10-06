@@ -15,6 +15,7 @@ import SurfaceRenderer from '../SurfaceRenderer';
 import { REPRESENTATION_VIEWS, TREE_VIEWS } from '../registry';
 import { resetValidationReporting, startValidationReporting } from '../validationReporting';
 import { installDomStubs, render, type Rendered } from './fixtures/render';
+import { fakeTransport } from './fixtures/transport';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
 
@@ -54,7 +55,7 @@ beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     sent = [];
-    setTransport({ start() {}, send: (m) => { sent.push(m); }, subscribe: () => () => {}, stop() {} });
+    setTransport(fakeTransport({ send: (m) => { sent.push(m); } }));
     resetValidationReporting();
     stopReporting = startValidationReporting();
     startRun();

@@ -14,6 +14,7 @@ import AiUiOverlay from '../overlay/AiUiOverlay';
 import { userLayoutCommand } from '../overlay/userCommand';
 import { announce, resetAnnouncer } from '../overlay/announcer';
 import { installDomStubs, render, type Rendered } from './fixtures/render';
+import { fakeTransport } from './fixtures/transport';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
 
@@ -30,7 +31,7 @@ const step = () => act(async () => { await Promise.resolve(); });
 const alertRegion = (r: Rendered) => r.container.querySelector<HTMLElement>('[data-region="alert"]')!;
 
 function startRun() {
-    setTransport({ start() {}, send() {}, subscribe: () => () => {}, stop() {} });
+    setTransport(fakeTransport());
     act(() => { useAiUi.getState().setSceneReady(); useAiUi.getState().startScenario('test'); });
 }
 const chartData = { kind: 'line', series: [{ label: '2026', points: [{ x: 'Q1', y: 1 }] }] };

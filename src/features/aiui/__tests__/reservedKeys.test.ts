@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { parseEvent, RESERVED_KEYS } from '../contract';
 import { setTransport, useAiUi } from '../store';
+import { fakeTransport } from './fixtures/transport';
 
 const V = 'v0.9.1';
 const json = (s: string) => JSON.parse(s) as unknown;
@@ -77,7 +78,7 @@ describe('FU-4: klucze zarezerwowane w ładunku (zagnieżdżone)', () => {
 
 describe('FU-4: przez transportDispatch — stan bez zmian, brak skażenia prototypów, następne zdarzenie działa', () => {
     it('odrzucony ładunek nie zmienia stanu; Object.prototype nietknięty; poprawne zdarzenie po nim jest obsłużone', () => {
-        setTransport({ start() {}, send() {}, subscribe: () => () => {}, stop() {} });
+        setTransport(fakeTransport());
         const s = useAiUi.getState();
         s.setSceneReady();
         s.startScenario('test');

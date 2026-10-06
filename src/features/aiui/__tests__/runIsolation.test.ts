@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentTransport } from '../transport/types';
 import { setTransport, useAiUi } from '../store';
+import { fakeTransport } from './fixtures/transport';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
 
@@ -19,7 +20,7 @@ let onEvent: Parameters<AgentTransport['subscribe']>[0] = () => {};
 
 beforeEach(() => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    setTransport({ start() {}, send() {}, subscribe: (e) => { onEvent = e; return () => {}; }, stop() {} });
+    setTransport(fakeTransport({ subscribe: (e) => { onEvent = e; return () => {}; } }));
     st().setSceneReady();
     st().startScenario('test');
 });

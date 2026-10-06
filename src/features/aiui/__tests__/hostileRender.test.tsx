@@ -13,6 +13,7 @@ import AiUiOverlay from '../overlay/AiUiOverlay';
 import SurfaceRenderer from '../SurfaceRenderer';
 import { REPRESENTATION_VIEWS, TREE_VIEWS } from '../registry';
 import { installDomStubs, render, type Rendered } from './fixtures/render';
+import { fakeTransport } from './fixtures/transport';
 
 vi.mock('../tts', () => ({ speak: vi.fn(), stopSpeaking: vi.fn() }));
 
@@ -24,7 +25,7 @@ const mount = (el: Parameters<typeof render>[0]) => { const r = render(el); moun
 /** Aktywny przebieg (status running) z transportem zapisującym komunikaty wychodzące. */
 function startRun() {
     sent = [];
-    setTransport({ start() {}, send: (m) => { sent.push(m); }, subscribe: () => () => {}, stop() {} });
+    setTransport(fakeTransport({ send: (m) => { sent.push(m); } }));
     useAiUi.getState().setSceneReady();
     useAiUi.getState().startScenario('test');
 }

@@ -74,6 +74,12 @@ describe('dokument profilu: przykłady i reguły maszynowe', () => {
         expect(kinds.additionalProperties.items.not.enum).toEqual(RULES.reservedKeys);
     });
 
+    it('D14: sieć nigdy nie kończy przebiegu — brak kodów błędu sieciowego w statusach', () => {
+        const all = [...RULES.codes.runErrors, ...RULES.codes.runErrorPrefixes] as string[];
+        expect(all.filter((c) => /NETWORK|CONNECTION|HTTP_|TIMEOUT/.test(c))).toEqual([]);
+        expect(RULES.codes.runErrors).toContain('transport:INPUT_REJECTED'); // odrzucenie treści to nie sieć
+    });
+
     it('reguły już obecne w kodzie mają te same wartości w dokumencie (pełny parytet: następny commit)', () => {
         expect(RULES.envelope).toEqual({ send: PROFILE_RULES.envelope.send, accept: [...PROFILE_RULES.envelope.accept] });
         expect(RULES.presentations).toEqual([...PROFILE_RULES.presentations]);
@@ -193,12 +199,17 @@ describe('schemat interruptu awaiting_action i odpowiedzi', () => {
     const action = buildAction('approve', 'hud', 'approval', { itemId: 'c1', workspace: { screen: null, focus: null, dismissed: [] } });
     const actionBody = 'action' in action ? action.action : null;
 
-    it('wpis resume z kopertą A2UI action zbudowaną przez klienta', () => {
+    it('wpis resume z kopertą A2UI action zbudowaną przez klienta (bieg akcji)', () => {
         expect(resumeEntry({ interruptId: 'int-1', status: 'resolved', payload: action }), errors(resumeEntry)).toBe(true);
     });
 
+    it('porzucenie niepokrytego interruptu w resync: cancelled bez payload (§7.2)', () => {
+        expect(resumeEntry({ interruptId: 'int-1', status: 'cancelled' }), errors(resumeEntry)).toBe(true);
+    });
+
     it.each([
-        ['status cancelled (profil/1 zawsze odpowiada akcją)', { interruptId: 'i', status: 'cancelled', payload: action }],
+        ['cancelled z akcją (porzucenie nie niesie akcji — brak replay, §8.4)', { interruptId: 'i', status: 'cancelled', payload: action }],
+        ['cancelled bez interruptId', { status: 'cancelled' }],
         ['brak payload', { interruptId: 'i', status: 'resolved' }],
         ['payload z raportem zamiast akcji', { interruptId: 'i', status: 'resolved', payload: buildError({ code: 'SURFACE_NOT_FOUND', surfaceId: 'hud', message: 'm' }) }],
         ['payload w kształcie middleware (a2uiAction.userAction)', { interruptId: 'i', status: 'resolved', payload: { a2uiAction: { userAction: actionBody } } }],

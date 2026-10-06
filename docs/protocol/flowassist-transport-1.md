@@ -93,7 +93,7 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   | `messages` | historia utrzymywana przez klienta AG-UI (wiadomości `activity` usunięte). Bieg startu: jedna wiadomość `user` z `prompt`, a bez niego z identyfikatorem scenariusza |
   | `tools`, `context`, `state`, `parentRunId` | NIE WOLNO ich wysyłać. Profil/1 nie oferuje narzędzi frontendu, nie wstrzykuje katalogu (I10) i nie używa stanu współdzielonego |
   | `forwardedProps.flowassist` | `{ profile, capabilities, scenario?, resync?, a2uiErrors?, diagnostics? }`. Pola: `capabilities` = snapshot przebiegu, w **każdym** biegu; `scenario` tylko w biegu startu; `resync` tylko w biegu resync (§7.2); `a2uiErrors` i `diagnostics` według §11.4 |
-  | `resume` | tylko w biegu akcji (§8.1) |
+  | `resume` | w biegu akcji: odpowiedź na interrupt (§8.1). W biegu resync: wyłącznie porzucenie niepokrytego interruptu (§7.2) |
 
 - **4.5 Ramka agent → klient** [agent; P1.6] (schemat `frame.schema.json`):
   ```json
@@ -160,13 +160,25 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
 ## 7. Połączenie, resync i stan `offline` (D14)
 
 - **7.1 Stan połączenia** (`connected` | `reconnecting` | `offline`) to oś **niezależna** od `RunStatus` [P1.6].
-  - Ucięcie biegu w `running` (przed zdarzeniem terminalnym) daje `reconnecting`.
-  - Tak samo ucięcie biegu akcji albo błąd sieci lub `5xx` przed odpowiedzią dla biegu akcji albo resync.
-  - Status przebiegu się nie zmienia.
+  Do `reconnecting` prowadzi **przyczyna sieciowa** w dowolnym biegu przebiegu, także w biegu startu:
+  - ucięcie biegu przed jego zdarzeniem terminalnym;
+  - błąd sieci przed odpowiedzią;
+  - odpowiedź `5xx`, `408` albo `429`, czyli błąd przejściowy serwera albo pośrednika.
+
+  Status przebiegu się nie zmienia (w biegu startu zostaje `running` ustawione przez `startScenario`).
 - **7.2 Bieg resync** [P1.6]:
   - ten sam `threadId`, nowy `runId`;
   - `forwardedProps.flowassist.resync = { surfaces: [<surfaceId trzymane przez klienta>] }`;
-  - **bez** `resume` i bez akcji;
+  - `forwardedProps.flowassist.scenario`: tylko gdy przebieg **nie widział jeszcze żadnego `RUN_STARTED`**, czyli start
+    niepotwierdzony. Resync zastępuje wtedy start (§7.7);
+  - akcji nie niesie nigdy (§8.4);
+  - `resume`: jeśli klient trzyma otwarty interrupt, którego nie pokrył żaden bieg potwierdzony `RUN_STARTED`
+    (typowo POST biegu akcji zawiódł przed `RUN_STARTED`), resync **MUSI** go pokryć wpisem
+    `{ interruptId, status: "cancelled" }` bez `payload`.
+    - To porzucenie wymagane regułą pokrycia AG-UI (konsument nie może po cichu pominąć otwartego interruptu), a nie
+      ponowienie akcji. W pozostałych przypadkach `resume` jest nieobecne;
+    - bieg akcji, który dostał `RUN_STARTED`, pokrył interrupt, więc po jego ucięciu klient nie trzyma otwartego
+      interruptu;
   - niesie raporty i diagnostykę według §11.4.
 - **7.3 Próby:**
   - po 1 s, 2 s i 4 s od ucięcia albo od poprzedniej nieudanej próby;
@@ -183,13 +195,25 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - dla swojego surface'u, którego klient nie trzyma: `createSurface` + to samo;
   - dla surface'u trzymanego przez klienta, którego agent już nie ma: `deleteSurface`;
   - na końcu `stage` (bieżące) i `narration` (bieżący tekst albo `null`, `speak: false`);
-  - bieg kończy bieżącym wynikiem lifecycle (§6). Otwarty interrupt podnosi ponownie (AG-UI dopuszcza to przy niepokrytym interrupcie).
+  - bieg kończy bieżącym wynikiem lifecycle (§6). Otwarty interrupt podnosi ponownie (AG-UI dopuszcza to przy niepokrytym interrupcie);
+  - wpis `resume` ze `status: "cancelled"` dla interruptu `flowassist.awaiting_action` oznacza „decyzja nie zapadła”,
+    a nie odrzucenie decyzji. Agent NIE MOŻE z tego powodu odrzucić wejścia ani uznać decyzji za podjętą. MUSI ponownie
+    podnieść interrupt, jeśli nadal czeka;
+  - wpis dotyczący interruptu, którego agent już nie ma (akcja jednak dotarła), to w AG-UI „nierozpoznany wpis”:
+    agent kontynuuje i ostrzega;
+  - resync z `scenario` dla wątku, którego agent nie zna (start nie dotarł), agent traktuje jak bieg startu tego
+    scenariusza. Dla znanego wątku `scenario` ignoruje i odtwarza stan.
 - **7.6** Resync **nie resetuje układu**: dla trzymanych surface'ów nie ma `deleteSurface`, a członkostwo wynika z `children` (P6). Komponenty, które agent porzucił, zostają w mapie, ale nie są członkami.
-- **7.7 Pierwszy bieg przebiegu** (start) [P1.6]:
-  - odpowiedź inna niż `200` daje `error` `transport:HTTP_<status>`;
-  - błąd sieci przed odpowiedzią daje `error` `transport:NETWORK`;
-  - bez resync, bo nie ma czego odtwarzać.
-- **7.8** Odpowiedź `4xx` na bieg akcji albo resync oznacza odrzucone wejście: `error` `transport:INPUT_REJECTED` [P1.6].
+- **7.7 Bieg startu** [P1.6] podlega tym samym regułom sieci co każdy bieg (D14).
+  - Przyczyna sieciowa (§7.1) uruchamia serię resync z `scenario` i `surfaces: []`. POST mógł dotrzeć do agenta, a §7.5
+    rozstrzyga oba przypadki bez podwójnego startu scenariusza.
+  - Seria może się skończyć stanem `offline` z przebiegiem wznawialnym (§7.3). **Terminalnego `error` z powodu sieci
+    nie ma także dla startu.**
+- **7.8 Wejście odrzucone** [P1.6]:
+  - odpowiedź `4xx` (poza `408` i `429`) na dowolny bieg, także start, daje `error` `transport:INPUT_REJECTED`. To
+    odrzucenie treści albo uprawnień, a nie sieć;
+  - inna odpowiedź niż `200` ze strumieniem `text/event-stream`, spoza §7.1 i `4xx` (np. `204`, `3xx` po
+    przekierowaniach, `200` bez SSE), daje `error` `agui:PROTOCOL_VIOLATION`.
 
 ## 8. Akcje semantyczne (I9, D12)
 
@@ -208,7 +232,8 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - po `done`, `error`, `cancelled` albo `stop` przepada z komunikatem.
 - **8.4 Brak replay** [P1.6]: profil/1 nie klasyfikuje idempotencji, więc każda akcja jest nieidempotentna, a **wysłana** akcja nigdy nie jest ponawiana automatycznie.
   - Akcja jest „wysłana” od chwili wysłania żądania HTTP z jej `resume`.
-  - Ucięcie albo błąd sieci po tej chwili oznacza, że akcja **mogła** dotrzeć. Klient ogłasza „akcja mogła nie dotrzeć” i przechodzi do resync, który akcji nie niesie.
+  - Ucięcie albo błąd sieci po tej chwili oznacza, że akcja **mogła** dotrzeć. Klient ogłasza „akcja mogła nie dotrzeć” i przechodzi do resync, który akcji nie niesie. Jeśli bieg akcji nie dostał
+    `RUN_STARTED`, resync porzuca jej interrupt wpisem `cancelled` (§7.2), a agent podnosi go ponownie (§7.5).
   - Odtworzony stan pokazuje skutek, a użytkownik może kliknąć ponownie.
   - Oczekująca akcja (§8.3) nie była wysłana, więc jej późniejsze wysłanie nie jest ponowieniem.
 
@@ -278,9 +303,9 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
     - `profile:FRAME_INVALID`, `profile:FRAME_SEQUENCE`, `profile:EVENT_TOO_LARGE`, `profile:AGUI_VERSION`, `profile:UNSUPPORTED_INTERRUPTS`, `profile:UNEXPECTED_TOOL_CALLS`;
     - `agui:PROTOCOL_VIOLATION`;
     - `agent:<kod>`;
-    - `transport:HTTP_<status>`, `transport:NETWORK` (tylko bieg startu), `transport:INPUT_REJECTED`.
+    - `transport:INPUT_REJECTED`.
 
-  Sieć nie kończy przebiegu (§7.3).
+  Sieć nie kończy przebiegu (§7.1–§7.3, §7.7). Kodów błędu sieciowego nie ma.
 - **11.3 `path`** to wskaźnik JSON (RFC 6901) z segmentami opartymi na `id`, nigdy na indeksie. Rodzinę wyznacza pierwszy segment:
   - **wiadomość odrzucona na granicy** — klucz payloadu: `/version`, `/createSurface/catalogId`, `/updateComponents/components/{id}/children`, `/updateDataModel/path`;
   - **problem stanu po przyjęciu** — `/components/{id}{wskaźnik propsa}` [kod: `workspace.ts`, `resolveTree.ts`] oraz `/dataModel{path}`.
@@ -314,7 +339,8 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 4. Czekając na użytkownika, kończy bieg interruptem `flowassist.awaiting_action`. Zawsze dokładnie jednym, bez `expiresAt` (§6).
 5. Kończy przebieg wynikiem `success`, a przerwanie z własnej woli zgłasza wynikiem `cancelled`. Nie wywołuje narzędzi frontendu (§6.1).
 6. Akcję czyta z `resume[0].payload` (koperta A2UI `action`) i nie zakłada jej ponowienia (§8).
-7. W biegu resync odtwarza pełny stan bez `createSurface` dla surface'ów klienta (§7.5).
+7. W biegu resync odtwarza pełny stan bez `createSurface` dla surface'ów klienta. Porzucony interrupt traktuje jako
+   „decyzja nie zapadła” i podnosi go ponownie, a resync z `scenario` dla nieznanego wątku traktuje jak start (§7.5).
 8. Nie używa katalogów inline, `context`, `tools` ani `state`. `id` nie zawiera `/` ani `~`, a dane nie zawierają kluczy zarezerwowanych (§10).
 9. `narration` traktuje jako dyrektywę prezentacji. Wypowiedź do historii emituje dodatkowo jako `TEXT_MESSAGE_*` (§9.2).
 10. Czyta raporty klienta z `forwardedProps.flowassist.a2uiErrors` i `diagnostics` (§11.4).
@@ -324,9 +350,10 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | Wejście | Reakcja | Status CameleON | Połączenie | Raport | § |
 |---|---|---|---|---|---|
 | `start`, negocjacja nieudana | brak żądania HTTP | `error` `negotiation:*` | — | — | 3.4 |
-| POST startu ≠ 200 / błąd sieci | — | `error` `transport:HTTP_n` / `NETWORK` | — | — | 7.7 |
-| POST akcji/resync: 4xx | — | `error` `transport:INPUT_REJECTED` | — | — | 7.8 |
-| POST akcji/resync: sieć / 5xx | resync | bez zmian | `reconnecting` | — | 7.1 |
+| POST dowolnego biegu: sieć / `5xx` / `408` / `429` | resync (start: z `scenario`, `surfaces: []`) | bez zmian | `reconnecting` | — | 7.1, 7.7 |
+| POST dowolnego biegu: `4xx` (poza `408`, `429`) | — | `error` `transport:INPUT_REJECTED` | — | — | 7.8 |
+| POST: odpowiedź inna niż `200` + SSE (`204`, `3xx`, `200` bez SSE) | przerwanie | `error` `agui:PROTOCOL_VIOLATION` | — | — | 7.8 |
+| resync, gdy klient trzyma niepokryty interrupt (POST akcji padł przed `RUN_STARTED`) | `resume` z wpisem `cancelled` bez `payload` | bez zmian | `reconnecting` | — | 7.2, 7.5 |
 | `RUN_STARTED` żądanego biegu, major 1 | potwierdza akcję i raporty | `running` | `connected` | — | 6.1, 8.2, 11.4 |
 | `RUN_STARTED` bez wersji / inny major | przerwanie | `error` `profile:AGUI_VERSION` | — | — | 2.4 |
 | biegi replayu (inny `runId`) | pominięte w całości | — | — | — | 4.7 |
@@ -395,9 +422,10 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Test parytetu por�
     "runErrors": [
       "profile:FRAME_INVALID", "profile:FRAME_SEQUENCE", "profile:EVENT_TOO_LARGE", "profile:AGUI_VERSION",
       "profile:UNSUPPORTED_INTERRUPTS", "profile:UNEXPECTED_TOOL_CALLS", "agui:PROTOCOL_VIOLATION",
-      "transport:NETWORK", "transport:INPUT_REJECTED"
+      "transport:INPUT_REJECTED"
     ],
-    "runErrorPrefixes": ["negotiation:", "agent:", "transport:HTTP_"]
+    "runErrorPrefixes": ["negotiation:", "agent:"],
+    "transientHttpStatus": [408, 429, "5xx"]
   }
 }
 ```
@@ -416,7 +444,8 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Test parytetu por�
 | D11 | `RUN_FINISHED cancelled` → nowy terminalny `RunStatus 'cancelled'` (P1.6, zmiana kernela zatwierdzona) | §6.1 |
 | D12 | najwyżej jedna oczekująca akcja; kolejne odrzucane lokalnie; brak replay (właściciel) | §8.3–8.4 |
 | D13 | raporty doklejane do następnego biegu (zmienia przypadek 2 testu zgodności i mock w P1.6) | §11.4 |
-| D14 | resync 1/2/4 s; potem `offline`, przebieg wznawialny, bez `error` z sieci (właściciel) | §7 |
+| D14 | resync 1/2/4 s; potem `offline`, przebieg wznawialny, bez `error` z sieci — także dla biegu startu (właściciel) | §7 |
+| — | reguła pochodna (D10 + D14 + pokrycie interruptów AG-UI): resync porzuca niepokryty interrupt wpisem `cancelled`; start niepotwierdzony = resync ze `scenario` | §7.2, §7.5, §7.7 |
 | D15 | limity 1 MiB / 256 KiB | §10.8 |
 | D16 | tablice: indeks ≤ długość, usuwanie zachowuje długość | §10.7 |
 | D17 | obiekty zamknięte (koperty A2UI, `stage`, `narration`) | §9.3, §10.1 |

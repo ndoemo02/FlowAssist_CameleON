@@ -325,7 +325,8 @@ Po każdym kroku: opis tego, co widać, PASS lub FAIL, a przy FAIL dokładny opi
 
 ## Aktualne priorytety
 
-v1.3 — wydanie utwardzające i adapterowe. Kernel CameleONa (inwarianty I1–I10) bez zmian.
+v1.3 — wydanie utwardzające i adapterowe. Inwarianty kernela I1–I10 zamrożone; zmiany kernela tylko za jawną zgodą
+właściciela, zapisane w ADR 0001.
 Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
 
 - **P0 (hardening, start od razu):**

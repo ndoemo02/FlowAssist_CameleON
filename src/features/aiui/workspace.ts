@@ -45,12 +45,21 @@ export function resolveItem(surface: Surface, id: string): WorkspaceItemView {
         return { status: 'fallback', id, title, reason: `oczekiwano WorkspaceItem, jest ${def.component}`, path: `/components/${id}/component` };
     }
 
+    // pending = któryś binding bez danych (jak w resolveTree); brak propsa dosłownego to błąd walidacji (ADR 0007, ST-1)
     const props: Record<string, unknown> = {};
+    let pending = false;
     for (const [k, v] of Object.entries(def)) {
         if (k === 'id' || k === 'component' || k === 'children') continue;
-        props[k] = isBinding(v) ? getAt(surface.data, v.path) : v;
+        if (isBinding(v)) {
+            // decyzja z wartości lokalnej, nie z odczytu props[k] (klucz `__proto__` od agenta) — jak w resolveTree
+            const value = getAt(surface.data, v.path);
+            if (value === undefined) pending = true;
+            props[k] = value;
+        } else {
+            props[k] = v;
+        }
     }
-    if (props.content === undefined) return { status: 'pending', id, title }; // dane jeszcze w drodze
+    if (pending) return { status: 'pending', id, title }; // dane jeszcze w drodze
 
     const problem = validateProps('WorkspaceItem', props);
     if (problem) return { status: 'fallback', id, title, reason: problem.message, path: `/components/${id}${problem.path}` };

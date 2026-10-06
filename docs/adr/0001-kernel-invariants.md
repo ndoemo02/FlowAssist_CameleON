@@ -39,6 +39,7 @@ Współrzędne, rozmiar i kolejność warstw kart nigdy nie pochodzą od agenta,
 - **Stan faktyczny:**
   - Pola układu w propsach `WorkspaceItem` (np. `x`, `y`) **nie są odrzucane, tylko strukturalnie ignorowane**: `workspace.ts: workspaceMeta` czyta wyłącznie `presentation` i `priority`, a `reconcileLayout` bierze pozycję z `autoSlot`.
   - Walidacja nie zgłasza nieznanych propsów.
+  - **Wyjątek (ST-1(b), ADR 0007):** pole spoza katalogu w kształcie bindingu `{path}` nie zmienia układu, ale wstrzymuje gotowość elementu (`pending`), dopóki pod ścieżką nie ma danych — jak każdy binding najwyższego poziomu.
 - **Granica pojęć:** `x`/`y` w treści `MapView` (`catalog.ts: views.MapView`, zakres 0..1) to **dane treści** (punkty na schemacie mapy), nie geometria układu. Są dozwolone.
 - **Testy:**
   - `layout.test.ts`: „layoutSnapshot: bez współrzędnych” (kierunek klient → agent);
@@ -51,6 +52,10 @@ Współrzędne, rozmiar i kolejność warstw kart nigdy nie pochodzą od agenta,
 - P4: hint stosowany przy zmianie wartości.
 - P5: `dismissed` nadrzędne.
 - P6: członkostwo = `Workspace.children`; niedostarczony ≠ usunięty; ponowne dodanie = nowy wpis.
+  Dostarczony `WorkspaceItem` (zły typ komponentu to fallback przed bindingami) jest `pending`, dopóki któryś jego binding
+  najwyższego poziomu nie ma danych (jak węzeł drzewa slotu); brak wymaganego propsa dosłownego, także `content`, to fallback
+  z raportem (ADR 0007, ST-1).
+  *Zmiana kernela zatwierdzona jawnie przez właściciela (ST-1(b), 2026-10-06; `workspace.ts: resolveItem`).*
 - P7: reset przy restarcie i `deleteSurface`.
 - P8: kolejność koordynatora.
 - P9: auto-layout i przeliczenie siatki dla kart nieprzesuniętych. Przeliczenie następuje przy każdej zmianie
@@ -61,7 +66,7 @@ Współrzędne, rozmiar i kolejność warstw kart nigdy nie pochodzą od agenta,
 
 **Konsekwencja P10:** rozszerzenie `catalog.ts: SUPPORTED_REPRESENTATIONS` zmienia wynik dla istniejących elementów, choć `workspace.ts` zostaje nietknięty. Patrz ADR 0002.
 - **Kod:** `layout.ts`, `workspace.ts: resolveItem`, `store.ts` (P3, P8).
-- **Testy:** `layout.test.ts` (P1, P2, P4–P7, P9), `workspace.test.ts` (P6, P10), `loop.test.ts` (P3, P7, P8).
+- **Testy:** `layout.test.ts` (P1, P2, P4–P7, P9), `workspace.test.ts` (P6, P10), `itemStates.test.ts` (P6: stany elementu, ST-1(b)), `loop.test.ts` (P3, P7, P8).
 
 ### I5: kolejność koordynatora
 Zdarzenie agenta: `parseEvent` → `reduce` → `reconcileLayout` (tylko gdy zmienił się surface `workspace`) → jeden `set()` → efekty (kamera, TTS, raport błędów).

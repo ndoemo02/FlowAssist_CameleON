@@ -386,6 +386,22 @@ describe('walidacja: odzyskanie dopiero po powrocie do ready', () => {
         mapData(true);
         expect(errorsSent()).toHaveLength(1);
     });
+
+    // ADR 0007, ST-1(b): binding propsa innego niż content bez danych to pending, które nie kończy wystąpienia
+    it('zły tytuł z bindingu → dane tytułu usunięte (pending) → ten sam zły tytuł → 1 raport', () => {
+        agent({ version: V, createSurface: { surfaceId: 'workspace', catalogId: 'flowassist/v2' } });
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [
+            { id: 'root', component: 'Workspace', children: ['m'] },
+            { id: 'm', component: 'WorkspaceItem', kind: 'map', title: { path: '/meta/title' }, representations: ['map2d'], content: { path: '/items/m' } },
+        ] } });
+        mapData(false);
+        const title = (value?: unknown) => agent({ version: V, updateDataModel: { surfaceId: 'workspace', path: '/meta/title', ...(value === undefined ? {} : { value }) } });
+        title(7);
+        expect(errorsSent()).toEqual([expect.objectContaining({ code: 'VALIDATION_FAILED', path: '/components/m/title' })]);
+        title();   // brak danych → pending
+        title(7);
+        expect(errorsSent()).toHaveLength(1);
+    });
 });
 
 /** ItemBody z bieżącym widokiem elementu (jak treść karty / panelu ekranu). */

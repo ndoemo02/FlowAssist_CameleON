@@ -34,9 +34,20 @@ export function entryProgress({ introActive, elapsed, reduced }: { introActive: 
     return reduced ? 1 : smoothstep01(elapsed / ENTRY_SECONDS);
 }
 
+/**
+ * Galaktyka w tle (StarField w page.tsx): obrót i „oddychanie” skali. Przy ograniczonym ruchu (decyzja właściciela
+ * 2026-10-06: poza overlayem tylko gwiazdy / galaktyka) — bez obrotu (`rotationY: null` = zostaw bieżący) i stała skala.
+ */
+export function galaxyPose({ t, rotationSpeed, scale, reduced }: { t: number; rotationSpeed: number; scale: number; reduced: boolean }) {
+    if (reduced) return { rotationY: null, scale };
+    return { rotationY: t * rotationSpeed, scale: scale + Math.sin(t * 0.3) * (scale * 0.05) };
+}
+
 /** Preferencja systemowa jako ref (odczyt w pętli klatek bez re-renderów); śledzi zmianę w trakcie działania. */
 export function useReducedMotionRef() {
-    const ref = useRef(false);
+    // wartość od pierwszej klatki (nie dopiero po efekcie) — inaczej element zamontowany później (np. model galaktyki)
+    // ruszy się w klatce sprzed efektu; SSR (brak window) → false, klient liczy od nowa przy montażu
+    const ref = useRef(typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(REDUCED_MOTION_QUERY).matches);
     useEffect(() => {
         const mq = window.matchMedia(REDUCED_MOTION_QUERY);
         const update = () => { ref.current = mq.matches; };

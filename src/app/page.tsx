@@ -19,7 +19,7 @@ import ScreenAnchorProbe from '@/features/aiui/scene/ScreenAnchorProbe';
 import { getScreenMeshes, onScreenMeshes, registerScreenMeshes } from '@/features/aiui/scene/anchorRegistry';
 import { dollyAlongView, focusDistance, frontDollyFactor } from '@/features/aiui/scene/frontFit';
 import { screenCenter } from '@/features/aiui/scene/screenGeometry';
-import { cameraTickSeconds, entryProgress, smoothing, useReducedMotionRef } from '@/features/aiui/motion';
+import { cameraTickSeconds, entryProgress, galaxyPose, smoothing, useReducedMotionRef } from '@/features/aiui/motion';
 import { devToolsEnabled } from '@/lib/devTools';
 
 // --- CONFIG ---
@@ -570,19 +570,26 @@ function StarField() {
     // Pass orbitEnabled state up to parent (dirty hack via window or context usually, but here we can just export a signaled atom or use a ref if we refactored.
     // FOR NOW: We will use a unique approach. We'll render a separate OrbitControls just for this mode if enabled, overriding the main one.)
 
+    // P0.6+ (decyzja właściciela 2026-10-06): przy prefers-reduced-motion galaktyka stoi (bez obrotu i „oddychania”)
+    const reducedMotion = useReducedMotionRef();
+
     useFrame((state) => {
         const t = state.clock.getElapsedTime();
 
         if (!manualMode && !blockRotation) {
-            galaxy.rotation.y = t * rotationSpeed;
-
-            // SUBTELNY RUCH "ODDYCHANIA" (PRZYBLIŻANIE/ODDALANIE)
-            // Sprawia, że gwiazdy nie są zbyt blisko ani zbyt daleko w jednym momencie
-            const pulse = scale + Math.sin(t * 0.3) * (scale * 0.05);
-            galaxy.scale.set(pulse, pulse, pulse);
+            // obrót + SUBTELNY RUCH "ODDYCHANIA" (PRZYBLIŻANIE/ODDALANIE): gwiazdy nie są zbyt blisko ani zbyt daleko naraz
+            const pose = galaxyPose({ t, rotationSpeed, scale, reduced: reducedMotion.current });
+            if (pose.rotationY !== null) galaxy.rotation.y = pose.rotationY;
+            galaxy.scale.set(pose.scale, pose.scale, pose.scale);
         } else {
             // W trybie edycji trzymamy stałą skalę
             galaxy.scale.set(scale, scale, scale);
+        }
+
+        // e2e: ślad pozy galaktyki na żądanie testu — tylko poza produkcją
+        if (process.env.NODE_ENV !== 'production') {
+            const trace = (window as unknown as { __galaxyTrace?: number[][] }).__galaxyTrace;
+            if (trace) trace.push([galaxy.rotation.y, galaxy.scale.x]);
         }
 
         // Update opacity if materials support it
@@ -831,6 +838,9 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
     const cinematicTargetRef = useRef(new THREE.Vector3());
     // P0.6: prefers-reduced-motion — każda gałąź kamery od razu w stanie końcowym (bez wygładzania)
     const reducedMotion = useReducedMotionRef();
+    // e2e (P0.6): poza docelowa gałęzi kamery w tej klatce — test porównuje ją z pozą faktyczną (tylko ślad testu)
+    const intendedRef = useRef<{ pos: THREE.Vector3; target: THREE.Vector3; fov: number } | null>(null);
+    const orbitGoalRef = useRef(new THREE.Vector3());
 
     // === DEVELOPER PANEL ===
     const { freeCamera, controlMode, precision, rotateSpeed, panSpeed, moveSpeed } = useControls('Director Camera', {
@@ -994,6 +1004,7 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
         // Kąt orbity z warstwy AI-to-UI (suwak 360° lub director); odczyt bez subskrypcji Reacta.
         // ograniczony ruch: cały czas tweenu w jednej klatce (kąt i źródło director bez zmian — P3, kernel nietknięty)
         const reduced = reducedMotion.current;
+        intendedRef.current = null;
         useAiUi.getState().tickCamera(cameraTickSeconds(delta, reduced));
         const orbitAngle = useAiUi.getState().camera.angle;
 
@@ -1044,11 +1055,13 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
 
             camera.position.lerp(cinematicPosRef.current, smoothing(delta, 4.8, reduced));
             controlsRef.current.target.lerp(cinematicTargetRef.current, smoothing(delta, 5.8, reduced));
+            const fovGoal = THREE.MathUtils.lerp(cueSet.wide.fov, cueSet.close.fov, scrollProgress);
             (camera as THREE.PerspectiveCamera).fov = THREE.MathUtils.lerp(
                 (camera as THREE.PerspectiveCamera).fov,
-                THREE.MathUtils.lerp(cueSet.wide.fov, cueSet.close.fov, scrollProgress),
+                fovGoal,
                 smoothing(delta, 4.2, reduced)
             );
+            intendedRef.current = { pos: cinematicPosRef.current, target: cinematicTargetRef.current, fov: fovGoal };
             (camera as THREE.PerspectiveCamera).updateProjectionMatrix();
             controlsRef.current.update();
         }
@@ -1065,6 +1078,10 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
             controlsRef.current.target.copy(newTarget);
             camera.lookAt(newTarget);
             controlsRef.current.update();
+            intendedRef.current = {
+                pos: initialPos, target: orbitGoalRef.current.addVectors(initialPos, rotatedViewDir),
+                fov: (camera as THREE.PerspectiveCamera).fov,
+            };
         }
 
         // e2e (P0.6): ślad pozy kamery (pozycja, target, FOV) na żądanie testu — tylko poza produkcją.
@@ -1072,8 +1089,10 @@ function CameraSetup({ setupData, controlsRef, introActive }: {
         if (process.env.NODE_ENV !== 'production') {
             const trace = (window as unknown as { __cameraTrace?: number[][] }).__cameraTrace;
             if (trace && controlsRef.current) {
-                const t = controlsRef.current.target, c = camera as THREE.PerspectiveCamera;
-                trace.push([c.position.x, c.position.y, c.position.z, t.x, t.y, t.z, c.fov]);
+                const t = controlsRef.current.target, c = camera as THREE.PerspectiveCamera, g = intendedRef.current;
+                // [pozycja, target, FOV] faktyczne + (gdy gałąź znana) docelowe tej klatki
+                trace.push([c.position.x, c.position.y, c.position.z, t.x, t.y, t.z, c.fov,
+                    ...(g ? [g.pos.x, g.pos.y, g.pos.z, g.target.x, g.target.y, g.target.z, g.fov] : [])]);
             }
         }
 

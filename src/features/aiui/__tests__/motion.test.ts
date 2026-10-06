@@ -2,7 +2,7 @@
 // Kąt i źródło `director` zachowują semantykę P3 (kernel store.ts bez zmian: page.tsx podaje tickCamera cały czas tweenu).
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { cameraTickSeconds, entryProgress, smoothing } from '../motion';
+import { cameraTickSeconds, entryProgress, galaxyPose, smoothing } from '../motion';
 import { TWEEN_SECONDS, useAiUi } from '../store';
 import { FOCUS_ANGLE } from '../slots';
 
@@ -51,5 +51,21 @@ describe('ograniczony ruch a semantyka P3 (kernel bez zmian)', () => {
         expect(tween).not.toBeNull();
         expect(angle).toBeGreaterThan(0);
         expect(angle).toBeLessThan(FOCUS_ANGLE.back);
+    });
+});
+
+// Decyzja właściciela 2026-10-06: poza overlayem przy ograniczonym ruchu wyłączamy tylko ruch galaktyki (gwiazdy);
+// napis z cząstek, intro powitalne i inne elementy — później.
+describe('galaktyka w tle (StarField)', () => {
+    it('zwykły ruch: obrót rośnie z czasem, skala „oddycha” wokół wartości bazowej', () => {
+        const a = galaxyPose({ t: 1, rotationSpeed: 0.01, scale: 65, reduced: false });
+        const b = galaxyPose({ t: 5, rotationSpeed: 0.01, scale: 65, reduced: false });
+        expect(a.rotationY).toBeCloseTo(0.01, 12);
+        expect(b.rotationY).toBeCloseTo(0.05, 12);
+        expect(a.scale).not.toBe(65);
+    });
+
+    it('ograniczony ruch: bez obrotu (null = zostaw bieżący) i stała skala bazowa', () => {
+        expect(galaxyPose({ t: 5, rotationSpeed: 0.01, scale: 65, reduced: true })).toEqual({ rotationY: null, scale: 65 });
     });
 });

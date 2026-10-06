@@ -1,13 +1,18 @@
 // P0.6 (plan v1.3.2, R5): ograniczony ruch. Każda gałąź kamery osiąga stan końcowy bez wygładzania; kąt i źródło
 // `director` zachowują semantykę P3 (także okres łaski ręcznego suwaka), `stage` nie jest przepisywane; po przejściu
 // rzeczywiście aktywuje się ScreenAnchor (nie tylko camera.angle).
-// Kadr mierzymy śladem pozy kamery (dev-hook `window.__cameraTrace` w page.tsx: pozycja, target, FOV na klatkę).
-// Test kontrolny bez ograniczonego ruchu dowodzi, że pomiar wykrywa wygładzanie.
+// Pomiar (review Astry P0.6): dev-hook `window.__cameraTrace` w page.tsx zapisuje w każdej klatce pozę faktyczną
+// (pozycja, target, FOV) i pozę DOCELOWĄ bieżącej gałęzi (cinematic: intro/wide/close ze scrolla; orbit: wide obrócone).
+// „Stan końcowy od razu” = w każdej klatce poza faktyczna = docelowa; przejście dodatkowo musi zmienić kadr (próbka
+// sprzed bodźca jest gwarantowana). Poza docelowa zależy od dopasowania Frontu do ekranu (meshe rejestrują się
+// asynchronicznie), więc porównanie w tej samej klatce jest odporne na ten czas. Test kontrolny bez ograniczonego ruchu
+// dowodzi, że pomiar wykrywa wygładzanie.
 import { expect, test, type Page } from '@playwright/test';
 import { BACK, anchorState, dispatch, layoutCommand, openApp, seedWorkspace, setAngle, waitScreenMeshes } from './helpers';
 
 type Cam = { angle: number; source: string; tween: unknown };
 type AiUi = { getState(): { camera: Cam; stage: { focus: string } }; subscribe(fn: (s: { camera: Cam }, p: { camera: Cam }) => void): () => void };
+type Sample = number[]; // [pozycja(3), target(3), fov] + opcjonalnie [docelowe: pozycja(3), target(3), fov]
 const camera = (page: Page) => page.evaluate(() => (window as unknown as { __aiui: AiUi }).__aiui.getState().camera);
 const near = (a: number, b: number) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < 1e-6;
 
@@ -21,24 +26,45 @@ async function recordAngles(page: Page) {
 }
 const angles = (page: Page) => page.evaluate(() => (window as unknown as { __angles: number[] }).__angles);
 
-/** Ślad pozy kamery: start, potem `frames` klatek; zwraca liczbę zmian kadru między kolejnymi klatkami. */
+const FRAMES = 10;
+const traceLength = (page: Page) => page.evaluate(() => (window as unknown as { __cameraTrace: number[][] }).__cameraTrace.length);
+/** Start śladu i co najmniej 2 klatki przed bodźcem (próbka „przed” jest gwarantowana). */
 async function startTrace(page: Page) {
     await page.evaluate(() => { (window as unknown as { __cameraTrace: number[][] }).__cameraTrace = []; });
+    await expect.poll(() => traceLength(page), { timeout: 60_000 }).toBeGreaterThanOrEqual(2);
 }
-async function traceChanges(page: Page, frames: number) {
-    await expect.poll(() => page.evaluate(() => (window as unknown as { __cameraTrace: number[][] }).__cameraTrace.length),
+/** Czeka, aż ślad będzie miał `frames` klatek PO bieżącej długości, i zwraca cały ślad. */
+async function readTrace(page: Page, frames = FRAMES): Promise<Sample[]> {
+    const from = await traceLength(page);
+    await expect.poll(() => traceLength(page), { timeout: 60_000 }).toBeGreaterThanOrEqual(from + frames);
+    return page.evaluate(() => (window as unknown as { __cameraTrace: number[][] }).__cameraTrace);
+}
+const pose = (s: Sample) => s.slice(0, 7);
+const samePose = (a: number[], b: number[], eps = 1e-6) => a.every((v, k) => Math.abs(v - b[k]) <= eps);
+const changes = (trace: Sample[]) => trace.slice(1).filter((s, i) => !samePose(pose(s), pose(trace[i]))).length;
+/** Klatki, w których kamera NIE jest w pozie docelowej swojej gałęzi (wygładzanie = dojazd przez kilka klatek). */
+const offTarget = (trace: Sample[]) => trace.filter((s) => s.length === 14 && !samePose(s.slice(0, 7), s.slice(7), 1e-4)).length;
+const withTarget = (trace: Sample[]) => trace.filter((s) => s.length === 14).length;
+/** Ograniczony ruch: w każdej klatce poza faktyczna = docelowa; przejście (`changed`) zmienia kadr. */
+function expectEndStateEveryFrame(trace: Sample[], changed: boolean) {
+    expect(withTarget(trace), 'brak klatek z pozą docelową gałęzi').toBeGreaterThan(0);
+    expect(offTarget(trace), 'klatki poza stanem końcowym (wygładzanie)').toBe(0);
+    if (changed) expect(changes(trace), 'kadr się nie zmienił').toBeGreaterThanOrEqual(1);
+}
+
+/** Ślad pozy galaktyki w tle (dev-hook `window.__galaxyTrace` w StarField): liczba zmian między klatkami. */
+async function galaxyChanges(page: Page, frames: number) {
+    await page.evaluate(() => { (window as unknown as { __galaxyTrace: number[][] }).__galaxyTrace = []; });
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __galaxyTrace: number[][] }).__galaxyTrace.length),
         { timeout: 60_000 }).toBeGreaterThanOrEqual(frames);
-    const trace = await page.evaluate(() => (window as unknown as { __cameraTrace: number[][] }).__cameraTrace);
-    let changes = 0;
-    for (let i = 1; i < trace.length; i++) if (trace[i].some((v, k) => Math.abs(v - trace[i - 1][k]) > 1e-6)) changes++;
-    return changes;
+    const trace = await page.evaluate(() => (window as unknown as { __galaxyTrace: number[][] }).__galaxyTrace);
+    return trace.slice(1).filter((s, i) => !samePose(s, trace[i], 1e-9)).length;
 }
-const FRAMES = 10;
 
 test.describe('ograniczony ruch (prefers-reduced-motion: reduce)', () => {
     test.use({ reducedMotion: 'reduce' });
 
-    test('director Back → Front: kąt bez stanów pośrednich, kadr skacze (≤ 2 zmiany), potem aktywna kotwica', async ({ page }) => {
+    test('director Back → Front: kąt bez stanów pośrednich, kadr od razu w stanie końcowym, potem aktywna kotwica', async ({ page }) => {
         await openApp(page);
         await seedWorkspace(page);
         await waitScreenMeshes(page);
@@ -51,7 +77,7 @@ test.describe('ograniczony ruch (prefers-reduced-motion: reduce)', () => {
         const intermediate = steps.filter((a) => !near(a, BACK) && !near(a, 0));
         expect(intermediate, `kąty pośrednie: ${intermediate.slice(0, 5).join(', ')}`).toEqual([]);
         expect(await camera(page)).toMatchObject({ source: 'director', tween: null });
-        expect(await traceChanges(page, FRAMES)).toBeLessThanOrEqual(2); // orbita → cinematic: pozycja, target, FOV od razu
+        expectEndStateEveryFrame(await readTrace(page), true);
         await expect.poll(async () => (await anchorState(page))?.active, { timeout: 30_000 }).toBe(true);
         await expect(page.getByRole('region', { name: 'Ekran: Element chart' })).toBeVisible();
     });
@@ -70,43 +96,60 @@ test.describe('ograniczony ruch (prefers-reduced-motion: reduce)', () => {
         expect(await page.evaluate(() => (window as unknown as { __aiui: AiUi }).__aiui.getState().stage.focus)).toBe(before);
     });
 
-    test('scroll do „close” → Back (orbita) → Front → powrót na górę: kadr skacze (≤ 2 zmiany) w obu przejściach, kotwica aktywna', async ({ page }) => {
+    test('scroll do „close” → Back (orbita) → Front → góra: każde przejście od razu w stanie końcowym, kotwica aktywna', async ({ page }) => {
         await openApp(page);
         await seedWorkspace(page);
         await waitScreenMeshes(page);
+        // wide → „close” (cinematic, scroll)
+        await startTrace(page);
         await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
         await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(0);
-        await page.waitForTimeout(500); // kadr „close” ustalony
+        expectEndStateEveryFrame(await readTrace(page), true);
+        // „close” → Back: powrót do orbity (gałąź orbit)
         await startTrace(page);
-        await setAngle(page, BACK); // powrót z „close” do orbity (gałąź orbit)
-        expect(await traceChanges(page, FRAMES)).toBeLessThanOrEqual(2);
+        await setAngle(page, BACK);
+        expectEndStateEveryFrame(await readTrace(page), true);
+        // Front (nadal przewinięte = „close”), potem powrót na górę: „close” → wide
         await layoutCommand(page, { type: 'toScreen', id: 'chart' });
         await expect.poll(async () => (await camera(page)).tween, { timeout: 30_000 }).toBeNull();
         await startTrace(page);
-        await page.evaluate(() => window.scrollTo(0, 0)); // „close” → wide
-        expect(await traceChanges(page, FRAMES)).toBeLessThanOrEqual(2);
+        await page.evaluate(() => window.scrollTo(0, 0));
+        expectEndStateEveryFrame(await readTrace(page), true);
         await expect.poll(async () => (await anchorState(page))?.active, { timeout: 30_000 }).toBe(true);
     });
 
-    test('po intro kadr nie dojeżdża (intro → wide od razu)', async ({ page }) => {
+    test('po intro kadr od razu w stanie końcowym (bez dojazdu intro → wide)', async ({ page }) => {
         await openApp(page);
         await startTrace(page);
-        expect(await traceChanges(page, FRAMES)).toBeLessThanOrEqual(1);
+        expectEndStateEveryFrame(await readTrace(page), false);
+    });
+
+    // decyzja właściciela 2026-10-06: poza overlayem wyłączamy tylko ruch gwiazd / galaktyki
+    test('galaktyka w tle stoi (bez obrotu i „oddychania” skali)', async ({ page }) => {
+        await openApp(page);
+        expect(await galaxyChanges(page, 6)).toBe(0);
     });
 });
 
-// Kontrola pomiaru: przy zwykłym ruchu ta sama sekwencja daje wiele zmian kadru (wygładzanie) — inaczej testy wyżej
-// niczego by nie dowodziły.
+// Kontrola pomiaru: przy zwykłym ruchu te same sekwencje dają klatki poza stanem końcowym (dojazd) — inaczej testy
+// wyżej niczego by nie dowodziły.
 test.describe('kontrola pomiaru (prefers-reduced-motion: no-preference)', () => {
     test.use({ reducedMotion: 'no-preference' });
 
-    test('director Back → Front przy zwykłym ruchu: kadr wygładzany (> 2 zmiany)', async ({ page }) => {
+    test('director Back → Front przy zwykłym ruchu: klatki poza stanem końcowym (wygładzanie)', async ({ page }) => {
         await openApp(page);
         await seedWorkspace(page);
         await setAngle(page, BACK);
         await startTrace(page);
         await layoutCommand(page, { type: 'toScreen', id: 'chart' });
-        expect(await traceChanges(page, FRAMES)).toBeGreaterThan(2);
+        const trace = await readTrace(page);
+        expect(offTarget(trace)).toBeGreaterThan(0);
+        expect(changes(trace)).toBeGreaterThan(2);
+    });
+
+    test('galaktyka przy zwykłym ruchu się obraca', async ({ page }) => {
+        await openApp(page);
+        expect(await galaxyChanges(page, 6)).toBeGreaterThan(0);
     });
 });
 

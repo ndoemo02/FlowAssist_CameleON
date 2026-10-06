@@ -398,7 +398,7 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
     (ADR 0002, `contract.ts: RESERVED_KEYS`).
 - **P1.7 — podzielone (decyzja właściciela 2026-10-06), plan `C:\Develop\Flow Assist\PLAN_P1.7_capabilities.md` (v2.2):**
   - ~~**Q2**~~ — zrealizowane: martwe `hint`/`priority` usunięte z widoku `ready` (kernel, ADR 0001/0007);
-  - ~~**P1.7a — capabilities w kodzie**~~ — zrealizowane lokalnie: D2 (obsługiwane reprezentacje = capabilities, nie
+  - **P1.7a — capabilities w kodzie** — kod gotowy lokalnie (przed raportem do właściciela i pushem): D2 (obsługiwane reprezentacje = capabilities, nie
     katalog; ADR 0002), `clientCapabilities()` w kształcie upstream A2UI, `negotiate()` (kolejność 0–5), zgoda na wysyłkę
     per przebieg (reset przy każdym `start`/`stop`), mock egzekwuje te same reguły, wspólny test zgodności transportu;
   - **P1.7b — zamknięcie profilu `flowassist-transport/1`** (następny etap): wiązanie AG-UI (research), ramka, lifecycle,

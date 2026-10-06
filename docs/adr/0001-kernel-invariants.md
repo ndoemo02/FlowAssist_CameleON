@@ -96,8 +96,10 @@ Ochrona jest w store, niezależnie od transportu.
   współdzieli I6, ale nie jest funkcją kernela) dokłada do `StartRequest` wymagane `capabilities` — zamrożony snapshot
   liczony raz na przebieg; transport go nie buduje, tylko dołącza do wywołań backendu. Druga warstwa izolacji jest
   w transporcie: zgoda na wysyłkę per przebieg (`transport/runPermission.ts`) — ustanawia ją tylko udana negocjacja,
-  resetuje każdy `start` i `stop`. Dzięki temu błąd kontraktu z efektu (`runEffects` → `send`, niestrzeżony statusem)
-  po nieudanej negocjacji albo po `stop` nie trafia do backendu (ADR 0002, „Handshake możliwości”).
+  resetuje każdy `start` i `stop`. To **druga linia obrony**: w produkcji efekty powstają tylko w koordynatorze
+  wywołanym z `transportDispatch`, który już odrzuca zdarzenia przebiegu starego i zamkniętego. Bramka transportu
+  zatrzymuje to, czego store nie strzeże statusem — błąd kontraktu z efektu (`runEffects` → `send`) z `devDispatch`
+  albo po `setTransport` w trakcie przebiegu, po nieudanej negocjacji lub po `stop` (ADR 0002, „Handshake możliwości”).
   Testy: `storeCapabilities.test.ts`, `runPermission.test.ts`, `mockTransport.test.ts` (wspólny test zgodności).
 
 ### I7: tożsamość gestu

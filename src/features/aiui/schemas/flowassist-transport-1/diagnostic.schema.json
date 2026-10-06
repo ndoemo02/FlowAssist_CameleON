@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-transport-1/diagnostic.schema.json",
+  "title": "flowassist-transport/1 — diagnostyka profilu (klient → agent)",
+  "description": "Profil §11.1–§11.3. Problem bez znanego surface'u (A2UI error wymaga surfaceId). Zamknięta lista kodów = blok reguł maszynowych profilu (codes.diagnostics). frame wskazuje ramkę, której dotyczy problem (runId AG-UI + seq). path: wskaźnik JSON, segmenty oparte na id.",
+  "type": "object",
+  "required": ["code", "message"],
+  "additionalProperties": false,
+  "properties": {
+    "code": { "enum": ["ENVELOPE_REJECTED", "STAGE_REJECTED", "NARRATION_REJECTED", "MESSAGE_TOO_LARGE"] },
+    "message": { "type": "string" },
+    "frame": {
+      "type": "object",
+      "required": ["runId", "seq"],
+      "additionalProperties": false,
+      "properties": {
+        "runId": { "type": "string", "minLength": 1 },
+        "seq": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+      }
+    },
+    "path": { "type": "string", "pattern": "^(/[^/]*)*$" }
+  }
+}

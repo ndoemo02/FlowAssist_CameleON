@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-transport-1/interrupt.schema.json",
+  "title": "flowassist-transport/1 — interrupt awaiting_action i odpowiedź (resume)",
+  "description": "Profil §6.3 i §8.1. Główny schemat: AG-UI Interrupt w profilu/1 (reason stały, bez expiresAt). $defs.resumeEntry: wpis RunAgentInput.resume biegu akcji — status zawsze resolved, payload = koperta A2UI action (flowassist-v2/envelope.client-to-agent.schema.json). RUN_FINISHED z wynikiem interrupt niesie dokładnie jeden taki interrupt (reguła zestawu, sprawdza adapter).",
+  "type": "object",
+  "required": ["id", "reason"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "reason": { "const": "flowassist.awaiting_action" },
+    "message": { "type": "string" },
+    "toolCallId": { "type": "string" },
+    "responseSchema": { "type": "object" },
+    "metadata": { "type": "object" },
+    "subagentRunId": { "type": "string" }
+  },
+  "$defs": {
+    "resumeEntry": {
+      "type": "object",
+      "required": ["interruptId", "status", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "interruptId": { "type": "string", "minLength": 1 },
+        "status": { "const": "resolved" },
+        "payload": {
+          "allOf": [
+            { "$ref": "../flowassist-v2/envelope.client-to-agent.schema.json" },
+            { "required": ["action"] }
+          ]
+        },
+        "metadata": { "type": "object" }
+      }
+    }
+  }
+}

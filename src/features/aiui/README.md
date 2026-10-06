@@ -193,5 +193,8 @@ jego materiał (kolor liniowy 0,07). Robi to też przy rejestracji meshy.
   `transportCapabilities` (strażnik dryfu jako ręczne literały, schematy upstream `schemas/a2ui-v0.9/` przez Ajv 2020,
   schemat `schemas/flowassist-transport-1/`, wszystkie kroki negocjacji), `runPermission`, `mockTransport`
   (wspólny test zgodności `transportConformance.ts` — ten sam zestaw musi przejść adapter P1.6), `storeCapabilities`.
+- Od P1.7b: `profileSchemas` — schematy profilu `schemas/flowassist-transport-1/` (ramka `CUSTOM flowassist.frame`,
+  `forwardedProps`, diagnostyka, interrupt + `resume`, capabilities agenta z parytetem `negotiate()`), przykład ramki
+  i stałe z bloku reguł maszynowych dokumentu `docs/protocol/flowassist-transport-1.md`.
 
 Inwarianty i reguły: [`docs/adr/`](../../../docs/adr/). Kontrole przeglądarkowe opisuje `AGENTS.md` → „Testowanie”.

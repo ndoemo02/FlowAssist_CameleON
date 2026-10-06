@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-transport-1/forwarded-props.schema.json",
+  "title": "flowassist-transport/1 — RunAgentInput.forwardedProps (klient → agent)",
+  "description": "Profil §4.4 i §11.4. Jedyny kanał aplikacji w RunAgentInput (AG-UI: pośrednicy go nie zmieniają). capabilities = zamrożony snapshot przebiegu w KAŻDYM biegu. scenario tylko w biegu startu, resync tylko w biegu resync (reguła rodzaju biegu, nie kształtu). a2uiErrors: koperty A2UI error (flowassist-v2/envelope.client-to-agent.schema.json); łączny limit a2uiErrors + diagnostics = 32 (limits.pendingReportsMax) pilnuje adapter.",
+  "type": "object",
+  "required": ["flowassist"],
+  "additionalProperties": false,
+  "properties": {
+    "flowassist": {
+      "type": "object",
+      "required": ["profile", "capabilities"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": { "const": "flowassist-transport/1" },
+        "capabilities": { "$ref": "client-capabilities.schema.json" },
+        "scenario": { "type": "string", "minLength": 1 },
+        "resync": {
+          "type": "object",
+          "required": ["surfaces"],
+          "additionalProperties": false,
+          "properties": {
+            "surfaces": { "type": "array", "uniqueItems": true, "items": { "enum": ["workspace", "tasks-drawer", "hud"] } }
+          }
+        },
+        "a2uiErrors": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "allOf": [
+              { "$ref": "../flowassist-v2/envelope.client-to-agent.schema.json" },
+              { "required": ["error"] }
+            ]
+          }
+        },
+        "diagnostics": { "type": "array", "maxItems": 32, "items": { "$ref": "diagnostic.schema.json" } }
+      }
+    }
+  }
+}

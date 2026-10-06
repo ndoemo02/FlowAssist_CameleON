@@ -1,0 +1,39 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-transport-1/server-capabilities.schema.json",
+  "title": "flowassist-transport/1 — capabilities agenta (ServerCapabilities, konfiguracja adaptera)",
+  "description": "Profil §3.2–§3.3 (D9: statyczna konfiguracja adaptera; to NIE jest AG-UI AgentCapabilities). Kształt sprawdza negotiate() w krokach 1–4 (transport/capabilities.ts); schemat ma z nim parytet dla porażek kształtu. Słownik rodzajów i reprezentacji jest otwarty (nieznane, poprawnie utypowane wpisy negocjacja pomija); nazwy zarezerwowane są błędem. Pola dodatkowe są dozwolone (upstream A2UI też je dopuszcza).",
+  "type": "object",
+  "required": ["transportProfiles", "a2uiServerCapabilities", "flowassist"],
+  "properties": {
+    "transportProfiles": { "type": "array", "items": { "type": "string" }, "contains": { "const": "flowassist-transport/1" } },
+    "a2uiServerCapabilities": {
+      "type": "object",
+      "required": ["v0.9"],
+      "properties": {
+        "v0.9": {
+          "type": "object",
+          "required": ["supportedCatalogIds"],
+          "properties": {
+            "supportedCatalogIds": { "type": "array", "items": { "type": "string" } },
+            "acceptsInlineCatalogs": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "flowassist": {
+      "type": "object",
+      "required": ["kinds"],
+      "properties": {
+        "kinds": {
+          "type": "object",
+          "propertyNames": { "not": { "enum": ["__proto__", "constructor", "prototype"] } },
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "not": { "enum": ["__proto__", "constructor", "prototype"] } }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-transport-1/frame.schema.json",
+  "title": "flowassist-transport/1 — ramka agent → klient (zdarzenie AG-UI CUSTOM)",
+  "description": "Profil §4.5–§5 (docs/protocol/flowassist-transport-1.md). Jedna wiadomość profilu na zdarzenie AG-UI CUSTOM o nazwie flowassist.frame. seq: per bieg AG-UI, od 0, +1 na ramkę (ciągłość sprawdza adapter P1.6, nie schemat). message walidowana schematem osi 1–2 (flowassist-v2/envelope.agent-to-client.schema.json). Pola zdarzenia AG-UI poza type/name/value: tylko opcjonalne pola wspólne (timestamp, rawEvent, metadata, subagentRunId).",
+  "type": "object",
+  "required": ["type", "name", "value"],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "CUSTOM" },
+    "name": { "const": "flowassist.frame" },
+    "value": {
+      "type": "object",
+      "required": ["profile", "seq", "message"],
+      "additionalProperties": false,
+      "properties": {
+        "profile": { "const": "flowassist-transport/1" },
+        "seq": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "message": { "$ref": "../flowassist-v2/envelope.agent-to-client.schema.json" }
+      }
+    },
+    "timestamp": { "type": "integer" },
+    "rawEvent": { "not": { "type": "null" } },
+    "metadata": { "type": "object" },
+    "subagentRunId": { "type": "string" }
+  }
+}

@@ -1,6 +1,6 @@
 # Profil transportowy `flowassist-transport/1`
 
-- **Status:** normatywny (P1.7b, 2026-10-07). Decyzje właściciela: D2, D3, D6, D7, D9–D20, H1, M1, M2 (rejestr w §16).
+- **Status:** normatywny (P1.7b, 2026-10-07). Decyzje właściciela: D2, D3, D6, D7, D9–D20, H1, M1, M2, N1–N3 (rejestr w §16).
 - **Zakres:** jak klient CameleON i agent wymieniają komunikaty A2UI i rozszerzenia aplikacji przez AG-UI.
   To trzecia oś zgodności z [ADR 0002](../adr/0002-protocol-compatibility-axes.md). Adapter P1.6 implementuje ten
   dokument i nie dodaje reguł w locie.
@@ -124,6 +124,11 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - nie przenosi `stage`/`narration`;
   - wstrzykuje katalog do `context` (sprzeczne z I10).
 - **4.7 Replay historii** [P1.6]: klient stosuje ramki, lifecycle i kontrolę wersji **wyłącznie z biegu, o który prosił** (`RUN_STARTED.runId` = `RunAgentInput.runId`). Biegi poprzedzające go w tym samym strumieniu pomija w całości, łącznie z ich spóźnionymi `RUN_ERROR` (§6.3).
+- **4.8 Tożsamość biegu żądanego** (N3) [P1.6]. `agui:PROTOCOL_VIOLATION`, terminalnie i bez resync, gdy:
+  - strumień zawierał biegi, ale żaden nie miał `RUN_STARTED.runId` = `RunAgentInput.runId` (AG-UI: bieg żądany powtarza `runId` wejścia);
+  - po biegu żądanym pojawia się kolejny bieg (AG-UI: bieg żądany jest ostatni w odpowiedzi);
+  - `RUN_FINISHED` biegu żądanego ma inny `runId` niż jego `RUN_STARTED`;
+  - zdarzenie brzegowe biegu żądanego ma `threadId` inny niż wejście.
 
 ## 5. Sekwencja ramek i deduplikacja (D6)
 
@@ -171,6 +176,7 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - `RUN_ERROR` przypisany do biegu replayu jest pomijany (§4.7).
 - **6.4 Interrupt profilu** [agent] (schemat `interrupt.schema.json` opisuje obowiązek agenta):
   - `id` unikalny w biegu, `reason = "flowassist.awaiting_action"`;
+  - **tożsamość decyzji** (N2): nowa logiczna decyzja MUSI dostać nowe `id` interruptu, a ponowne podniesienie tej samej nierozstrzygniętej decyzji (np. w resync) MOŻE zachować poprzednie. Klient wiąże z tym `id` akcję oczekującą (§8.3);
   - `message`, `toolCallId` i `responseSchema` klient ignoruje;
   - `expiresAt` NIE WOLNO wysyłać [agent]. **Klient go ignoruje** i nie odrzuca z tego powodu interruptu, bo klient profilu/1 nie ocenia wygaśnięcia.
 - **6.5** Agent, który czeka na decyzję użytkownika, MUSI zakończyć bieg tym interruptem [agent]. AG-UI nie dopuszcza „sukcesu, który czeka” (F2).
@@ -182,12 +188,12 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
 
   | Klasa | Przypadki | Reakcja |
   |---|---|---|
-  | **Awaria transportu** (jednoznaczna, wykryta przez adapter) | błąd sieci przed odpowiedzią (DNS, reset, brak sieci); brak nagłówków odpowiedzi w **30 s**; odpowiedź `408`, `429`, `502`, `503`, `504`; zerwanie połączenia w trakcie body przed zdarzeniem terminalnym żądanego biegu; **45 s bez żadnego ruchu SSE**; czysty koniec body bez zdarzenia terminalnego żądanego biegu (ucięty bieg, F5) | **resync** (§7.3–§7.4); status przebiegu bez zmian |
+  | **Awaria transportu** (jednoznaczna, wykryta przez adapter) | błąd sieci przed odpowiedzią (DNS, reset, brak sieci); brak nagłówków odpowiedzi w **30 s**; odpowiedź `408`, `429`, `502`, `503`, `504`; zerwanie połączenia w trakcie body przed zdarzeniem terminalnym żądanego biegu; **45 s bez żadnego ruchu SSE**; czysty koniec body bez zdarzenia terminalnego żądanego biegu, gdy strumień nie zawierał żadnego biegu albo zawierał bieg żądany (ucięty bieg, F5) | **resync** (§7.3–§7.4); status przebiegu bez zmian |
   | **Odrzucenie uprawnień** | `401`, `403` | `error` `transport:AUTH_REJECTED`, bez ponowień |
   | **Odrzucenie wejścia** | pozostałe `4xx` | `error` `transport:INPUT_REJECTED`, bez ponowień |
   | **Błąd serwera spoza listy przejściowej** | `500`, `501`, `505`–`599` | `error` `transport:SERVER_ERROR`, bez ponowień |
   | **Nieoczekiwana odpowiedź** | odpowiedź inna niż `200` z `Content-Type: text/event-stream` spoza wierszy wyżej (np. `204`, `3xx` po przekierowaniach, strona logowania sieci) | `error` `transport:UNEXPECTED_RESPONSE`, bez ponowień |
-  | **Naruszenie profilu / protokołu** | `profile:*` (§5, §2.4, §6.1, §10.8), `agui:PROTOCOL_VIOLATION` | `error`, bez ponowień |
+  | **Naruszenie profilu / protokołu** | `profile:*` (§5, §2.4, §6.1, §10.8), `agui:PROTOCOL_VIOLATION`, w tym **nieprawidłowy albo brakujący wymagany `runId`** (N3, §4.8) | `error`, bez ponowień i bez resync |
   | **Błąd agenta** | `RUN_ERROR` w dowolnym miejscu biegu żądanego, także jako pierwsze zdarzenie | `error` `agent:*`, bez ponowień |
 
   - Awarię transportu wykrytą przez siebie adapter kieruje **bezpośrednio do ścieżki resync**. NIE WOLNO mu syntetyzować `RUN_ERROR`, `RUN_FINISHED` ani statusu `agent:*`.
@@ -240,20 +246,29 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - `payload` jest dokładnie kopertą klient → agent A2UI (`client_to_server.json` upstream);
   - `context` to kontekst podany przez wywołującego, np. `itemId` [kod: `ScreenLayer.tsx`, `WorkspaceLayer.tsx`]. Do niego klient dokłada `workspace` = migawkę układu **bez współrzędnych** [kod: `store.ts: sendAction`].
 - **8.2** Tożsamością akcji jest `runId` invocation, która ją niesie. **Potwierdzeniem** przyjęcia jest `RUN_STARTED` tego biegu. Osobnego identyfikatora akcji nie ma.
-- **8.3 Jedno miejsce na akcję** (D12 + M1, decyzje właściciela) [P1.6]. Przebieg ma **jedno** miejsce na akcję. Zajmuje je:
-  - **akcja w locie** — od przyjęcia przez klienta do wysłania aż do **końca invocation**, która ją niesie: czysty koniec (§6.2) albo porzucenie po awarii transportu (§7.1, akcja staje się niepewna, §8.4);
-  - **albo akcja oczekująca** — akcja użytkownika w trakcie biegu startu lub resync, albo w `reconnecting` / `offline`, gdy miejsce jest wolne.
+- **8.3 Jedno miejsce na akcję** (D12 + M1 + N1 + N2, decyzje właściciela) [P1.6].
+  - **Bieżący interrupt** to interrupt z ostatniego wyniku `awaiting_action`, którego nie pokryła jeszcze żadna invocation potwierdzona `RUN_STARTED`.
+    - Bieg akcji z `RUN_STARTED` go pokrywa; resync go porzuca (§7.4).
+    - Brak takiego interruptu oznacza „brak bieżącego interruptu”.
+  - Przebieg ma **jedno** miejsce na akcję. Zajmuje je:
+    - **akcja w locie** — od przyjęcia przez klienta do **końca invocation**, która ją niesie: czysty koniec (§6.2) albo porzucenie po awarii transportu (§7.1, akcja staje się niepewna, §8.4);
+    - **albo akcja oczekująca** z zapamiętanym oczekiwanym interruptem (`expectedInterruptId`).
 
   Zasady:
-  - każda akcja, gdy miejsce jest zajęte, jest **odrzucana lokalnie** z komunikatem dla użytkownika. Nie zastępuje akcji w miejscu i nie trafia do żadnej kolejki (podwójny klik nie zatwierdzi kolejnej decyzji);
-  - akcja w `awaiting_action` przy wolnym miejscu i połączeniu `connected` jest wysyłana od razu (staje się akcją w locie);
-  - akcja oczekująca jest wysyłana, gdy bieżąca invocation zakończy się wynikiem `awaiting_action`. **Przed wysłaniem** klient ponownie sprawdza jej źródło:
-    - surface `surfaceId` istnieje;
-    - komponent `sourceComponentId` istnieje na tym surface;
-    - jeśli `context.itemId` jest podany, element nadal jest członkiem `Workspace.children`.
+  - **W trakcie aktywnej invocation (start, akcja, resync) oraz w `reconnecting` / `offline` klient niczego nie wysyła** (N1, §4.2).
+    - Akcja może wtedy jedynie zająć miejsce jako akcja oczekująca, jeśli miejsce jest wolne **i** klient ma bieżący interrupt. Klient zapamiętuje wtedy `expectedInterruptId` = id bieżącego interruptu.
+    - W każdym innym przypadku akcja jest **odrzucana lokalnie** z komunikatem.
+  - Akcja w `awaiting_action`, gdy **żadna invocation nie trwa**, połączenie jest `connected`, miejsce wolne, a klient ma bieżący interrupt, jest wysyłana od razu jako bieg akcji odpowiadający na ten interrupt (akcja w locie).
+  - Każda akcja, gdy miejsce jest zajęte (w locie albo oczekująca), jest **odrzucana lokalnie** z komunikatem dla użytkownika. Nie zastępuje akcji w miejscu i nie trafia do żadnej kolejki (podwójny klik nie zatwierdzi kolejnej decyzji).
+  - Akcja oczekująca jest rozpatrywana **dopiero po końcu invocation** (§6.2) z wynikiem `awaiting_action`. Wtedy klient sprawdza **wszystkie** warunki:
+    - interrupt z tego wyniku ma `id` równe `expectedInterruptId`;
+    - surface `surfaceId` istnieje, a komponent `sourceComponentId` istnieje na tym surface;
+    - jeśli `context.itemId` jest podany, element jest nadal członkiem `Workspace.children` z **tą samą tożsamością wpisu układu** (`instance` z `layout.ts`, P6: ponowne dodanie = nowy wpis = nowa tożsamość).
+      - `rev` się **nie** liczy, bo rośnie także przy lokalnych zmianach formy (I7);
+      - odcisku propsów nie ma (decyzja właściciela).
 
-    Brak źródła oznacza **porzucenie z lokalnym komunikatem**, bez wysyłki;
-  - po `done`, `error`, `cancelled` albo `stop` akcja oczekująca przepada z komunikatem.
+    Zgodność oznacza nowy bieg akcji (akcja w locie). Niezgodność dowolnego warunku oznacza **porzucenie z lokalnym komunikatem**, bez wysyłki.
+  - Po wyniku innym niż `awaiting_action` (`done`, `error`, `cancelled`) albo po `stop` akcja oczekująca przepada z komunikatem.
 - **8.4 Brak replay** [P1.6]: profil/1 nie klasyfikuje idempotencji, więc każda akcja jest nieidempotentna, a **wysłana** akcja nigdy nie jest ponawiana automatycznie.
   - Akcja jest „wysłana” od chwili wysłania żądania HTTP z jej `resume`.
   - Awaria transportu po tej chwili, a przed potwierdzeniem (`RUN_STARTED`) albo przed końcem invocation, czyni akcję **niepewną**: mogła dotrzeć. Klient:
@@ -384,7 +399,7 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 2. W `RUN_STARTED` deklaruje `protocolVersion` `1.x` (§2.4).
 3. Każdą wiadomość profilu wysyła jako `CUSTOM flowassist.frame` z `profile` i ciągłym `seq` od `0` w każdym biegu (§4.5, §5).
 4. W otwartej odpowiedzi wysyła ruch SSE (zdarzenie albo `: keep-alive`) co ≤ 15 s i zamyka body zaraz po zdarzeniu terminalnym (§7.2, §6.2).
-5. Czekając na użytkownika, kończy bieg interruptem `flowassist.awaiting_action`. Zawsze dokładnie jednym, bez `expiresAt` (§6).
+5. Czekając na użytkownika, kończy bieg interruptem `flowassist.awaiting_action`. Zawsze dokładnie jednym, bez `expiresAt`. Nowa decyzja dostaje nowe `id` interruptu (§6.4).
 6. Kończy przebieg wynikiem `success`, a przerwanie z własnej woli zgłasza wynikiem `cancelled`. Nie wywołuje narzędzi frontendu (§6.1).
 7. Akcję czyta z `resume[0].payload` (koperta A2UI `action`) i nie zakłada jej ponowienia (§8).
 8. W biegu resync (§7.5):
@@ -410,6 +425,7 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | resync, gdy klient trzyma niepokryty interrupt (invocation akcji padła przed `RUN_STARTED`) | `resume` z wpisem `cancelled` bez `payload` | bez zmian | `reconnecting` | — | 7.4, 7.5 |
 | `RUN_STARTED` żądanego biegu, `protocolVersion` `1.x` | potwierdza akcję i raporty | `running` | `connected` | — | 6.1, 8.2, 11.4 |
 | `RUN_STARTED` żądanego biegu bez wersji / inny major | przerwanie | `error` `profile:AGUI_VERSION` | — | — | 2.4 |
+| biegi w strumieniu, ale żaden z żądanym `runId`; bieg po żądanym; niezgodny `runId` / `threadId` biegu żądanego | przerwanie, bez resync | `error` `agui:PROTOCOL_VIOLATION` | — | — | 4.8, 7.1 |
 | biegi replayu (inny `runId`), także ich spóźnione `RUN_ERROR` i brak wersji | pominięte w całości | — | — | — | 4.7, 6.3 |
 | `CUSTOM flowassist.frame` poprawna | round-trip → `transportDispatch` | — | — | — | 4.5, 10.9 |
 | ramka: zły kształt / profil / typ `seq` / nieznany klucz w `value` | przerwanie | `error` `profile:FRAME_INVALID` | — | — | 5.4 |
@@ -442,10 +458,12 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | 3 nieudane próby | koniec serii | bez zmian (wznawialny) | `offline` | — | 7.3 |
 | `offline` + „Połącz ponownie” / zdarzenie `online` | nowa seria resync | bez zmian | `reconnecting` | — | 7.3 |
 | `stop()` | przerwanie; akcja w miejscu i raporty przepadają | `idle` | — | — | 7.3, 8.3 |
-| akcja w `awaiting_action`, miejsce wolne, `connected` | bieg akcji z `resume` (akcja w locie) | `running` po `RUN_STARTED` | — | — | 8.1, 8.3 |
-| akcja w trakcie startu / resync albo w `reconnecting` / `offline`, miejsce wolne | staje się oczekującą | — | — | — | 8.3 |
+| akcja w `awaiting_action`, żadna invocation nie trwa, `connected`, miejsce wolne, jest bieżący interrupt | bieg akcji z `resume` (akcja w locie) | `running` po `RUN_STARTED` | — | — | 8.1, 8.3 |
+| akcja w trakcie dowolnej invocation albo w `reconnecting` / `offline`, miejsce wolne, jest bieżący interrupt | oczekująca z `expectedInterruptId`; **nic nie jest wysyłane** | — | — | — | 8.3 |
+| akcja bez bieżącego interruptu (poza `awaiting_action` albo interrupt już pokryty) | odrzucona lokalnie z komunikatem | — | — | — | 8.3 |
 | akcja, gdy miejsce zajęte (w locie albo oczekująca) | odrzucona lokalnie z komunikatem | — | — | — | 8.3 |
-| wysyłka oczekującej: brak surface / komponentu / członkostwa `itemId` | porzucona z komunikatem | — | — | — | 8.3 |
+| koniec invocation z `awaiting_action` i akcja oczekująca: zgodne `interruptId`, surface, komponent, `instance` elementu | nowy bieg akcji | `running` po `RUN_STARTED` | — | — | 8.3 |
+| j.w., dowolna niezgodność | porzucona z komunikatem, bez wysyłki | `awaiting_action` | — | — | 8.3 |
 | awaria transportu po wysłaniu akcji | akcja niepewna: bez ponowienia, komunikat, miejsce zwolnione, resync | bez zmian | `reconnecting` | — | 8.4, 7.4 |
 | raport renderera (`send(error)`) | do raportów następnego biegu | — | — | — | 11.4 |
 
@@ -486,7 +504,7 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
     "retryableHttpStatus": [408, 429, 502, 503, 504],
     "retryAfterMaxMs": 60000
   },
-  "actions": { "slots": 1 },
+  "actions": { "slots": 1, "pendingMatch": ["interruptId", "surfaceId", "sourceComponentId", "itemInstance"] },
   "literalOnlyProps": { "WorkspaceItem": ["presentation", "priority"] },
   "idForbiddenChars": ["/", "~"],
   "codes": {
@@ -514,7 +532,10 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
 | D9 | `ServerCapabilities` ze statycznej konfiguracji adaptera | §3.3 |
 | D10 | `awaiting_action` = interrupt `flowassist.awaiting_action`; akcja w `resume.payload` | §6, §8 |
 | D11 | `RUN_FINISHED cancelled` → nowy terminalny `RunStatus 'cancelled'` (P1.6, zmiana kernela zatwierdzona) | §6.1 |
-| D12 + M1 | jedno miejsce na akcję: akcja w locie zajmuje je do końca swojej invocation; oczekująca sprawdzana przed wysyłką; kolejne odrzucane lokalnie; brak replay (właściciel) | §8.3–8.4 |
+| D12 + M1 | jedno miejsce na akcję: akcja w locie zajmuje je do końca swojej invocation; kolejne odrzucane lokalnie; brak replay (właściciel) | §8.3–8.4 |
+| N1 | w trakcie aktywnej invocation i bez połączenia nic nie jest wysyłane; akcja może jedynie zająć wolne miejsce jako oczekująca, gdy jest bieżący interrupt; walidacja i nowa invocation dopiero po końcu poprzedniej (właściciel) | §8.3 |
+| N2 | akcja oczekująca przechowuje `expectedInterruptId`; przed wysyłką zgodność `interruptId`, komponentu źródłowego i tożsamości wpisu (`instance`), bez odcisku propsów; nowa decyzja = nowe `id` interruptu (właściciel) | §6.4, §8.3 |
+| N3 | nieprawidłowy albo brakujący wymagany `runId` = `agui:PROTOCOL_VIOLATION`, terminalnie, bez resync (właściciel) | §4.8, §7.1 |
 | D13 | raporty doklejane do następnego biegu (zmienia przypadek 2 testu zgodności i mock w P1.6) | §11.4 |
 | D14 | resync 1/2/4 s; potem `offline`, przebieg wznawialny, bez `error` z sieci, także dla startu (właściciel) | §7.3 |
 | H1 | keep-alive ≤ 15 s; 45 s bez ruchu SSE = zerwanie; 30 s na nagłówki; 5 s po zdarzeniu terminalnym; komentarz SSE to ruch (właściciel) | §6.2, §7.2 |

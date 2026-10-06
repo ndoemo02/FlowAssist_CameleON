@@ -5,7 +5,7 @@
 // Stałe adaptera (limity bajtów i czasu, reconnect, akcje, kody) nie mają jeszcze konsumenta w runtime — użyje ich
 // adapter P1.6; dziś pilnuje ich wyłącznie parytet z dokumentem (bez zmiany zachowania).
 
-import { A2UI_VERSION, ACCEPTED_VERSIONS, PRESENTATIONS, PROTOCOL_LIMITS, RESERVED_KEYS, type CatalogName } from '../contract';
+import { A2UI_VERSION, ACCEPTED_VERSIONS, PARSE_REASONS, PRESENTATIONS, PROTOCOL_LIMITS, RESERVED_KEYS, type CatalogName } from '../contract';
 import type { CATALOG_PROPS } from '../catalog';
 
 export const TRANSPORT_PROFILE = 'flowassist-transport/1' as const;
@@ -47,7 +47,7 @@ export const LITERAL_ONLY_PROPS = {
 /** Profil §10.6 (D19). */
 export const ID_FORBIDDEN_CHARS = ['/', '~'] as const;
 
-/** Profil §11.2: zamknięte listy kodów raportów, diagnostyki i statusów `error`. */
+/** Profil §11.2, §11.5: zamknięte listy kodów raportów, diagnostyki, statusów `error` i przyczyn odrzucenia (D7). */
 export const PROFILE_CODES = {
     a2uiErrors: ['VALIDATION_FAILED', 'SURFACE_EXISTS', 'SURFACE_NOT_FOUND'],
     diagnostics: ['ENVELOPE_REJECTED', 'STAGE_REJECTED', 'NARRATION_REJECTED', 'MESSAGE_TOO_LARGE'],
@@ -57,6 +57,7 @@ export const PROFILE_CODES = {
         'transport:AUTH_REJECTED', 'transport:INPUT_REJECTED', 'transport:SERVER_ERROR', 'transport:UNEXPECTED_RESPONSE',
     ],
     runErrorPrefixes: ['negotiation:', 'agent:'],
+    parseReasons: PARSE_REASONS,
 } as const;
 
 // Zamrożone także w runtime (`as const` działa tylko na typach): mutacja reguły rozjechałaby profil z guardami.

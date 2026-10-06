@@ -16,7 +16,6 @@
 
 **Egzekwowanie** — przy każdej regule:
 - **[kod]** — klient egzekwuje ją już dziś (plik w nawiasie);
-- **[P1.7b-kod]** — kod powstaje w P1.7b bez zmiany zachowania (pakiet 2). **Jeszcze nie istnieje**;
 - **[P1.6]** — klient będzie ją egzekwował od adaptera P1.6;
 - **[agent]** — obowiązek agenta, którego klient nie zawsze może wykryć.
 
@@ -364,7 +363,7 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - pozycje potwierdza `RUN_STARTED` biegu, który je niósł;
   - po stanie terminalnym przebiegu niewysłane pozycje przepadają;
   - deduplikacja raportów renderera „raz na wystąpienie” [kod: `validationReporting.ts`] się nie zmienia.
-- **11.5 Wariant diagnostyczny `parseEvent`** (D7) [P1.7b-kod — jeszcze nie istnieje]:
+- **11.5 Wariant diagnostyczny `parseEvent`** (D7) [kod: `contract.ts: parseEventDiagnostic`, `PARSE_REASONS`; test `parseDiagnostic.test.ts`]:
   - `parseEventDiagnostic(raw)` zwraca `{ ok: true, event }` albo `{ ok: false, reason, path, surfaceId? }`;
   - `parseEvent` pozostaje opakowaniem o identycznym zachowaniu (ślady replay bez zmian).
 
@@ -521,7 +520,11 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
       "profile:UNSUPPORTED_INTERRUPTS", "profile:UNEXPECTED_TOOL_CALLS", "agui:PROTOCOL_VIOLATION",
       "transport:AUTH_REJECTED", "transport:INPUT_REJECTED", "transport:SERVER_ERROR", "transport:UNEXPECTED_RESPONSE"
     ],
-    "runErrorPrefixes": ["negotiation:", "agent:"]
+    "runErrorPrefixes": ["negotiation:", "agent:"],
+    "parseReasons": [
+      "NOT_OBJECT", "RESERVED_KEY", "PAYLOAD_COUNT", "STAGE_INVALID", "NARRATION_INVALID", "VERSION_UNSUPPORTED",
+      "SURFACE_UNKNOWN", "CATALOG_MISMATCH", "COMPONENT_INVALID", "PATH_INVALID", "PATH_LIMIT"
+    ]
   }
 }
 ```

@@ -162,49 +162,159 @@ const isComponent = (v: unknown): v is A2Component =>
 const A2UI_KEYS = ['createSurface', 'updateComponents', 'updateDataModel', 'deleteSurface'] as const;
 const PAYLOAD_KEYS = ['stage', 'narration', ...A2UI_KEYS] as const;
 
-/** Waliduje surowy komunikat od agenta. Zwraca null dla wszystkiego, czego renderer nie obsłuży. */
-export function parseEvent(raw: unknown): AiUiEvent | null {
-    if (!isObj(raw)) return null;
-    if (hasReservedKey(raw)) return null; // FU-4: zarezerwowany klucz własny na dowolnym poziomie ładunku
+// ── diagnostyka odrzucenia (D7, profil flowassist-transport/1 §11.5) ────────────
+
+/**
+ * Zamknięta lista przyczyn odrzucenia na granicy protokołu — dokładnie dzisiejsze gałęzie parseEvent.
+ * Adapter P1.6 mapuje je na raport A2UI albo diagnostykę profilu (profil §11.2–§11.5); nie powiela walidacji.
+ */
+export const PARSE_REASONS = [
+    'NOT_OBJECT', 'RESERVED_KEY', 'PAYLOAD_COUNT', 'STAGE_INVALID', 'NARRATION_INVALID', 'VERSION_UNSUPPORTED',
+    'SURFACE_UNKNOWN', 'CATALOG_MISMATCH', 'COMPONENT_INVALID', 'PATH_INVALID', 'PATH_LIMIT',
+] as const;
+export type ParseReason = (typeof PARSE_REASONS)[number];
+
+export type ParseRejection = {
+    ok: false;
+    reason: ParseReason;
+    /** Wskaźnik JSON w kopercie (profil §11.3): segmenty po id, nigdy po indeksie; '' = cała wiadomość. */
+    path: string;
+    /** Surface, jeśli da się go ustalić z koperty (wtedy raport A2UI, inaczej diagnostyka profilu). */
+    surfaceId?: SurfaceId;
+};
+export type ParseResult = { ok: true; event: AiUiEvent } | ParseRejection;
+
+/** Segment wskaźnika JSON (RFC 6901): `~` → `~0`, `/` → `~1`. */
+const escapeSegment = (s: string) => s.replace(/~/g, '~0').replace(/\//g, '~1');
+const pointer = (segs: readonly string[]) => segs.map((s) => '/' + escapeSegment(s)).join('');
+
+type PathNode = { seg: string; parent: PathNode | null } | null;
+const segsOf = (node: PathNode): string[] => {
+    const out: string[] = [];
+    for (let n = node; n; n = n.parent) out.push(n.seg);
+    return out.reverse();
+};
+
+/**
+ * Ścieżka do pierwszego zarezerwowanego klucza (to samo przejście co hasReservedKey; wołane tylko przy odrzuceniu,
+ * więc koszt przyjętej wiadomości się nie zmienia). Profil §11.3: wewnątrz tablicy ścieżka kończy się na kolekcji,
+ * z wyjątkiem `updateComponents.components`, gdzie segmentem jest poprawne `id` komponentu.
+ */
+function reservedKeyPath(root: Record<string, unknown>): string {
+    const components = isObj(root.updateComponents) && Array.isArray(root.updateComponents.components)
+        ? root.updateComponents.components : null;
+    const stack: [unknown, PathNode, boolean][] = [[root, null, false]]; // [wartość, ścieżka, wewnątrz kolekcji]
+    const seen = new Set<object>();
+    while (stack.length) {
+        const [v, node, collapsed] = stack.pop()!;
+        if (v === null || typeof v !== 'object' || seen.has(v)) continue;
+        seen.add(v);
+        if (Array.isArray(v)) {
+            for (const item of v) {
+                const id = v === components && isObj(item) && typeof item.id === 'string' && item.id.length > 0 && !isReserved(item.id)
+                    ? item.id : null;
+                stack.push(id !== null && !collapsed ? [item, { seg: id, parent: node }, false] : [item, node, true]);
+            }
+            continue;
+        }
+        for (const k of Object.keys(v)) {
+            const child: PathNode = collapsed ? node : { seg: k, parent: node };
+            if (isReserved(k)) return pointer(segsOf(child));
+            stack.push([(v as Record<string, unknown>)[k], child, collapsed]);
+        }
+    }
+    return '';
+}
+
+/** Surface z jedynej koperty A2UI, jeśli da się go ustalić (do raportu A2UI zamiast diagnostyki). */
+function surfaceOf(raw: Record<string, unknown>): SurfaceId | undefined {
+    const present = A2UI_KEYS.filter((k) => k in raw);
+    if (present.length !== 1) return undefined;
+    const body = raw[present[0]];
+    return isObj(body) && isSurfaceId(body.surfaceId) ? body.surfaceId : undefined;
+}
+
+const reject = (reason: ParseReason, path: string, surfaceId?: SurfaceId): ParseRejection =>
+    surfaceId === undefined ? { ok: false, reason, path } : { ok: false, reason, path, surfaceId };
+
+/** Pierwsza wada komponentu (ta sama kolejność co isComponent): ścieżka po id albo na kolekcji. */
+function componentPath(c: unknown): string {
+    const base = ['updateComponents', 'components'];
+    if (!isObj(c) || typeof c.id !== 'string' || c.id.length === 0 || isReserved(c.id)) return pointer(base);
+    const field = typeof c.component === 'string' && c.component.length > 0 ? 'children' : 'component';
+    return pointer([...base, c.id, field]);
+}
+
+/**
+ * Waliduje surowy komunikat od agenta i mówi, DLACZEGO go odrzuca (D7). Kolejność kontroli i wynik
+ * przyjęcia/odrzucenia są identyczne z parseEvent (parseEvent jest jej opakowaniem).
+ */
+export function parseEventDiagnostic(raw: unknown): ParseResult {
+    if (!isObj(raw)) return reject('NOT_OBJECT', '');
+    // FU-4: zarezerwowany klucz własny na dowolnym poziomie ładunku (ścieżka liczona tylko przy odrzuceniu)
+    if (hasReservedKey(raw)) return reject('RESERVED_KEY', reservedKeyPath(raw), surfaceOf(raw));
     // Dokładnie jeden payload: mieszana koperta (np. stage + createSurface) jest odrzucana w całości,
     // a nie częściowo konsumowana (ADR 0005, OBS-4).
-    if (PAYLOAD_KEYS.filter((k) => k in raw).length !== 1) return null;
+    if (PAYLOAD_KEYS.filter((k) => k in raw).length !== 1) return reject('PAYLOAD_COUNT', '');
 
     if ('stage' in raw) {
         const s = raw.stage;
-        if (!isObj(s)) return null;
+        if (!isObj(s)) return reject('STAGE_INVALID', '/stage');
         const keys = Object.keys(s);
-        if (keys.length === 0 || keys.some((k) => k !== 'focus' && k !== 'drawer')) return null;
-        if (s.focus !== undefined && s.focus !== 'front' && s.focus !== 'back') return null;
-        if (s.drawer !== undefined && s.drawer !== 'open' && s.drawer !== 'closed') return null;
-        return { stage: s as StageMsg['stage'] };
+        if (keys.length === 0) return reject('STAGE_INVALID', '/stage');
+        const unknown = keys.find((k) => k !== 'focus' && k !== 'drawer');
+        if (unknown !== undefined) return reject('STAGE_INVALID', pointer(['stage', unknown]));
+        if (s.focus !== undefined && s.focus !== 'front' && s.focus !== 'back') return reject('STAGE_INVALID', '/stage/focus');
+        if (s.drawer !== undefined && s.drawer !== 'open' && s.drawer !== 'closed') return reject('STAGE_INVALID', '/stage/drawer');
+        return { ok: true, event: { stage: s as StageMsg['stage'] } };
     }
 
     if ('narration' in raw) {
         const n = raw.narration;
-        if (!isObj(n)) return null;
-        if (!(n.text === null || typeof n.text === 'string')) return null;
-        if (n.speak !== undefined && typeof n.speak !== 'boolean') return null;
-        return { narration: n as NarrationMsg['narration'] };
+        if (!isObj(n)) return reject('NARRATION_INVALID', '/narration');
+        if (!(n.text === null || typeof n.text === 'string')) return reject('NARRATION_INVALID', '/narration/text');
+        if (n.speak !== undefined && typeof n.speak !== 'boolean') return reject('NARRATION_INVALID', '/narration/speak');
+        return { ok: true, event: { narration: n as NarrationMsg['narration'] } };
     }
 
-    if (typeof raw.version !== 'string' || !ACCEPTED.has(raw.version)) return null;
+    if (typeof raw.version !== 'string' || !ACCEPTED.has(raw.version)) return reject('VERSION_UNSUPPORTED', '/version', surfaceOf(raw));
     const present = A2UI_KEYS.filter((k) => k in raw);
-    if (present.length !== 1) return null;
+    if (present.length !== 1) return reject('PAYLOAD_COUNT', ''); // nieosiągalne po kontroli PAYLOAD_KEYS; zachowane jak w parseEvent
     const kind = present[0];
     const body = raw[kind];
-    if (!isObj(body) || !isSurfaceId(body.surfaceId)) return null;
+    if (!isObj(body)) return reject('NOT_OBJECT', pointer([kind]));
+    if (!isSurfaceId(body.surfaceId)) return reject('SURFACE_UNKNOWN', pointer([kind, 'surfaceId']));
+    const surfaceId = body.surfaceId;
 
     switch (kind) {
         case 'createSurface':
-            return body.catalogId === CATALOG_ID ? (raw as CreateSurfaceMsg) : null;
-        case 'updateComponents':
-            return Array.isArray(body.components) && body.components.every(isComponent) ? (raw as UpdateComponentsMsg) : null;
-        case 'updateDataModel':
-            return body.path === undefined || isBoundedPointer(body.path) ? (raw as UpdateDataModelMsg) : null;
+            return body.catalogId === CATALOG_ID
+                ? { ok: true, event: raw as CreateSurfaceMsg }
+                : reject('CATALOG_MISMATCH', '/createSurface/catalogId', surfaceId);
+        case 'updateComponents': {
+            if (!Array.isArray(body.components)) return reject('COMPONENT_INVALID', '/updateComponents/components', surfaceId);
+            const bad = body.components.findIndex((c) => !isComponent(c)); // = !every(isComponent)
+            return bad === -1
+                ? { ok: true, event: raw as UpdateComponentsMsg }
+                : reject('COMPONENT_INVALID', componentPath(body.components[bad]), surfaceId);
+        }
+        case 'updateDataModel': {
+            const path = body.path;
+            if (path === undefined || isBoundedPointer(path)) return { ok: true, event: raw as UpdateDataModelMsg };
+            const inLimits = isPointer(path) && codePointsAtMost(path as string, PROTOCOL_LIMITS.dataModelPathMaxLength)
+                && parsePointer(path as string).length <= PROTOCOL_LIMITS.dataModelPathMaxSegments;
+            const reason: ParseReason = isPointer(path) && !inLimits ? 'PATH_LIMIT' : 'PATH_INVALID'; // zły kształt albo segment zarezerwowany
+            return reject(reason, '/updateDataModel/path', surfaceId);
+        }
         case 'deleteSurface':
-            return raw as DeleteSurfaceMsg;
+            return { ok: true, event: raw as DeleteSurfaceMsg };
     }
+}
+
+/** Waliduje surowy komunikat od agenta. Zwraca null dla wszystkiego, czego renderer nie obsłuży. */
+export function parseEvent(raw: unknown): AiUiEvent | null {
+    const r = parseEventDiagnostic(raw);
+    return r.ok ? r.event : null;
 }
 
 // ── koperty klient → agent ────────────────────────────────────────

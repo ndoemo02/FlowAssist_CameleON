@@ -226,8 +226,12 @@ function reservedKeyPath(root: Record<string, unknown>): string {
     return '';
 }
 
-/** Surface z jedynej koperty A2UI, jeśli da się go ustalić (do raportu A2UI zamiast diagnostyki). */
+/**
+ * Surface z jedynej koperty A2UI, jeśli da się go ustalić (do raportu A2UI zamiast diagnostyki). Wiadomość mieszana
+ * (więcej niż jeden payload, także stage/narration obok koperty A2UI) nie ma surface'u.
+ */
 function surfaceOf(raw: Record<string, unknown>): SurfaceId | undefined {
+    if (PAYLOAD_KEYS.filter((k) => k in raw).length !== 1) return undefined;
     const present = A2UI_KEYS.filter((k) => k in raw);
     if (present.length !== 1) return undefined;
     const body = raw[present[0]];
@@ -293,10 +297,10 @@ export function parseEventDiagnostic(raw: unknown): ParseResult {
                 : reject('CATALOG_MISMATCH', '/createSurface/catalogId', surfaceId);
         case 'updateComponents': {
             if (!Array.isArray(body.components)) return reject('COMPONENT_INVALID', '/updateComponents/components', surfaceId);
-            const bad = body.components.findIndex((c) => !isComponent(c)); // = !every(isComponent)
-            return bad === -1
-                ? { ok: true, event: raw as UpdateComponentsMsg }
-                : reject('COMPONENT_INVALID', componentPath(body.components[bad]), surfaceId);
+            // o przyjęciu decyduje every (jak przed D7: pomija dziury tablicy); findIndex tylko do ścieżki odrzucenia
+            if (body.components.every(isComponent)) return { ok: true, event: raw as UpdateComponentsMsg };
+            const bad = body.components.findIndex((c) => !isComponent(c));
+            return reject('COMPONENT_INVALID', componentPath(body.components[bad]), surfaceId);
         }
         case 'updateDataModel': {
             const path = body.path;

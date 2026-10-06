@@ -537,7 +537,7 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
 | D1, D2, D4, D5, D8 | handshake P1.7a | zrealizowane (`fdc79b6`) |
 | D3 | profil jako dokument w repo + schematy | ten dokument |
 | D6 | wiązanie: ramki `CUSTOM flowassist.frame`; `seq` per bieg AG-UI, reset w każdym biegu, kontrola fatalna, deduplikacja po (`runId`, `seq`), nigdy po treści | §4–§5 |
-| D7 | `parseEventDiagnostic` — czysty refaktor w P1.7b (pakiet 2) | §11.5 |
+| D7 | `parseEventDiagnostic` — czysty refaktor w P1.7b (pakiet 2); zrealizowane (`84f22c6` + poprawki review) | §11.5 |
 | D9 | `ServerCapabilities` ze statycznej konfiguracji adaptera | §3.3 |
 | D10 | `awaiting_action` = interrupt `flowassist.awaiting_action`; akcja w `resume.payload` | §6, §8 |
 | D11 | `RUN_FINISHED cancelled` → nowy terminalny `RunStatus 'cancelled'` (P1.6, zmiana kernela zatwierdzona) | §6.1 |

@@ -99,6 +99,7 @@ describe('przyczyny, ścieżki i surface (profil §11.3, §11.5)', () => {
         ['klucz zarezerwowany w propsach komponentu: segment po id', JSON.parse('{"version":"v0.9.1","updateComponents":{"surfaceId":"workspace","components":[{"id":"c/1","component":"WorkspaceItem","content":{"__proto__":{}}}]}}'), 'RESERVED_KEY', '/updateComponents/components/c~11/content/__proto__', 'workspace'],
         ['klucz zarezerwowany w komponencie bez poprawnego id: kolekcja', JSON.parse('{"version":"v0.9.1","updateComponents":{"surfaceId":"hud","components":[{"component":"X","props":{"constructor":1}}]}}'), 'RESERVED_KEY', '/updateComponents/components', 'hud'],
         ['klucz z "/" i "~" escapowany', JSON.parse('{"version":"v0.9.1","updateDataModel":{"surfaceId":"hud","path":"/m","value":{"a/b~c":{"__proto__":1}}}}'), 'RESERVED_KEY', '/updateDataModel/value/a~1b~0c/__proto__', 'hud'],
+        ['klucz zarezerwowany w wiadomości mieszanej: bez surface (to nie jest jedna koperta)', JSON.parse('{"__proto__":{},"stage":{"focus":"back"},"createSurface":{"surfaceId":"hud","catalogId":"flowassist/v2"},"version":"v0.9.1"}'), 'RESERVED_KEY', '/__proto__', undefined],
         ['dwa payloady (OBS-4)', { stage: { focus: 'back' }, narration: { text: null } }, 'PAYLOAD_COUNT', '', undefined],
         ['brak payloadu', { version: 'v0.9.1' }, 'PAYLOAD_COUNT', '', undefined],
         ['stage nie obiekt', { stage: null }, 'STAGE_INVALID', '/stage', undefined],
@@ -138,6 +139,13 @@ describe('przyczyny, ścieżki i surface (profil §11.3, §11.5)', () => {
 
     it('każda przyczyna z listy ma co najmniej jeden przypadek', () => {
         expect(new Set(cases.map((c) => c[2]))).toEqual(new Set(PARSE_REASONS));
+    });
+
+    it('tablica z dziurami (tylko obiekty z JS, nie z JSON.parse): przyjęcie jak przed D7 (every pomija dziury)', () => {
+        const raw = { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [, { id: 'a', component: 'TaskList' }] } };
+        const d = parseEventDiagnostic(raw);
+        expect(d.ok).toBe(true);
+        expect(parseEvent(raw)).toBe(raw);
     });
 
     it('bardzo głębokie zagnieżdżenie (12 000 poziomów) z kluczem na dnie: przyczyna i ścieżka bez przepełnienia stosu', () => {

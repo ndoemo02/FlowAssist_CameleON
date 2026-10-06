@@ -50,6 +50,22 @@ describe('strażnik dryfu profilu flowassist-transport/1', () => {
         expect(JSON.parse(JSON.stringify(PROFILE_RULES))).toEqual(PROFILE_DOC_RULES);
         expect(PROFILE_RULES.limits).toMatchObject({ dataModelPathMaxLength: 512, dataModelPathMaxSegments: 32 });
     });
+
+    // Niezależny literał dla stałych krytycznych (review pakietu 2, L3): zgodna zmiana dokumentu i kodu naraz
+    // nie przejdzie bez świadomej zmiany także tutaj.
+    it('stałe krytyczne profilu — twardy literał', () => {
+        expect(PROFILE_RULES.limits).toEqual({
+            dataModelPathMaxLength: 512, dataModelPathMaxSegments: 32,
+            eventMaxBytes: 1_048_576, messageMaxBytes: 262_144, pendingReportsMax: 32,
+        });
+        expect(PROFILE_RULES.envelope).toEqual({ send: 'v0.9.1', accept: ['v0.9', 'v0.9.1'] });
+        expect(PROFILE_RULES.reservedKeys).toEqual(['__proto__', 'constructor', 'prototype']);
+        expect(PROFILE_RULES.actions.slots).toBe(1);
+        expect(PROFILE_RULES.codes.parseReasons).toEqual([
+            'NOT_OBJECT', 'RESERVED_KEY', 'PAYLOAD_COUNT', 'STAGE_INVALID', 'NARRATION_INVALID', 'VERSION_UNSUPPORTED',
+            'SURFACE_UNKNOWN', 'CATALOG_MISMATCH', 'COMPONENT_INVALID', 'PATH_INVALID', 'PATH_LIMIT',
+        ]);
+    });
 });
 
 describe('clientCapabilities(): snapshot', () => {

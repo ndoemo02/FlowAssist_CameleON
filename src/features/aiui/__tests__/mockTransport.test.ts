@@ -49,7 +49,9 @@ describeTransportConformance('MockTransport', {
 
 /**
  * Dowód, że wspólny zestaw przyjmuje transport ASYNCHRONICZNY (jak adapter fetch/SSE w P1.6): wywołania backendu,
- * zdarzenia, statusy i samo `send` dochodzą w mikrozadaniach, a nie synchronicznie (review P1.7a, M1).
+ * zdarzenia i statusy dochodzą w mikrozadaniach (review Claude P1.7a, M1). Jak poprawny adapter, wrapper rozstrzyga
+ * zgodę w chwili PRZYJĘCIA `send` (synchronicznie), a dopiero dostarczenie jest odroczone — odroczenie samej decyzji
+ * przenosiłoby komunikat do następnego przebiegu (review Astry P1.7a, MEDIUM 2; przypadki 12–13 zestawu).
  */
 class AsyncMock implements AgentTransport {
     private readonly inner: ConfigurableMock;
@@ -57,7 +59,7 @@ class AsyncMock implements AgentTransport {
         this.inner = new ConfigurableMock(server, (c) => queueMicrotask(() => onBackendCall(c)));
     }
     start(runId: number, request: StartRequest) { this.inner.start(runId, request); }
-    send(message: ClientMessage) { queueMicrotask(() => this.inner.send(message)); }
+    send(message: ClientMessage) { this.inner.send(message); }
     subscribe(onEvent: Parameters<AgentTransport['subscribe']>[0], onStatus: Parameters<AgentTransport['subscribe']>[1]) {
         return this.inner.subscribe(
             (runId, raw) => queueMicrotask(() => onEvent(runId, raw)),

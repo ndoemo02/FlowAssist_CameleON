@@ -133,6 +133,21 @@ JSON Schema: `$defs.noReservedKeys` (rekurencyjnie `propertyNames` + `additional
 `id` i `children`, wykluczenie segmentu w `pattern` ścieżki; parytet z guardem w `schema.test.ts`.
 Nazwy podobne (`constructorName`, `proto`, `__proto`) i wartości tekstowe `"__proto__"` są przyjmowane.
 
+**Założenia i granice (review FU-4, 2026-10-06):**
+- Guard sprawdza **migawkę** danych, a store zachowuje referencje do wejścia (bez kopii). Ochrona obowiązuje więc dla
+  **świeżego wyniku `JSON.parse`**, którego wywołujący nie zatrzymuje ani nie mutuje. Obiekty zbudowane w JS (gettery
+  zwracające różne wartości przy kolejnych odczytach, Proxy ze zmiennym `ownKeys`, mutacja po dispatch) są poza modelem
+  zagrożeń — osiągalne dziś tylko przez dev-hook (`devDispatch`, wyłączony w produkcji). Adapter P1.6 parsuje każdy
+  komunikat świeżo (albo robi round-trip JSON) — do zapisania w profilu (P1.7b).
+- Koszt skanu jest liniowy w rozmiarze ładunku (rząd kosztu samego `JSON.parse`; 1 mln obiektów ≈ 0,2 s). Limitu
+  rozmiaru komunikatu dziś nie ma (FU-3 ogranicza tylko ścieżkę) — limit bajtów **przed** `JSON.parse` należy do adaptera
+  P1.6 (do zapisania w profilu, P1.7b).
+- Klucz własny `constructor` albo `prototype` także w legalnych danych (np. id w mapie, nazwa kolumny) odrzuca cały
+  komunikat — świadoma konsekwencja decyzji, do opisania w profilu (P1.7b).
+- Parytet schematu: wzorzec ścieżki sprawdza segmenty przez `[^/]*`, nie przez `.` (`.` nie dopasowuje znaku końca linii,
+  więc `/a
+/__proto__` przechodziło przez schemat, choć guard je odrzucał); przypadki brzegowe w `schema.test.ts`.
+
 ## Otwarte
 
 1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie. Kandydat na uzasadnienie: schematy upstream v0.9.1 same przyjmują `version ∈ {"v0.9","v0.9.1"}`. Zamknięcie w dokumencie profilu (P1.7b).

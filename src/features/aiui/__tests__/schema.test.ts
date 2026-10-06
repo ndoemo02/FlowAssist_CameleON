@@ -76,6 +76,9 @@ const ENVELOPE_EDGES: unknown[] = [
     { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'constructor', component: 'Approval' }] } },
     { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'r', component: 'Workspace', children: ['prototype'] }] } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a/__proto__/b', value: 1 } },
+    // review FU-4 LOW-1: `.` w lookahead wzorca nie dopasowywał znaku końca linii — segment zarezerwowany po nim przechodził
+    ...['\n', '\r', ' ', ' '].map((sep) => ({ version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: `/a${sep}/__proto__/b`, value: 1 } })),
+    { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a\n/ok', value: 1 } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/constructor', value: 1 } },
     { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/constructorName', value: { prototypes: 1, label: '__proto__' } } },
     // OBS-4: mieszane koperty odrzucane w całości

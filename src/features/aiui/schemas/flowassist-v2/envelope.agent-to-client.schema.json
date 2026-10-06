@@ -209,9 +209,9 @@
             },
             "path": {
               "type": "string",
-              "description": "FU-3 / ADR 0002: limit zasobów — ≤ 512 punktów kodowych Unicode (jednostka maxLength) i ≤ 32 segmenty (contract.ts: PROTOCOL_LIMITS); FU-4: segment o nazwie zarezerwowanej odrzucany",
+              "description": "FU-3 / ADR 0002: limit zasobów — ≤ 512 punktów kodowych Unicode (jednostka maxLength) i ≤ 32 segmenty (contract.ts: PROTOCOL_LIMITS); FU-4: segment o nazwie zarezerwowanej odrzucany (lookahead po segmentach [^/]*, nie po `.` — `.` nie dopasowuje znaku końca linii)",
               "maxLength": 512,
-              "pattern": "^(?!.*/(?:__proto__|constructor|prototype)(?:/|$))(/[^/]*){0,32}$"
+              "pattern": "^(?!(?:/[^/]*)*/(?:__proto__|constructor|prototype)(?:/|$))(/[^/]*){0,32}$"
             },
             "value": {}
           }

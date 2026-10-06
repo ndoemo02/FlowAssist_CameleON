@@ -45,7 +45,7 @@ export default function WorkspaceLayer({ compact }: { compact: boolean }) {
             aria-label="Stół roboczy"
             data-focus-layer="table"
             tabIndex={-1} // bezpieczny cel fokusu (tylko programowo, P0.5)
-            className="absolute inset-x-0 outline-none transition-opacity duration-200"
+            className="absolute inset-x-0 outline-none transition-opacity duration-200 focus-visible:ring-1 focus-visible:ring-cyan-400/40"
             style={{
                 top: zones.top, bottom: zones.panel, opacity: visibility,
                 visibility: visibility === 0 ? 'hidden' : 'visible',
@@ -80,6 +80,12 @@ const WorkspaceCard = memo(function WorkspaceCard({ id, compact, containerRef }:
     // pokazujemy, gdy fokus KLAWIATURY jest w karcie (:focus-visible). Fokus myszą (klik, drag) nie zmienia wyglądu;
     // kontrolki chowa dopiero wyjście fokusu z karty (klik myszą w kontrolkę ich nie chowa).
     const [keyboardWithin, setKeyboardWithin] = useState(false);
+    // karta znika ze stołu (ukryta, na ekranie, usunięta): menu i kontrolki z fokusu klawiatury nie przeżywają tego
+    // (komponent zostaje zamontowany i rysuje null / ślad na stole, więc stan lokalny trzeba wyzerować — P0.5, R7)
+    const presentation = entry?.presentation;
+    useEffect(() => {
+        if (presentation !== 'card' && presentation !== 'focus') { setMenu(false); setKeyboardWithin(false); }
+    }, [presentation]);
     // ważność właściciela (P0.5): menu zamyka się, gdy stół przestaje być aktywny (visibility ≤ 0.6)
     const tableActive = useAiUi((s) => slotVisibility(s.camera.angle, FOCUS_ANGLE.back) > 0.6);
     useEffect(() => { if (!tableActive) setMenu(false); }, [tableActive]);

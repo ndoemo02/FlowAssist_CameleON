@@ -37,22 +37,32 @@ export function useFocusRescue(rootRef: RefObject<HTMLElement>) {
         const check = () => {
             scheduled = false;
             const active = document.activeElement;
-            if (!last || (active && active !== document.body)) return;
+            if (active && active !== document.body) {
+                if (!root.contains(active)) last = null; // fokus żyje poza overlayem — nie jest już „naszym” fokusem
+                return;
+            }
+            if (!last) return;
             const lost = last;
             last = null;
             if (canTakeFocus(lost)) return; // użytkownik sam zdjął fokus — zostaje na <body>
-            safeFocusTarget(root)?.focus();
+            // preventScroll: overlay jest w sekcji hero przewijanej strony — ratunek nie może przejąć viewportu
+            safeFocusTarget(root)?.focus({ preventScroll: true });
         };
         const schedule = () => { if (!scheduled) { scheduled = true; queueMicrotask(check); } };
         const onFocusIn = (e: FocusEvent) => { last = e.target as HTMLElement; };
+        const onFocusOut = (e: FocusEvent) => {
+            const to = e.relatedTarget as Node | null;
+            if (to && !root.contains(to)) last = null; // fokus przeszedł poza overlay (review P0.5 krok 3–4, HIGH-1)
+            schedule();
+        };
         const observer = new MutationObserver(schedule);
         observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['inert', 'aria-hidden'] });
         root.addEventListener('focusin', onFocusIn);
-        root.addEventListener('focusout', schedule);
+        root.addEventListener('focusout', onFocusOut);
         return () => {
             observer.disconnect();
             root.removeEventListener('focusin', onFocusIn);
-            root.removeEventListener('focusout', schedule);
+            root.removeEventListener('focusout', onFocusOut);
         };
     }, [rootRef]);
 }

@@ -63,6 +63,13 @@ function itemWithActions() {
 const toBack = () => act(() => useAiUi.getState().setAngle(Math.PI, 'manual'));
 const anchorActive = () => act(() => publishAnchor({ mode: 'anchor', active: true, reason: 'ok', outer: null, inner: null,
     panel: { x: 0, y: 0, w: 600, h: 300 }, coverage: 1, visibleFraction: 1, angleDeg: 0, pointCount: 0, computeMs: 0 } as unknown as AnchorState));
+function twoItems() {
+    itemWithActions();
+    agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [
+        { id: 'root', component: 'Workspace', children: ['m', 'n'] },
+        { id: 'n', component: 'WorkspaceItem', kind: 'chart', title: 'Inne', representations: ['chart2d'], content: { path: '/items/m' }, presentation: 'card' },
+    ] } });
+}
 const article = (r: Rendered) => r.container.querySelector<HTMLElement>('article[aria-label="Zapytania"]')!;
 const screen = (r: Rendered) => r.container.querySelector<HTMLElement>('section[aria-label="Ekran: Zapytania"]')!;
 
@@ -331,14 +338,83 @@ describe('bezpieczny cel fokusu, gdy fokusowany element znika', () => {
     it('fokus zdjęty przez użytkownika (body) nie wraca sam przy późniejszych zmianach', async () => {
         const r = mount();
         startRun();
-        itemWithActions();
+        twoItems();
         toBack();
         article(r).focus();
         act(() => article(r).blur()); // np. klik w scenę 3D
         await flush();
-        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: [] }] } });
-        await flush();
         expect(document.activeElement).toBe(document.body);
+        // zmiana, która zostawia stół (bezpieczny cel istnieje) — ratunek nie może zabrać fokusu z <body>
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: ['m'] }] } });
+        await flush();
+        expect(tableLayer(r)).not.toBeNull();
+        expect(document.activeElement).toBe(document.body);
+    });
+
+    // review kroków 3–4, HIGH-1: fokus, który wyszedł poza overlay, nie jest „ostatnim fokusem overlayu”
+    it('fokus poza overlayem → <body> → agent usuwa kartę: fokus zostaje na <body>', async () => {
+        const r = mount();
+        startRun();
+        twoItems();
+        toBack();
+        article(r).focus();
+        const outside = document.createElement('button');
+        document.body.appendChild(outside);
+        act(() => outside.focus());
+        await flush(); // sprawdzenie ratunku zdąży się wykonać, gdy fokus jest jeszcze poza overlayem
+        act(() => outside.blur());
+        await flush();
+        agent({ version: V, updateComponents: { surfaceId: 'workspace', components: [{ id: 'root', component: 'Workspace', children: ['n'] }] } });
+        await flush();
+        expect(article(r)).toBeNull();
+        expect(document.activeElement).toBe(document.body);
+        outside.remove();
+    });
+
+    // review kroków 3–4, MEDIUM-1: ratunek nie przewija strony (overlay jest w sekcji hero przewijanej strony)
+    it('ratunek ustawia fokus z preventScroll', async () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => useAiUi.getState().layoutCommand({ type: 'focus', id: 'm' }));
+        const hide = button(article(r), 'Ukryj');
+        hide.focus();
+        const spy = vi.spyOn(HTMLElement.prototype, 'focus');
+        click(hide);
+        await flush();
+        const rescue = spy.mock.calls.find((_, i) => (spy.mock.instances[i] as unknown) === tableLayer(r));
+        expect(rescue?.[0]).toEqual({ preventScroll: true });
+    });
+});
+
+// review kroków 3–4, MEDIUM-2 / LOW-4: menu i kontrolki z fokusu klawiatury nie przeżywają zniknięcia karty
+describe('menu i kontrolki karty po ukryciu i po ekranie', () => {
+    it('Akcje → Ukryj → Przywróć: menu zamknięte, kontrolki bez fokusu schowane', () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => article(r).focus()); // fokus klawiatury: kontrolki widoczne
+        click(button(article(r), 'Akcje'));
+        expect(button(article(r), 'Pogłęb')).toBeTruthy();
+        act(() => useAiUi.getState().layoutCommand({ type: 'dismiss', id: 'm' }));
+        act(() => useAiUi.getState().layoutCommand({ type: 'restore', id: 'm' }));
+        expect(useAiUi.getState().layout.m.presentation).toBe('card');
+        expect(button(article(r), 'Pogłęb')).toBeUndefined();
+        expect(button(article(r), 'Powiększ')).toBeUndefined();
+    });
+
+    it('Akcje → Na ekran → Na stół: menu zamknięte', () => {
+        const r = mount();
+        startRun();
+        itemWithActions();
+        toBack();
+        act(() => useAiUi.getState().layoutCommand({ type: 'focus', id: 'm' }));
+        click(button(article(r), 'Akcje'));
+        act(() => useAiUi.getState().layoutCommand({ type: 'toScreen', id: 'm' }));
+        act(() => useAiUi.getState().layoutCommand({ type: 'toCard', id: 'm' }));
+        expect(button(article(r), 'Pogłęb')).toBeUndefined();
     });
 });
 

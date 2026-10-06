@@ -84,7 +84,7 @@ function ScreenPanel({ id }: { id: string }) {
             data-focus-layer="screen"
             tabIndex={-1} // bezpieczny cel fokusu (tylko programowo, P0.5)
             onKeyDown={(ev) => { if (menu && ev.key === 'Escape') { ev.preventDefault(); ev.stopPropagation(); closeMenu(); } }}
-            className={`absolute flex flex-col overflow-hidden border text-white transition-opacity duration-150 ${
+            className={`absolute flex flex-col overflow-hidden border text-white outline-none transition-opacity duration-150 focus-visible:ring-1 focus-visible:ring-cyan-400/40 ${
                 centered
                     ? 'left-1/2 top-[14%] max-h-[62%] w-[calc(100%-32px)] max-w-[560px] -translate-x-1/2 rounded-2xl border-cyan-400/40 bg-[#07040f]/95'
                     : 'left-0 top-0 rounded-lg border-cyan-400/30 bg-[#07040f]/90'

@@ -310,6 +310,34 @@ describe('FU-1: błędy struktury surface\'u', () => {
         expect(errorsSent()).toHaveLength(2);
     });
 
+    // Weryfikacja Astry (FU-1): nierozwiązany binding (pending) nie może maskować pewnego błędu typu w slocie.
+    it('typ niedozwolony w slocie jest zgłaszany mimo nierozwiązanego bindingu (pending)', () => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        agent({ version: V, updateComponents: { surfaceId: 'hud', components: [
+            { id: 'root', component: 'Workspace', children: [], note: { path: '/missing' } },
+        ] } });
+        expect(errorsSent()).toEqual([expect.objectContaining({ surfaceId: 'hud', path: '/components/root/component' })]);
+        agent({ version: V, updateDataModel: { surfaceId: 'hud', path: '/missing', value: 1 } }); // dostarczenie danych
+        expect(errorsSent()).toHaveLength(1);                                                     // to samo wystąpienie
+    });
+
+    it('dziecko z typem niedozwolonym w slocie pod rodzicem w pending jest zgłaszane', () => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        agent({ version: V, updateComponents: { surfaceId: 'hud', components: [
+            { id: 'root', component: 'Approval', title: 'T', summary: 'S', children: ['w'], note: { path: '/missing' } }, // pending
+            { id: 'w', component: 'Workspace', children: [] },                                                       // zły typ
+        ] } });
+        expect(errorsSent()).toEqual([expect.objectContaining({ surfaceId: 'hud', path: '/components/w/component' })]);
+    });
+
+    it('strażnik: poprawny typ z brakującym bindingiem to pending, bez raportu', () => {
+        agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });
+        agent({ version: V, updateComponents: { surfaceId: 'hud', components: [
+            { id: 'root', component: 'Approval', title: 'T', summary: 'S', note: { path: '/missing' } },
+        ] } });
+        expect(errorsSent()).toHaveLength(0);
+    });
+
     it('brak roota to pending, nie błąd struktury', () => {
         agent({ version: V, createSurface: { surfaceId: 'workspace', catalogId: 'flowassist/v2' } });
         agent({ version: V, createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2' } });

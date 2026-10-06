@@ -19,7 +19,7 @@
 // - Każdy raport niesie przebieg, w którym powstał; store wysyła go tylko w tym samym, aktywnym przebiegu.
 // Instaluje go warstwa UI (AiUiOverlay) — koordynator (store.dispatch) nie raportuje fallbacków.
 
-import { SURFACE_IDS, type ClientError, type SurfaceId } from './contract';
+import { SURFACE_IDS, isCatalogName, type ClientError, type SurfaceId } from './contract';
 import { resolveTree, type ResolvedNode } from './resolveTree';
 import { resolveItem, workspaceChildren } from './workspace';
 import { SLOT_UNAVAILABLE_REASON, TREE_VIEWS } from './registry';
@@ -70,13 +70,24 @@ export function scanSurfaces(surfaces: AiUiState['surfaces']) {
                 if (view.status === 'fallback') problems.push({ surfaceId, nodeId: id, path: view.path, message: view.reason });
             }
         } else {
-            treeMembers(surface.components).forEach((id) => nodes.set(nodeKey(surfaceId, id), 'unavailable'));
+            // FU-1: zgodność typu ze slotem z DEFINICJI członka grafu, przed rozwiązaniem bindingów — nierozwiązany
+            // binding (pending) ani rodzic w pending nie maskują pewnego błędu struktury (komponent katalogu bez
+            // widoku w slocie; SurfaceRenderer rysuje fallback). Taki węzeł jest 'fallback' bez względu na dane.
+            const slotInvalid = new Set<string>();
+            treeMembers(surface.components).forEach((id) => {
+                const type = surface.components[id].component;
+                const invalid = isCatalogName(type) && !TREE_VIEWS[type];
+                nodes.set(nodeKey(surfaceId, id), invalid ? 'fallback' : 'unavailable');
+                if (invalid) {
+                    slotInvalid.add(id);
+                    problems.push({ surfaceId, nodeId: id, path: `/components/${id}/component`, message: SLOT_UNAVAILABLE_REASON });
+                }
+            });
             const visit = (n: ResolvedNode) => {
-                // FU-1: komponent katalogu bez widoku w slocie = błąd struktury (SurfaceRenderer rysuje fallback)
-                const noSlotView = n.kind === 'component' && !TREE_VIEWS[n.type];
-                nodes.set(nodeKey(surfaceId, n.id), n.kind === 'component' ? (noSlotView ? 'fallback' : 'ready') : n.kind);
-                if (noSlotView) problems.push({ surfaceId, nodeId: n.id, path: `/components/${n.id}/component`, message: SLOT_UNAVAILABLE_REASON });
-                if (n.kind === 'fallback') problems.push({ surfaceId, nodeId: n.id, path: n.path ?? `/components/${n.id}`, message: n.reason });
+                if (!slotInvalid.has(n.id)) {
+                    nodes.set(nodeKey(surfaceId, n.id), n.kind === 'component' ? 'ready' : n.kind);
+                    if (n.kind === 'fallback') problems.push({ surfaceId, nodeId: n.id, path: n.path ?? `/components/${n.id}`, message: n.reason });
+                }
                 if (n.kind === 'component') n.children.forEach(visit);
             };
             const tree = resolveTree(surface);

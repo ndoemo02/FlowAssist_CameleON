@@ -1,7 +1,7 @@
 // Katalog flowassist/v2: czyste walidatory propsów (bez Reacta), używane przez resolveTree/resolveWorkspace.
 // Każdy walidator zwraca null albo { path, message } — path względny do propsów komponentu.
 
-import { ITEM_KINDS, PRESENTATIONS, REPRESENTATIONS, type CatalogName, type ItemKind, type Representation } from './contract';
+import { CATALOG_ID, ITEM_KINDS, PRESENTATIONS, REPRESENTATIONS, type CatalogName, type ItemKind, type Representation } from './contract';
 
 export type ValidationIssue = { path: string; message: string };
 type Validator = (p: Record<string, unknown>) => ValidationIssue | null;
@@ -125,6 +125,35 @@ export type SupportedRepresentation = keyof typeof SUPPORTED_REPRESENTATIONS;
 
 export const isSupportedRepresentation = (r: unknown): r is SupportedRepresentation =>
     typeof r === 'string' && r in SUPPORTED_REPRESENTATIONS;
+
+/** Obsługiwane reprezentacje per rodzaj (rodzaje bez obsługiwanej reprezentacji pominięte). */
+export type CatalogKinds = { readonly [K in ItemKind]?: readonly SupportedRepresentation[] };
+
+/**
+ * Część katalogowa capabilities klienta (oś 2, ADR 0002; P1.7a): identyfikator katalogu i to, co klient FAKTYCZNIE
+ * rysuje — KIND_REPRESENTATIONS ∩ SUPPORTED_REPRESENTATIONS, w kolejności KIND_REPRESENTATIONS (informacyjnej: P10
+ * bierze kolejność z listy agenta). Składanie z regułami profilu: transport/capabilities.ts.
+ */
+export function catalogCapabilities(): { catalogId: typeof CATALOG_ID; kinds: CatalogKinds } {
+    const kinds: { [K in ItemKind]?: SupportedRepresentation[] } = {};
+    for (const kind of ITEM_KINDS) {
+        const supported = KIND_REPRESENTATIONS[kind].filter(isSupportedRepresentation);
+        if (supported.length > 0) kinds[kind] = supported;
+    }
+    return { catalogId: CATALOG_ID, kinds };
+}
+
+/**
+ * Propsy każdego komponentu katalogu (bez `id`, `component`, `children`), deklaratywnie — źródło dla reguły profilu
+ * „bindingi tylko w propsach katalogu” (Q1, egzekwuje adapter P1.6). Parytet z components.schema.json pilnuje test;
+ * walidatory poniżej pozostają autorytetem kształtu wartości.
+ */
+export const CATALOG_PROPS = {
+    Workspace: [],
+    WorkspaceItem: ['kind', 'title', 'representations', 'presentation', 'priority', 'actions', 'content'],
+    TaskList: ['tasks'],
+    Approval: ['title', 'summary', 'items'],
+} as const satisfies Record<CatalogName, readonly string[]>;
 
 const validators: Record<CatalogName, Validator> = {
     TaskList: views.TaskList,

@@ -8,7 +8,9 @@ import { parsePointer } from './jsonPointer';
 
 export const A2UI_VERSION = 'v0.9.1' as const;
 export const CATALOG_ID = 'flowassist/v2' as const;
-const ACCEPTED_VERSIONS = new Set(['v0.9', 'v0.9.1']);
+/** Wersje koperty przyjmowane na wejściu (OBS-3, ADR 0002 oś 1); wychodzące zawsze A2UI_VERSION. Reguła profilu (P1.7a). */
+export const ACCEPTED_VERSIONS = ['v0.9', 'v0.9.1'] as const;
+const ACCEPTED = new Set<string>(ACCEPTED_VERSIONS);
 
 /**
  * Limity zasobów protokołu (FU-3, ADR 0002): niezaufane zdarzenie musi mieć rozsądny rozmiar, ZANIM dotknie stanu.
@@ -186,7 +188,7 @@ export function parseEvent(raw: unknown): AiUiEvent | null {
         return { narration: n as NarrationMsg['narration'] };
     }
 
-    if (typeof raw.version !== 'string' || !ACCEPTED_VERSIONS.has(raw.version)) return null;
+    if (typeof raw.version !== 'string' || !ACCEPTED.has(raw.version)) return null;
     const present = A2UI_KEYS.filter((k) => k in raw);
     if (present.length !== 1) return null;
     const kind = present[0];

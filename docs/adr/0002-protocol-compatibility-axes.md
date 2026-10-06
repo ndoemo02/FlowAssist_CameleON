@@ -155,3 +155,5 @@ Nazwy podobne (`constructorName`, `proto`, `__proto`) i wartości tekstowe `"__p
 3. **Które zdarzenia AG-UI niosą sygnały lifecycle:** research przed P1.6. `RUN_FINISHED` dotyczy pojedynczego wywołania backendu, nie przebiegu CameleON.
 4. **Indeks tablicy ≥ długości:** kanoniczny indeks równy długości tablicy dziś ją wydłuża, a większy tworzy dziury
    (`[ , , x]`). Nieobjęte decyzją z review #4 — do rozstrzygnięcia (odrzucać czy dopuszczać).
+   **Przypisane do P1.7b jako B4b** (właściciel, 2026-10-06): regułę normatywną ustala dokument profilu,
+   a jej egzekwowanie w kodzie (`jsonPointer.ts: setAt`, zmiana kontraktu) wymaga osobnej zgody.

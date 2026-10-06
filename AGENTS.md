@@ -202,14 +202,20 @@ Checkpointy:
 - `8c6e4ca` — v1.2.1, kroki 2–6
 - `2e2debc` — cleanup tekstur
 - `6e96223` — poprawki po review Astry + AGENTS.md
+- `4e0f766` / `f9b9f32` — v1.3 P0 zamknięte (z poprawkami po review Astry)
+- `fdc79b6` — P1.7a zamknięte, tag `p1.7a-closed`; handoff:
+  [`docs/checkpoints/P1.7a-CLOSED-2026-10-06.md`](docs/checkpoints/P1.7a-CLOSED-2026-10-06.md)
 
-Stan v1.3 P0 (2026-10-06, lokalnie, przed pushem): P0.1–P0.7 zrealizowane (taksonomia stanów: ADR 0007;
-dostępność: regiony ogłoszeń, fokus i klawiatura, axe = zero naruszeń; ograniczony ruch), zmiana kernela ST-1(b)
-za zgodą właściciela. Testy: vitest 325/325; pełny tsc: 1 znany błąd (Lanyard); ostatni pełny e2e 27 passed /
-15 skipped / 0 failed na `af57706`, później celowane (`motion` 12/12, `surfaces` + `a11y` desktop 6/6).
-Review: recenzent Claude w świeżym kontekście dla każdego kroku (GO WITH FIXES → poprawione, ponowne sprawdzenie OK);
-po pushu (`4e0f766`) zbiorcze review Astry (GPT-6 Astra przez inference.sh, `belt`, koszt łącznie $2): ST-1(b) GO,
-P0.5 i P0.6 GO WITH FIXES → poprawione.
+Stan v1.3 (2026-10-06, wypchnięte do `cameleon/feat/aiui-prototype`): P0.1–P0.7, FU-1..FU-4, Q2 i P1.7a zamknięte.
+- P0: taksonomia stanów (ADR 0007); dostępność (regiony ogłoszeń, fokus i klawiatura, axe = zero naruszeń); ograniczony
+  ruch; zmiany kernela ST-1(b) i Q2 za zgodą właściciela.
+- P1.7a: handshake możliwości (`clientCapabilities()`, `negotiate()`, zgoda na wysyłkę per przebieg, mock egzekwuje
+  negocjację, wspólny test zgodności transportu); szczegóły w checkpoincie i ADR 0002.
+- Testy na `fdc79b6`: vitest 474/474; pełny tsc: 1 znany błąd (Lanyard); pełny e2e 39 passed / 15 skipped / 0 failed;
+  `next build` PASS.
+- Review: recenzent Claude w świeżym kontekście dla każdego kroku (GO WITH FIXES → poprawione, ponowne sprawdzenie OK);
+  Astra (GPT-6 Astra przez inference.sh, `belt`): P0 zbiorczo (ST-1(b) GO, P0.5 i P0.6 GO WITH FIXES → poprawione),
+  plan P1.7 i kod P1.7a GO WITH FIXES → poprawione. Granice tych review: checkpoint P1.7a, §6.
 
 Stan na `6e96223` (historyczny):
 
@@ -369,12 +375,13 @@ v1.3 — wydanie utwardzające i adapterowe. Inwarianty kernela I1–I10 zamroż
 właściciela, zapisane w ADR 0001.
 Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
 
-- **P0 (hardening) — zrealizowane (2026-10-06, lokalnie, przed pushem):**
+- **P0 (hardening) — zrealizowane i wypchnięte (2026-10-06):**
   - ~~Playwright + axe (tylko Chromium)~~ — P0.1;
   - ~~korpus fixture'ów z replay~~ — P0.2;
   - ~~JSON Schema jako warstwowy test konformacji~~ — P0.3;
   - ~~taksonomia stanów elementu~~ — P0.4, ADR 0007 (ST-1(b): zmiana kernela za zgodą właściciela; ST-2, ST-3 zostają;
-    ST-4: `presentation` i `priority` tylko dosłownie — opisać w profilu P1.7; pytania Q1–Q3 do decyzji);
+    ST-4: `presentation` i `priority` tylko dosłownie — opisać w profilu P1.7b; Q1–Q3 rozstrzygnięte: Q1 profil + adapter,
+    Q2 zrobione, Q3 → FU-4);
   - ~~dostępność natywnym HTML~~ — P0.5 (axe = zero naruszeń; regiony ogłoszeń; fokus i klawiatura; ważność
     właściciela menu; LOW-1: fokus po „Na ekran” z klawiatury na panel ekranu);
   - ~~reduced motion~~ — P0.6 (+ galaktyka w tle; napis z cząstek i intro — później);
@@ -398,11 +405,14 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
     (ADR 0002, `contract.ts: RESERVED_KEYS`).
 - **P1.7 — podzielone (decyzja właściciela 2026-10-06), plan `C:\Develop\Flow Assist\PLAN_P1.7_capabilities.md` (v2.2):**
   - ~~**Q2**~~ — zrealizowane: martwe `hint`/`priority` usunięte z widoku `ready` (kernel, ADR 0001/0007);
-  - **P1.7a — capabilities w kodzie** — kod gotowy lokalnie (przed raportem do właściciela i pushem): D2 (obsługiwane reprezentacje = capabilities, nie
-    katalog; ADR 0002), `clientCapabilities()` w kształcie upstream A2UI, `negotiate()` (kolejność 0–5), zgoda na wysyłkę
-    per przebieg (reset przy każdym `start`/`stop`), mock egzekwuje te same reguły, wspólny test zgodności transportu;
-  - **P1.7b — zamknięcie profilu `flowassist-transport/1`** (następny etap): wiązanie AG-UI (research), ramka, lifecycle,
-    raportowanie bez surface, reguły danych dla adaptera (Q1, ST-4), polityka wersji koperty, akcje, `stage`/`narration`.
+  - ~~**P1.7a — capabilities w kodzie**~~ — zamknięte i wypchnięte (`fdc79b6`, tag `p1.7a-closed`; handoff
+    `docs/checkpoints/P1.7a-CLOSED-2026-10-06.md`): D2 (obsługiwane reprezentacje = capabilities, nie katalog; ADR 0002),
+    `clientCapabilities()` w kształcie upstream A2UI, `negotiate()` (kolejność 0–5), zgoda na wysyłkę per przebieg
+    (reset przy każdym `start`/`stop`), mock egzekwuje te same reguły, wspólny test zgodności transportu;
+  - **P1.7b — zamknięcie profilu `flowassist-transport/1`** (następny etap, tylko za zgodą właściciela): wiązanie AG-UI
+    (research, D6), ramka, lifecycle, raportowanie bez surface (D7: diagnostyczny `parseEvent`), reguły danych dla
+    adaptera (Q1, ST-4; B4a: granica danych; **B4b: indeks tablicy ≥ długości, ADR 0002 „Otwarte” 4**), polityka wersji
+    koperty, akcje, `stage`/`narration`, polityka katalogu. Pełna lista B1–B8 i kryteria zamknięcia: checkpoint P1.7a, §10.
   - P1.6 dopiero po zamknięciu P1.7b.
 - **P1 (warunkowo):** Radix albo React Aria, tylko jeśli po P0 natywna mechanika menu i fokusu okaże się krucha.
 - **Poza v1.3:** spike'i gestów, wykresów i tabel. Eksperymenty P2 (MCP Apps, Drei Html, graph2d, Vega-Lite, MapLibre) w v1.4.

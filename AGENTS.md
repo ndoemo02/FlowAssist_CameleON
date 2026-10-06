@@ -409,7 +409,8 @@ Plan: `C:\Develop\Flow Assist\PLAN_v1.3_proposal.md` (v1.3.2 FINAL, poza repo).
     `docs/checkpoints/P1.7a-CLOSED-2026-10-06.md`): D2 (obsługiwane reprezentacje = capabilities, nie katalog; ADR 0002),
     `clientCapabilities()` w kształcie upstream A2UI, `negotiate()` (kolejność 0–5), zgoda na wysyłkę per przebieg
     (reset przy każdym `start`/`stop`), mock egzekwuje te same reguły, wspólny test zgodności transportu;
-  - **P1.7b — zamknięcie profilu `flowassist-transport/1`** (następny etap, tylko za zgodą właściciela): wiązanie AG-UI
+  - **P1.7b — zamknięcie profilu `flowassist-transport/1`** (w toku, zgoda właściciela 2026-10-06; dokument normatywny
+    [`docs/protocol/flowassist-transport-1.md`](docs/protocol/flowassist-transport-1.md), plan `C:\Develop\Flow Assist\PLAN_P1.7b_profile.md`): wiązanie AG-UI
     (research, D6), ramka, lifecycle, raportowanie bez surface (D7: diagnostyczny `parseEvent`), reguły danych dla
     adaptera (Q1, ST-4; B4a: granica danych; **B4b: indeks tablicy ≥ długości, ADR 0002 „Otwarte” 4**), polityka wersji
     koperty, akcje, `stage`/`narration`, polityka katalogu. Pełna lista B1–B8 i kryteria zamknięcia: checkpoint P1.7a, §10.

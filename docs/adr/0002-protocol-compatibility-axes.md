@@ -1,6 +1,6 @@
 # ADR 0002: Trzy osie zgodności protokołu
 
-- **Status:** zaakceptowany (v1.3). Oś 2 doprecyzowana decyzją D2 (2026-10-06, właściciel + review Astry): obsługiwane reprezentacje to capabilities, nie katalog. Mechanizm handshake'u ustalony (P1.7a). Polityka przyjmowania wersji koperty: do zamknięcia w profilu (P1.7b).
+- **Status:** zaakceptowany (v1.3). Oś 2 doprecyzowana decyzją D2 (2026-10-06, właściciel + review Astry): obsługiwane reprezentacje to capabilities, nie katalog. Mechanizm handshake'u ustalony (P1.7a). Oś 3 zamknięta normatywnie dokumentem profilu [`docs/protocol/flowassist-transport-1.md`](../protocol/flowassist-transport-1.md) (P1.7b, 2026-10-06): wiązanie AG-UI, ramka, lifecycle, reconnect, raportowanie, polityka wersji koperty.
 - **Kontekst:**
   - `contract.ts`, `catalog.ts` i `transport/types.ts` to powierzchnia protokołu, nie zamrożony kernel.
   - Jeden numer wersji (np. `flowassist/v2.x`) mieszałby trzy niezależne rzeczy: kopertę A2UI, katalog komponentów oraz transport z rozszerzeniami aplikacji.
@@ -41,7 +41,8 @@
 - rozszerzenia aplikacji `stage { focus, drawer }` i `narration { text, speak }` są **nieodwersjonowane**: `parseEvent` rozpoznaje je przed sprawdzeniem `version`;
 - `AgentTransport` (`transport/types.ts`): `start(runId, request)`, `send(message)`, `subscribe(onEvent, onStatus)`, `stop()`;
 - izolacja przebiegów przez `runId` tagowany przez transport;
-- brak identyfikatorów zdarzeń, sekwencji, handshake'u i reconnectu.
+- handshake możliwości: zrealizowany (P1.7a, sekcja niżej);
+- ramka zdarzeń, sekwencja, lifecycle i reconnect: **zdefiniowane normatywnie** w profilu (P1.7b), implementacja w adapterze P1.6 — dziś `MockTransport` ich nie używa.
 
 **Zasada:** profil transportowy (roboczo `flowassist-transport/1`) jest wersjonowany osobno i obejmuje:
 - rozszerzenia aplikacji (`stage`, `narration`);
@@ -70,7 +71,8 @@ jest opcjonalne, a `acceptsInlineCatalogs` domyślnie `false`. Katalogów inline
   druga linia obrony; reprezentację spoza obsługi klienta P10 i tak zamienia w fallback z raportem.
 - **Zgoda na wysyłkę jest per przebieg:** ustanawia ją wyłącznie udana negocjacja danego przebiegu; każdy `start`
   i `stop` ją resetuje. Po porażce albo `stop` żadne `send` nie trafia do backendu.
-- Ramka zdarzeń, lifecycle, reconnect, raportowanie odrzuconych kopert i wiązanie z AG-UI: zamknięcie profilu (P1.7b),
+- Ramka zdarzeń, lifecycle, reconnect, raportowanie odrzuconych kopert i wiązanie z AG-UI: zamknięte normatywnie w profilu
+  (P1.7b; ramka = AG-UI `CUSTOM flowassist.frame` z `seq` per bieg AG-UI, §4–§5 profilu),
   implementacja w P1.6.
 
 ## Schematy (P0.3)
@@ -138,12 +140,12 @@ Nazwy podobne (`constructorName`, `proto`, `__proto`) i wartości tekstowe `"__p
   **świeżego wyniku `JSON.parse`**, którego wywołujący nie zatrzymuje ani nie mutuje. Obiekty zbudowane w JS (gettery
   zwracające różne wartości przy kolejnych odczytach, Proxy ze zmiennym `ownKeys`, mutacja po dispatch) są poza modelem
   zagrożeń — osiągalne dziś tylko przez dev-hook (`devDispatch`, wyłączony w produkcji). Adapter P1.6 parsuje każdy
-  komunikat świeżo (albo robi round-trip JSON) — do zapisania w profilu (P1.7b).
+  komunikat świeżo (albo robi round-trip JSON) — reguła profilu §10.9 (round-trip JSON, implementacja P1.6).
 - Koszt skanu jest liniowy w rozmiarze ładunku (rząd kosztu samego `JSON.parse`; 1 mln obiektów ≈ 0,2 s). Limitu
   rozmiaru komunikatu dziś nie ma (FU-3 ogranicza tylko ścieżkę) — limit bajtów **przed** `JSON.parse` należy do adaptera
-  P1.6 (do zapisania w profilu, P1.7b).
+  P1.6 (profil §10.8: zdarzenie ≤ 1 MiB przed `JSON.parse`, wiadomość ≤ 256 KiB).
 - Klucz własny `constructor` albo `prototype` także w legalnych danych (np. id w mapie, nazwa kolumny) odrzuca cały
-  komunikat — świadoma konsekwencja decyzji, do opisania w profilu (P1.7b).
+  komunikat — świadoma konsekwencja decyzji, opisana w profilu (§10.10, obowiązek agenta).
 - Parytet schematu: wzorzec ścieżki sprawdza segmenty przez `[^/]*`, nie przez `.` (`.` nie dopasowuje znaku końca linii,
   więc `/a
 /__proto__` przechodziło przez schemat, choć guard je odrzucał); przypadki brzegowe w `schema.test.ts`.
@@ -151,9 +153,17 @@ Nazwy podobne (`constructorName`, `proto`, `__proto`) i wartości tekstowe `"__p
 ## Otwarte
 
 1. **Polityka wersji koperty:** czy tolerancja `v0.9` na wejściu zostaje (i jak ją uzasadnić), czy zawężamy do `v0.9.1`. Do decyzji kod bez zmian, a korpus P0.2 dokumentuje obecne zachowanie. Kandydat na uzasadnienie: schematy upstream v0.9.1 same przyjmują `version ∈ {"v0.9","v0.9.1"}`. Zamknięcie w dokumencie profilu (P1.7b).
+   **Zamknięte (2026-10-06, profil §2.1):** tolerancja `v0.9` + `v0.9.1` zostaje (uzasadnienie: upstream v0.9.1
+   przyjmuje oba); wyjście zawsze `v0.9.1`; A2UI v1.0 (Candidate) odrzucane — przyszły profil `flowassist-transport/2`.
 2. ~~**Mechanizm handshake'u**~~ — **zamknięte (2026-10-06):** metadane transportu, kształt wg schematów upstream (sekcja „Handshake możliwości”).
 3. **Które zdarzenia AG-UI niosą sygnały lifecycle:** research przed P1.6. `RUN_FINISHED` dotyczy pojedynczego wywołania backendu, nie przebiegu CameleON.
+   **Zamknięte (2026-10-06, profil §6, research AG-UI spec 1.0):** `awaiting_action` = `RUN_FINISHED` z interruptem
+   `flowassist.awaiting_action`, `done` = wynik `success`, `cancelled` = nowy status terminalny (D11), `RUN_ERROR` → `error`;
+   status ustalany na czystym końcu strumienia; ucięcie nie kończy przebiegu (resync, profil §7).
 4. **Indeks tablicy ≥ długości:** kanoniczny indeks równy długości tablicy dziś ją wydłuża, a większy tworzy dziury
    (`[ , , x]`). Nieobjęte decyzją z review #4 — do rozstrzygnięcia (odrzucać czy dopuszczać).
    **Przypisane do P1.7b jako B4b** (właściciel, 2026-10-06): regułę normatywną ustala dokument profilu,
    a jej egzekwowanie w kodzie (`jsonPointer.ts: setAt`, zmiana kontraktu) wymaga osobnej zgody.
+   **Rozstrzygnięte (D16, 2026-10-06, profil §10.7):** indeks `= długość` dopisuje, `> długość` odrzuca kopertę;
+   usunięcie elementu tablicy zachowuje długość (`undefined`, jak A2UI v0.9.1) zamiast dzisiejszego `splice`.
+   Kod: P1.6.

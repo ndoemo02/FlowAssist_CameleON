@@ -1,0 +1,427 @@
+# Profil transportowy `flowassist-transport/1`
+
+- **Status:** normatywny (P1.7b, 2026-10-06). Decyzje właściciela: D2, D3, D6, D7, D9–D20 (rejestr w §16).
+- **Zakres:** jak klient CameleON i agent wymieniają komunikaty A2UI i rozszerzenia aplikacji przez AG-UI.
+  To trzecia oś zgodności z [ADR 0002](../adr/0002-protocol-compatibility-axes.md). Adapter P1.6 implementuje ten
+  dokument i nie dodaje reguł w locie.
+- **Słownik normatywny** (BCP 14: RFC 2119, RFC 8174):
+  - **MUSI** = MUST;
+  - **NIE WOLNO** = MUST NOT;
+  - **POWINIEN** = SHOULD;
+  - **MOŻE** = MAY.
+
+**Role:**
+- **klient** — CameleON: adapter transportu i store;
+- **agent** — producent strumienia AG-UI, czyli backend albo proxy, które mówi tym profilem.
+
+**Egzekwowanie** — przy każdej regule:
+- **[kod]** — klient egzekwuje ją już dziś (plik w nawiasie);
+- **[P1.6]** — klient będzie ją egzekwował od adaptera P1.6;
+- **[agent]** — obowiązek agenta, którego klient nie zawsze może wykryć.
+
+## 1. Źródła (przypięte, research 2026-10-06)
+
+| Źródło | Wersja | Rola |
+|---|---|---|
+| AG-UI spec 1.0 | `ag-ui-protocol/ag-ui` @ `a30600791dcb`, `docs/spec/1.0/**`, `schema.json` | binding, lifecycle, model przetwarzania |
+| `@ag-ui/core`, `@ag-ui/client` | 1.0.2 | klient AG-UI dla adaptera P1.6 |
+| A2UI v0.9.1 | `google/A2UI` @ `0b22a7e`; capabilities zvendorowane @ `d6f6a62` (md5 zgodne z `main`) | koperta, capabilities |
+| `@ag-ui/a2ui-middleware` | 0.0.12 | konwencja oceniona i **niewspierana** w profilu/1 (§4.6) |
+
+Cytaty z AG-UI, na których opierają się reguły:
+- **F1.** Od klienta płynie jeden komunikat na bieg (`RunAgentInput`). W trakcie biegu nie ma kanału od klienta.
+- **F2.** Wynik biegu MUSI jechać w polach standardowych (`RUN_FINISHED.outcome`), nigdy tylko w nowym zdarzeniu.
+- **F5.** Binding HTTP + SSE daje kolejne i kompletne dostarczanie. Nie ma wznawiania. Zerwanie bez zdarzenia terminalnego to ucięty bieg.
+- **F7.** `CUSTOM` o nieznanej nazwie konsument ignoruje. NIE WOLNO przenosić w nim semantyki zdarzenia standardowego.
+- **F8.** Brak deklaracji `AgentCapabilities` NIE MOŻE blokować biegu.
+- **F11.** Nierozpoznany materiał przeżywa. Zniekształcona znana wartość jest fatalna.
+
+## 2. Osie i wersje
+
+- **2.1 Koperta A2UI (oś 1)** [kod: `contract.ts`]:
+  - wejście `version` ∈ {`v0.9`, `v0.9.1`}, bo upstream `server_to_client.json` v0.9.1 przyjmuje oba;
+  - wyjście zawsze `v0.9.1`;
+  - **A2UI v1.0 (status upstream: Candidate) nie jest częścią profilu/1.** Koperta z inną wersją jest odrzucana (§11). v1.0 zmienia między innymi semantykę usuwania danych, więc jej obsługa to przyszły profil `flowassist-transport/2`.
+- **2.2 Katalog (oś 2):**
+  - `catalogId = flowassist/v2` to kontrakt komponentów. Nowy identyfikator pojawia się tylko przy zmianie tego kontraktu;
+  - obsługiwane reprezentacje to **capabilities** (`flowassist.kinds`), a nie katalog (D2);
+  - katalogów inline profil/1 nie wspiera (I10). `acceptsInlineCatalogs` agenta jest ignorowane.
+- **2.3 Profil (oś 3):**
+  - identyfikator `flowassist-transport/1`;
+  - rozszerzenie `flowassist` jest **obowiązkowe** po obu stronach;
+  - tryb bazowy A2UI bez rozszerzenia to przyszły, jawnie wybierany osobny profil, a nie fallback.
+- **2.4 AG-UI:** profil/1 działa na **AG-UI 1.x**, binding **HTTP + SSE**. Protobuf i inne bindingi są poza profilem.
+  - Klient MUSI wysłać `RunAgentInput.protocolVersion = "1.0"` [P1.6].
+  - `RUN_STARTED.protocolVersion` MUSI mieć major `1` [agent; P1.6]. Brak pola albo inny major jest fatalny i kończy przebieg `profile:AGUI_VERSION` (D18), bo producent 0.x nie wyrazi wyniku `interrupt` (§6).
+  - Nowszy minor: klient kontynuuje i ostrzega w konsoli.
+
+## 3. Handshake możliwości
+
+Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts`, ADR 0002 „Handshake możliwości”].
+
+- **3.1** Capabilities klienta:
+  - `{ a2uiClientCapabilities: { "v0.9": { supportedCatalogIds } }, flowassist: { profile, kinds } }`;
+  - snapshot zamrożony raz na przebieg (`startScenario`);
+  - transport go nie buduje, tylko dołącza do **każdego** biegu (§4.4).
+- **3.2** Capabilities agenta (`ServerCapabilities`: `transportProfiles`, `a2uiServerCapabilities`, `flowassist.kinds`) **nie są** AG-UI `AgentCapabilities` i NIE WOLNO ich przenosić w `AgentCapabilities.custom`. Profil kończy negocjację błędem przy ich braku, a AG-UI zabrania blokowania biegu z powodu deklaracji (F8). To dwa różne dokumenty.
+- **3.3 Źródło (D9):** statyczna konfiguracja adaptera, czyli obiekt `ServerCapabilities` przypisany do endpointu agenta [P1.6]. `negotiate()` waliduje go przy każdym `start`.
+- **3.4** Negocjacja:
+  - kroki 0–5 w stałej kolejności; pierwsza porażka wygrywa;
+  - porażka kończy przebieg statusem `error` `negotiation:<przyczyna>` przed pierwszym zdarzeniem i bez wywołania backendu;
+  - zgoda na wysyłkę jest per przebieg [kod].
+- **3.5** Wynik negocjacji to zobowiązanie agenta. Agent MUSI emitować tylko elementy, których `kind` jest w wynegocjowanym `kinds`, z niepustym przecięciem reprezentacji [agent].
+  - Klient kontroluje to odbiorczo: P10 daje fallback z raportem, a `validateProps` łapie rodzaj spoza katalogu [kod].
+  - Element rodzaju obsługiwanego przez klienta, ale niezadeklarowanego przez agenta, klient renderuje. To niezgodność agenta bez ryzyka renderowania, bez osobnej reakcji.
+
+## 4. Wiązanie z AG-UI (D6, D10)
+
+- **4.1 Tożsamość** [P1.6]:
+  - jeden przebieg CameleON (od `start` do stanu terminalnego) to **jeden `threadId`**: UUID, nowy przy każdym `start` (P7);
+  - każde wywołanie backendu to **jeden bieg AG-UI** z nowym `runId` (UUID);
+  - liczbowy `runId` CameleON nie trafia na drut. Adapter mapuje `runId` AG-UI na `runId` CameleON.
+- **4.2 Biegi są sekwencyjne** [P1.6]. Następny bieg zaczyna się dopiero po końcu body poprzedniej odpowiedzi albo po jej ucięciu. Dwa biegi jednego przebiegu nigdy nie trwają równocześnie.
+- **4.3 Rodzaje biegów:**
+  - **start** — pierwszy bieg przebiegu;
+  - **akcja** — odpowiedź na interrupt (§8);
+  - **resync** — po ucięciu (§7).
+- **4.4 `RunAgentInput`** [P1.6] (schemat: `schemas/flowassist-transport-1/forwarded-props.schema.json`):
+
+  | Pole | Reguła |
+  |---|---|
+  | `threadId`, `runId` | §4.1 |
+  | `protocolVersion` | `"1.0"` |
+  | `messages` | historia utrzymywana przez klienta AG-UI (wiadomości `activity` usunięte). Bieg startu: jedna wiadomość `user` z `prompt`, a bez niego z identyfikatorem scenariusza |
+  | `tools`, `context`, `state`, `parentRunId` | NIE WOLNO ich wysyłać. Profil/1 nie oferuje narzędzi frontendu, nie wstrzykuje katalogu (I10) i nie używa stanu współdzielonego |
+  | `forwardedProps.flowassist` | `{ profile, capabilities, scenario?, resync?, a2uiErrors?, diagnostics? }`. Pola: `capabilities` = snapshot przebiegu, w **każdym** biegu; `scenario` tylko w biegu startu; `resync` tylko w biegu resync (§7.2); `a2uiErrors` i `diagnostics` według §11.4 |
+  | `resume` | tylko w biegu akcji (§8.1) |
+
+- **4.5 Ramka agent → klient** [agent; P1.6] (schemat `frame.schema.json`):
+  ```json
+  { "type": "CUSTOM", "name": "flowassist.frame",
+    "value": { "profile": "flowassist-transport/1", "seq": 0, "message": { "version": "v0.9.1", "createSurface": { "surfaceId": "workspace", "catalogId": "flowassist/v2" } } } }
+  ```
+  - `value` jest zamknięte: tylko `profile`, `seq`, `message`.
+  - `message` to **dokładnie jedna** wiadomość profilu: koperta A2UI (`createSurface` | `updateComponents` | `updateDataModel` | `deleteSurface`), `stage` albo `narration`.
+  - Zdarzenie MOŻE nieść `subagentRunId`. Atrybucja nie zmienia reguł.
+- **4.6 Inne zdarzenia AG-UI** nie zmieniają stanu CameleON w profilu/1 [P1.6]:
+  - `TEXT_MESSAGE_*`, `REASONING_*`, `TOOL_CALL_*`, `STATE_*`, `MESSAGES_SNAPSHOT`, `ACTIVITY_*`, `STEP_*`, `SUBAGENT_*`, `RAW`, `CUSTOM` o innej nazwie;
+  - klient MOŻE je logować w dev; walidację strukturalną robi potok klienta AG-UI (F11).
+
+  Konwencja `@ag-ui/a2ui-middleware` (skumulowane `ACTIVITY_SNAPSHOT a2ui-surface` z `replace: true`) **nie jest wspierana**:
+  - każda migawka ponawia `createSurface` (`SURFACE_EXISTS`, ADR 0005);
+  - nie przenosi `stage`/`narration`;
+  - wstrzykuje katalog do `context` (sprzeczne z I10).
+- **4.7 Replay historii** [P1.6]: klient stosuje ramki i lifecycle **wyłącznie z biegu, o który prosił** (`RUN_STARTED.runId` = `RunAgentInput.runId`). Biegi poprzedzające go w tym samym strumieniu pomija w całości.
+
+## 5. Sekwencja ramek i deduplikacja (D6)
+
+- **5.1 Zakres.** Licznik `seq` należy do **jednego biegu AG-UI**, czyli do jednego `RunAgentInput` (start, akcja, resync). Nie należy do przebiegu CameleON, wątku ani połączenia. Jeden licznik obejmuje wszystkie ramki biegu, także te z `subagentRunId` [agent].
+- **5.2 Reset.**
+  - Pierwsza ramka po `RUN_STARTED` żądanego biegu ma `seq = 0`, a każda kolejna `seq` poprzedniej + 1 (liczba całkowita ≤ 2^53 − 1) [agent; P1.6].
+  - Każdy nowy bieg, w tym każda próba resync, zaczyna od `0`.
+  - Ramek biegów replayu (§4.7) się nie liczy i nie stosuje.
+- **5.3 Kontrola, a nie bufor.** Binding gwarantuje kolejność i kompletność (F5), więc klient niczego nie przestawia ani nie buforuje.
+  - Ramka o `seq` innym niż oczekiwany (luka, cofnięcie, powtórzenie) jest **fatalna**: klient przerywa żądanie, a przebieg kończy się `error` `profile:FRAME_SEQUENCE` [P1.6].
+  - Ramka poza jakimkolwiek otwartym biegiem to naruszenie AG-UI wykrywane przez potok klienta: `agui:PROTOCOL_VIOLATION`.
+- **5.4 Ramka zniekształcona** (zły kształt `value`, nieznany klucz, `profile` inny niż wynegocjowany, `seq` niebędący liczbą całkowitą ≥ 0) jest fatalna: `profile:FRAME_INVALID` [P1.6]. Profil w każdej ramce działa jako echo negocjacji.
+- **5.5 Deduplikacja.**
+  - Tożsamością ramki jest para (`runId` AG-UI, `seq`), a ramka jest stosowana **najwyżej raz** [P1.6].
+  - Powtórzenie klucza w biegu jest naruszeniem (§5.3), a nie cichym pominięciem.
+  - Bieg już przetworzony, który pojawia się ponownie (replay), jest pomijany w całości (§4.7).
+  - **Deduplikacji po treści nigdy nie ma** (ADR 0005): dwie identyczne wiadomości o różnych kluczach to dwa zdarzenia.
+- **5.6 Bez ponownego dostarczenia.**
+  - Ramek uciętego biegu nikt nie dosyła (F5). Ramki zastosowane przed ucięciem zostają.
+  - Zgodność przywraca bieg resync (§7), którego treść jest idempotentna z konstrukcji: upsert komponentów, pełna wymiana danych, bez `createSurface` dla surface'ów klienta.
+
+## 6. Lifecycle przebiegu (D10, D11)
+
+- **6.1 Mapowanie.** Klient zapamiętuje wynik `RUN_FINISHED`, a **status ustala dopiero na czystym końcu strumienia**, czyli na końcu body albo przy zerwaniu **po** zdarzeniu terminalnym [P1.6]:
+
+  | Zdarzenie żądanego biegu | Status CameleON |
+  |---|---|
+  | `RUN_STARTED` | `running` (natychmiast) |
+  | `RUN_FINISHED`, `outcome: interrupt` z **dokładnie jednym** interruptem `reason: "flowassist.awaiting_action"` | `awaiting_action` |
+  | `RUN_FINISHED`, `outcome: interrupt` z innym zestawem | `error` `profile:UNSUPPORTED_INTERRUPTS` |
+  | `RUN_FINISHED`, `outcome: success` albo brak `outcome` (także `outcome` nieznany, usunięty przez potok AG-UI) | `done` |
+  | `RUN_FINISHED`, `success` z niepustym `pendingToolCallIds` | `error` `profile:UNEXPECTED_TOOL_CALLS` |
+  | `RUN_FINISHED`, `outcome: cancelled` | **`cancelled`**: nowy terminalny `RunStatus` (D11), w UI neutralny, bez alertu; AG-UI zabrania pokazania go jako sukcesu albo porażki |
+  | `RUN_ERROR` przed końcem strumienia (przed, w trakcie albo po `RUN_FINISHED`) | `error` `agent:<code ?? RUN_ERROR>: <message>` |
+
+- **6.2** Spóźniony `RUN_ERROR` wygrywa, bo status ustala się dopiero na końcu strumienia. `done` nigdy nie jest więc wysyłane przed czystym końcem, a trwałość stanu terminalnego w store (I6) zostaje bez zmian.
+  - `RUN_ERROR` nie niesie `runId`, więc przypisuje się go pozycją do biegu otwartego w strumieniu.
+  - `RUN_ERROR` przed `RUN_STARTED` dotyczy biegu żądanego.
+- **6.3 Interrupt profilu** [agent]:
+  - `id` unikalny w biegu, `reason = "flowassist.awaiting_action"`;
+  - `message`, `toolCallId` i `responseSchema` klient ignoruje;
+  - `expiresAt` NIE WOLNO wysyłać, a obecne jest ignorowane, bo klient profilu/1 nie ocenia wygaśnięcia.
+- **6.4** Agent, który czeka na decyzję użytkownika, MUSI zakończyć bieg tym interruptem [agent]. AG-UI nie dopuszcza „sukcesu, który czeka” (F2).
+- **6.5** Ucięcie strumienia **nie** oznacza `done` ani `error`. Patrz §7.
+
+## 7. Połączenie, resync i stan `offline` (D14)
+
+- **7.1 Stan połączenia** (`connected` | `reconnecting` | `offline`) to oś **niezależna** od `RunStatus` [P1.6].
+  - Ucięcie biegu w `running` (przed zdarzeniem terminalnym) daje `reconnecting`.
+  - Tak samo ucięcie biegu akcji albo błąd sieci lub `5xx` przed odpowiedzią dla biegu akcji albo resync.
+  - Status przebiegu się nie zmienia.
+- **7.2 Bieg resync** [P1.6]:
+  - ten sam `threadId`, nowy `runId`;
+  - `forwardedProps.flowassist.resync = { surfaces: [<surfaceId trzymane przez klienta>] }`;
+  - **bez** `resume` i bez akcji;
+  - niesie raporty i diagnostykę według §11.4.
+- **7.3 Próby:**
+  - po 1 s, 2 s i 4 s od ucięcia albo od poprzedniej nieudanej próby;
+  - udana próba to `RUN_STARTED` biegu resync, który przywraca `connected`;
+  - **po 3 nieudanych próbach** połączenie przechodzi w `offline`, a **przebieg zostaje wznawialny**: status logiczny (`running` / `awaiting_action`) się nie zmienia;
+  - **sieć nigdy sama nie daje terminalnego `error`.**
+- **7.4 Wznowienie z `offline`** to nowa seria prób (§7.3), uruchamiana:
+  - jawnie przez użytkownika (kontrolka „Połącz ponownie”, `reconnect()` transportu, D20);
+  - albo raz przez zdarzenie przeglądarki `online`.
+
+  Przebieg w `offline` kończy tylko użytkownik (`stop`, restart) albo agent po wznowieniu. `stop()` przerywa żądanie i serię prób.
+- **7.5 Obowiązek agenta w biegu resync.** Agent ramkami odtwarza **pełny bieżący stan** [agent]:
+  - dla każdego swojego surface'u, który klient trzyma: `updateComponents` ze wszystkimi komponentami, a potem `updateDataModel` bez `path` (całość);
+  - dla swojego surface'u, którego klient nie trzyma: `createSurface` + to samo;
+  - dla surface'u trzymanego przez klienta, którego agent już nie ma: `deleteSurface`;
+  - na końcu `stage` (bieżące) i `narration` (bieżący tekst albo `null`, `speak: false`);
+  - bieg kończy bieżącym wynikiem lifecycle (§6). Otwarty interrupt podnosi ponownie (AG-UI dopuszcza to przy niepokrytym interrupcie).
+- **7.6** Resync **nie resetuje układu**: dla trzymanych surface'ów nie ma `deleteSurface`, a członkostwo wynika z `children` (P6). Komponenty, które agent porzucił, zostają w mapie, ale nie są członkami.
+- **7.7 Pierwszy bieg przebiegu** (start) [P1.6]:
+  - odpowiedź inna niż `200` daje `error` `transport:HTTP_<status>`;
+  - błąd sieci przed odpowiedzią daje `error` `transport:NETWORK`;
+  - bez resync, bo nie ma czego odtwarzać.
+- **7.8** Odpowiedź `4xx` na bieg akcji albo resync oznacza odrzucone wejście: `error` `transport:INPUT_REJECTED` [P1.6].
+
+## 8. Akcje semantyczne (I9, D12)
+
+- **8.1** Akcja to **nowy bieg AG-UI**, który odpowiada na otwarty interrupt [P1.6]:
+  ```json
+  "resume": [{ "interruptId": "<id>", "status": "resolved",
+               "payload": { "version": "v0.9.1", "action": { "name": "...", "surfaceId": "...", "sourceComponentId": "...", "timestamp": "...", "context": {} } } }]
+  ```
+  - `payload` jest dokładnie kopertą klient → agent A2UI (`client_to_server.json` upstream);
+  - `context.workspace` to migawka układu **bez współrzędnych**, z `itemId` [kod: `store.ts: sendAction`].
+- **8.2** Tożsamością akcji jest `runId` biegu, który ją niesie. **Potwierdzeniem** przyjęcia jest `RUN_STARTED` tego biegu. Osobnego identyfikatora akcji nie ma.
+- **8.3 Najwyżej jedna oczekująca akcja** (D12, decyzja właściciela) [P1.6]:
+  - akcja w trakcie aktywnego biegu albo w `reconnecting` / `offline` staje się oczekującą, jeśli żadna nie czeka;
+  - każda kolejna, gdy jedna już czeka, jest **odrzucana lokalnie** z komunikatem dla użytkownika. Nie zastępuje oczekującej i nie trafia do żadnej kolejki;
+  - oczekująca akcja jest wysyłana, gdy bieżący bieg zakończy się wynikiem `awaiting_action`;
+  - po `done`, `error`, `cancelled` albo `stop` przepada z komunikatem.
+- **8.4 Brak replay** [P1.6]: profil/1 nie klasyfikuje idempotencji, więc każda akcja jest nieidempotentna, a **wysłana** akcja nigdy nie jest ponawiana automatycznie.
+  - Akcja jest „wysłana” od chwili wysłania żądania HTTP z jej `resume`.
+  - Ucięcie albo błąd sieci po tej chwili oznacza, że akcja **mogła** dotrzeć. Klient ogłasza „akcja mogła nie dotrzeć” i przechodzi do resync, który akcji nie niesie.
+  - Odtworzony stan pokazuje skutek, a użytkownik może kliknąć ponownie.
+  - Oczekująca akcja (§8.3) nie była wysłana, więc jej późniejsze wysłanie nie jest ponowieniem.
+
+## 9. `stage` i `narration`
+
+- **9.1** Należą do profilu, a nie do katalogu:
+  - obowiązują niezależnie od `catalogId`;
+  - nie mają `version` ani `surfaceId`;
+  - jadą tym samym kanałem ramek i w tej samej kolejności `seq` co koperty A2UI.
+- **9.2** `narration` to **dyrektywa prezentacji**: podpis i TTS w HUD, a nie wiadomość rozmowy.
+  - Klient nie zapisuje jej w historii, a agent nie wznawia z niej rozmowy.
+  - Agent, który chce mieć wypowiedź w historii wątku, emituje ją **dodatkowo** jako standardowe `TEXT_MESSAGE_*`, które profil/1 ignoruje (§4.6).
+  - `CUSTOM` nie przenosi więc wyłącznie semantyki zdarzenia standardowego (F7).
+- **9.3 Obiekty zamknięte** (D17) [P1.6; dziś częściowo]:
+  - `stage`: tylko `focus` (`front` | `back`) i `drawer` (`open` | `closed`), co najmniej jedno [kod];
+  - `narration`: tylko `text` (string | `null`) i `speak` (boolean, opcjonalne). Dziś nieznane klucze przechodzą [P1.6];
+  - nieznane pole odrzuca wiadomość z raportem (§11).
+
+## 10. Reguły danych
+
+- **10.1 Obiekty zamknięte A2UI** (D17) [P1.6]:
+  - koperta zawiera tylko `version` i jeden payload;
+  - treść payloadu zawiera tylko pola schematu upstream v0.9.1 (`additionalProperties: false`). Dziś nieznane pola są ignorowane;
+  - propsy komponentów zostają otwarte jak dziś (I3, OBS-6).
+- **10.2 Atomowość.**
+  - Błąd wykryty na granicy odrzuca **całą** wiadomość, także `updateComponents`, gdy zła jest jedna pozycja (jak OBS-4, bez częściowej konsumpcji) [kod + P1.6]. Do takich błędów należą: kształt koperty, `id`/`children`, limity, klucze zarezerwowane, wersja oraz §10.4–10.7.
+  - Błąd semantyczny propsów po przyjęciu daje fallback **elementu** z raportem [kod: `validationReporting.ts`].
+- **10.3 Binding** to wartość propsa **najwyższego poziomu**: obiekt z dokładnie jednym własnym kluczem `path` typu string [kod: `contract.ts: isBinding`]. `{path}` zagnieżdżony głębiej to **dana**.
+- **10.4 Q1** [P1.6]: binding w propsie spoza `CATALOG_PROPS[component]` [kod: `catalog.ts`] odrzuca kopertę z `VALIDATION_FAILED` `/updateComponents/components/{id}/{prop}`.
+  - Kernelowa ścieżka ST-1(b) („binding poza katalogiem wstrzymuje gotowość”) zostaje dla `devDispatch`, ale z transportu jest nieosiągalna.
+- **10.5 ST-4 (a)** [P1.6]: binding w `WorkspaceItem.presentation` albo `WorkspaceItem.priority` (`literalOnlyProps`) odrzuca kopertę z raportem jak w §10.4. Układ czyta te pola tylko dosłownie (ADR 0007).
+- **10.6 Identyfikatory** (D19) [P1.6]:
+  - `id` komponentu i wpisy `children` NIE MOGĄ zawierać `/` ani `~`. Segmenty ścieżek raportów (§11.3) nie wymagają wtedy escapowania RFC 6901;
+  - nazwy zarezerwowane `__proto__`, `constructor`, `prototype` są zakazane jako `id`, wpis `children` i segment ścieżki [kod: FU-4].
+- **10.7 Tablice w `updateDataModel.path`** (D16, ADR 0002 „Otwarte” 4) [P1.6; dziś: `jsonPointer.ts: setAt` dopisuje, tworzy dziury i robi `splice`]:
+  - zapis pod indeksem `< długość` zastępuje, a `= długość` dopisuje (jak `add` w RFC 6902);
+  - **`> długość` odrzuca kopertę** z `VALIDATION_FAILED` `/dataModel{path}`, bo dziur nie da się wyrazić w JSON;
+  - usunięcie (brak `value`) elementu tablicy **zachowuje długość**, a element staje się `undefined` (A2UI v0.9.1). Walidatory treści traktują `undefined` jak brak wartości (fallback z raportem);
+  - reguła dotyczy też segmentów pośrednich. Indeksy kanoniczne bez zmian (ADR 0002), klucze obiektów bez zmian.
+- **10.8 Limity** (D15):
+  - ścieżka `updateDataModel`: ≤ 512 punktów kodowych i ≤ 32 segmenty [kod: FU-3];
+  - **zdarzenie AG-UI** (bajty UTF-8 pola `data` jednej ramki SSE, mierzone **przed** `JSON.parse` we własnej warstwie strumienia adaptera) ≤ **1 MiB**. Przekroczenie jest fatalne: `profile:EVENT_TOO_LARGE` [P1.6];
+  - **wiadomość profilu** (`JSON.stringify(frame.message)`, bajty UTF-8) ≤ **256 KiB**. Przekroczenie odrzuca wiadomość z diagnostyką `MESSAGE_TOO_LARGE`; `seq` liczy się dalej [P1.6].
+- **10.9 Świeżość danych** [P1.6]:
+  - klient przekazuje do `transportDispatch` wynik **round-tripu JSON** pola `frame.message`;
+  - nigdy nie przekazuje obiektu dzielonego z potokiem klienta AG-UI, nie zatrzymuje referencji i nie mutuje.
+
+  To spełnia założenie guarda FU-4 (ADR 0002: guard sprawdza migawkę, a store trzyma referencje).
+- **10.10 Klucze zarezerwowane w danych** [kod: FU-4]: własny klucz `__proto__`, `constructor` albo `prototype` **gdziekolwiek** w wiadomości, także w legalnych danych (nazwa kolumny, klucz mapy), odrzuca całą wiadomość. Agent MUSI zmieniać nazwy takich kluczy [agent].
+
+## 11. Raportowanie (D7, D13)
+
+- **11.1 Dwie klasy** (oba warianty A2UI `error` wymagają `surfaceId`):
+  - **raport A2UI** `{ version: "v0.9.1", error }` (schemat upstream) — tylko gdy surface jest znany i poprawny (`surfaceId` ∈ `workspace` | `tasks-drawer` | `hud`);
+  - **diagnostyka profilu** `{ code, message, frame?: { runId, seq }, path? }` (schemat `diagnostic.schema.json`) — wszystko bez surface'u.
+- **11.2 Zamknięte listy kodów:**
+  - raport A2UI:
+    - `VALIDATION_FAILED` (upstream);
+    - `SURFACE_EXISTS`, `SURFACE_NOT_FOUND` [kod: `reducer.ts`];
+  - diagnostyka:
+    - `ENVELOPE_REJECTED` (koperta odrzucona, surface nieustalony);
+    - `STAGE_REJECTED`;
+    - `NARRATION_REJECTED`;
+    - `MESSAGE_TOO_LARGE`;
+  - status `error` przebiegu (format `<przestrzeń>:<KOD>[: szczegół]`):
+    - `negotiation:<przyczyna>` [kod];
+    - `profile:FRAME_INVALID`, `profile:FRAME_SEQUENCE`, `profile:EVENT_TOO_LARGE`, `profile:AGUI_VERSION`, `profile:UNSUPPORTED_INTERRUPTS`, `profile:UNEXPECTED_TOOL_CALLS`;
+    - `agui:PROTOCOL_VIOLATION`;
+    - `agent:<kod>`;
+    - `transport:HTTP_<status>`, `transport:NETWORK` (tylko bieg startu), `transport:INPUT_REJECTED`.
+
+  Sieć nie kończy przebiegu (§7.3).
+- **11.3 `path`** to wskaźnik JSON (RFC 6901) z segmentami opartymi na `id`, nigdy na indeksie. Rodzinę wyznacza pierwszy segment:
+  - **wiadomość odrzucona na granicy** — klucz payloadu: `/version`, `/createSurface/catalogId`, `/updateComponents/components/{id}/children`, `/updateDataModel/path`;
+  - **problem stanu po przyjęciu** — `/components/{id}{wskaźnik propsa}` [kod: `workspace.ts`, `resolveTree.ts`] oraz `/dataModel{path}`.
+- **11.4 Dostarczenie** (D13) [P1.6]:
+  - raporty i diagnostyka **nie uruchamiają biegu**. Klient zbiera je i dołącza do **następnego** biegu (akcji albo resync) w `forwardedProps.flowassist.a2uiErrors` i `diagnostics`;
+  - limit łącznie 32 pozycje; najstarsze odpadają z ostrzeżeniem w konsoli;
+  - pozycje potwierdza `RUN_STARTED` biegu, który je niósł;
+  - po stanie terminalnym przebiegu niewysłane pozycje przepadają;
+  - deduplikacja raportów renderera „raz na wystąpienie” [kod: `validationReporting.ts`] się nie zmienia.
+- **11.5 Wariant diagnostyczny `parseEvent`** (D7):
+  - `parseEventDiagnostic(raw)` zwraca przyczynę (zamknięta lista), `path` i ustalony `surfaceId` zamiast `null`;
+  - `parseEvent` pozostaje opakowaniem o identycznym zachowaniu;
+  - adapter mapuje przyczynę na §11.2/§11.3 i nie powiela walidacji.
+
+## 12. Model zagrożeń transportu (podsumowanie)
+
+Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidatory katalogu [kod: `catalog.ts`] obowiązują dla każdej ścieżki wejścia.
+- Adapter dodaje:
+  - limity bajtów (§10.8);
+  - świeżość (§10.9);
+  - kontrolę ramek (§5);
+  - reguły danych (§10.4–10.7).
+- Nic wykonywalnego od agenta (I10).
+- `RAW` i `CUSTOM` o innej nazwie nie mają wpływu na stan.
+
+## 13. Obowiązki agenta (lista kontrolna)
+
+1. Deklaruje `ServerCapabilities` profilu/1 w konfiguracji klienta (§3.3) i emituje tylko wynegocjowane rodzaje i reprezentacje (§3.5).
+2. W `RUN_STARTED` deklaruje `protocolVersion` 1.x (§2.4).
+3. Każdą wiadomość profilu wysyła jako `CUSTOM flowassist.frame` z `profile` i ciągłym `seq` od `0` w każdym biegu (§4.5, §5).
+4. Czekając na użytkownika, kończy bieg interruptem `flowassist.awaiting_action`. Zawsze dokładnie jednym, bez `expiresAt` (§6).
+5. Kończy przebieg wynikiem `success`, a przerwanie z własnej woli zgłasza wynikiem `cancelled`. Nie wywołuje narzędzi frontendu (§6.1).
+6. Akcję czyta z `resume[0].payload` (koperta A2UI `action`) i nie zakłada jej ponowienia (§8).
+7. W biegu resync odtwarza pełny stan bez `createSurface` dla surface'ów klienta (§7.5).
+8. Nie używa katalogów inline, `context`, `tools` ani `state`. `id` nie zawiera `/` ani `~`, a dane nie zawierają kluczy zarezerwowanych (§10).
+9. `narration` traktuje jako dyrektywę prezentacji. Wypowiedź do historii emituje dodatkowo jako `TEXT_MESSAGE_*` (§9.2).
+10. Czyta raporty klienta z `forwardedProps.flowassist.a2uiErrors` i `diagnostics` (§11.4).
+
+## 14. Macierz pokrycia (reakcja klienta)
+
+| Wejście | Reakcja | Status CameleON | Połączenie | Raport | § |
+|---|---|---|---|---|---|
+| `start`, negocjacja nieudana | brak żądania HTTP | `error` `negotiation:*` | — | — | 3.4 |
+| POST startu ≠ 200 / błąd sieci | — | `error` `transport:HTTP_n` / `NETWORK` | — | — | 7.7 |
+| POST akcji/resync: 4xx | — | `error` `transport:INPUT_REJECTED` | — | — | 7.8 |
+| POST akcji/resync: sieć / 5xx | resync | bez zmian | `reconnecting` | — | 7.1 |
+| `RUN_STARTED` żądanego biegu, major 1 | potwierdza akcję i raporty | `running` | `connected` | — | 6.1, 8.2, 11.4 |
+| `RUN_STARTED` bez wersji / inny major | przerwanie | `error` `profile:AGUI_VERSION` | — | — | 2.4 |
+| biegi replayu (inny `runId`) | pominięte w całości | — | — | — | 4.7 |
+| `CUSTOM flowassist.frame` poprawna | round-trip → `transportDispatch` | — | — | — | 4.5, 10.9 |
+| ramka: zły kształt / profil / typ `seq` | przerwanie | `error` `profile:FRAME_INVALID` | — | — | 5.4 |
+| ramka: luka / cofnięcie / powtórzenie `seq` | przerwanie | `error` `profile:FRAME_SEQUENCE` | — | — | 5.3 |
+| ramka poza otwartym biegiem | przerwanie (potok AG-UI) | `error` `agui:PROTOCOL_VIOLATION` | — | — | 5.3 |
+| wiadomość > 256 KiB | pominięta | — | — | `MESSAGE_TOO_LARGE` | 10.8 |
+| zdarzenie > 1 MiB | przerwanie | `error` `profile:EVENT_TOO_LARGE` | — | — | 10.8 |
+| wiadomość odrzucona na granicy, surface znany | pominięta | — | — | `VALIDATION_FAILED` | 11 |
+| wiadomość odrzucona, surface nieznany / `stage` / `narration` | pominięta | — | — | `ENVELOPE_` / `STAGE_` / `NARRATION_REJECTED` | 11 |
+| klucz zarezerwowany, `/` lub `~` w `id` | wiadomość pominięta | — | — | jak wyżej | 10.6, 10.10 |
+| binding poza `CATALOG_PROPS` / w `presentation`, `priority` | koperta pominięta | — | — | `VALIDATION_FAILED` | 10.4, 10.5 |
+| `updateDataModel`: indeks > długość | koperta pominięta | — | — | `VALIDATION_FAILED` `/dataModel…` | 10.7 |
+| `createSurface` istniejącego / operacja na nieistniejącym | reducer | — | — | `SURFACE_EXISTS` / `SURFACE_NOT_FOUND` | 11.2 |
+| inne zdarzenia AG-UI (`TEXT_*`, `TOOL_*`, `STATE_*`, `ACTIVITY_*`, `STEP_*`, `SUBAGENT_*`, `REASONING_*`, `MESSAGES_SNAPSHOT`, `RAW`, inny `CUSTOM`) | ignorowane (log dev) | — | — | — | 4.6 |
+| nieznany typ zdarzenia | potok AG-UI odrzuca z ostrzeżeniem | — | — | — | F11 |
+| naruszenie AG-UI | przerwanie | `error` `agui:PROTOCOL_VIOLATION` | — | — | F11 |
+| `RUN_FINISHED` interrupt `flowassist.awaiting_action` ×1 | ustal na końcu strumienia | `awaiting_action` | — | — | 6.1 |
+| `RUN_FINISHED` interrupt — inny zestaw | — | `error` `profile:UNSUPPORTED_INTERRUPTS` | — | — | 6.1 |
+| `RUN_FINISHED` success / brak / nieznany `outcome` | ustal na końcu strumienia | `done` | — | — | 6.1 |
+| `RUN_FINISHED` success + `pendingToolCallIds` | — | `error` `profile:UNEXPECTED_TOOL_CALLS` | — | — | 6.1 |
+| `RUN_FINISHED` cancelled | — | `cancelled` | — | — | 6.1 |
+| `RUN_ERROR` przed końcem strumienia (także spóźniony) | — | `error` `agent:*` | — | — | 6.2 |
+| ucięcie przed zdarzeniem terminalnym | resync ×3 (1/2/4 s) | bez zmian, także po 3 próbach | `reconnecting` → `connected` / `offline` | — | 7.1–7.3 |
+| `offline` + „Połącz ponownie” / zdarzenie `online` | nowa seria resync | bez zmian | `reconnecting` | — | 7.4 |
+| zerwanie po zdarzeniu terminalnym | czysty koniec | wg zapamiętanego wyniku | — | — | 6.1 |
+| `stop()` | przerwanie, oczekująca akcja i raporty przepadają | `idle` | — | — | 7.4, 8.3 |
+| akcja w `awaiting_action` | bieg akcji z `resume` | `running` po `RUN_STARTED` | — | — | 8.1 |
+| akcja w `running` / `reconnecting` / `offline`, brak oczekującej | staje się oczekującą | — | — | — | 8.3 |
+| akcja, gdy jedna już oczekuje | odrzucona lokalnie z komunikatem | — | — | — | 8.3 |
+| ucięcie / błąd sieci po wysłaniu biegu akcji | bez ponowienia, komunikat, resync | bez zmian | `reconnecting` | — | 8.4, 7.1 |
+| raport renderera (`send(error)`) | do raportów następnego biegu | — | — | — | 11.4 |
+
+## 15. Reguły maszynowe profilu
+
+Blok niżej jest **normatywnym źródłem** stałych profilu. Test parytetu porównuje go z `transport/profile.ts: PROFILE_RULES`, a zmiana dowolnej wartości to świadoma zmiana profilu (ADR 0002).
+
+<!-- profile-rules:begin -->
+```json
+{
+  "profile": "flowassist-transport/1",
+  "envelope": { "send": "v0.9.1", "accept": ["v0.9", "v0.9.1"] },
+  "presentations": ["card", "focus", "screen"],
+  "limits": {
+    "dataModelPathMaxLength": 512,
+    "dataModelPathMaxSegments": 32,
+    "eventMaxBytes": 1048576,
+    "messageMaxBytes": 262144,
+    "pendingReportsMax": 32
+  },
+  "reservedKeys": ["__proto__", "constructor", "prototype"],
+  "agui": {
+    "protocolVersion": "1.0",
+    "major": 1,
+    "frameEventName": "flowassist.frame",
+    "awaitingActionReason": "flowassist.awaiting_action"
+  },
+  "reconnect": { "delaysMs": [1000, 2000, 4000] },
+  "actions": { "maxPending": 1 },
+  "literalOnlyProps": { "WorkspaceItem": ["presentation", "priority"] },
+  "idForbiddenChars": ["/", "~"],
+  "codes": {
+    "a2uiErrors": ["VALIDATION_FAILED", "SURFACE_EXISTS", "SURFACE_NOT_FOUND"],
+    "diagnostics": ["ENVELOPE_REJECTED", "STAGE_REJECTED", "NARRATION_REJECTED", "MESSAGE_TOO_LARGE"],
+    "runErrors": [
+      "profile:FRAME_INVALID", "profile:FRAME_SEQUENCE", "profile:EVENT_TOO_LARGE", "profile:AGUI_VERSION",
+      "profile:UNSUPPORTED_INTERRUPTS", "profile:UNEXPECTED_TOOL_CALLS", "agui:PROTOCOL_VIOLATION",
+      "transport:NETWORK", "transport:INPUT_REJECTED"
+    ],
+    "runErrorPrefixes": ["negotiation:", "agent:", "transport:HTTP_"]
+  }
+}
+```
+<!-- profile-rules:end -->
+
+## 16. Rejestr decyzji
+
+| # | Decyzja | Stan |
+|---|---|---|
+| D1, D2, D4, D5, D8 | handshake P1.7a | zrealizowane (`fdc79b6`) |
+| D3 | profil jako dokument w repo + schematy | ten dokument |
+| D6 | wiązanie: ramki `CUSTOM flowassist.frame`; `seq` per bieg AG-UI, reset w każdym biegu, kontrola fatalna, deduplikacja po (`runId`, `seq`), nigdy po treści | §4–§5 |
+| D7 | `parseEventDiagnostic` — czysty refaktor na końcu P1.7b | §11.5 |
+| D9 | `ServerCapabilities` ze statycznej konfiguracji adaptera | §3.3 |
+| D10 | `awaiting_action` = interrupt `flowassist.awaiting_action`; akcja w `resume.payload` | §6, §8 |
+| D11 | `RUN_FINISHED cancelled` → nowy terminalny `RunStatus 'cancelled'` (P1.6, zmiana kernela zatwierdzona) | §6.1 |
+| D12 | najwyżej jedna oczekująca akcja; kolejne odrzucane lokalnie; brak replay (właściciel) | §8.3–8.4 |
+| D13 | raporty doklejane do następnego biegu (zmienia przypadek 2 testu zgodności i mock w P1.6) | §11.4 |
+| D14 | resync 1/2/4 s; potem `offline`, przebieg wznawialny, bez `error` z sieci (właściciel) | §7 |
+| D15 | limity 1 MiB / 256 KiB | §10.8 |
+| D16 | tablice: indeks ≤ długość, usuwanie zachowuje długość | §10.7 |
+| D17 | obiekty zamknięte (koperty A2UI, `stage`, `narration`) | §9.3, §10.1 |
+| D18 | AG-UI major 1 wymagany | §2.4 |
+| D19 | zakaz `/` i `~` w `id` / `children` | §10.6 |
+| D20 | addytywne API transportu P1.6: stan połączenia, `reconnect()`, komunikaty, `BackendCall 'resync'` | §7, §8 |
+
+Implementacja reguł oznaczonych [P1.6] należy do P1.6 i każda zmiana zachowania przechodzi przez zgodę właściciela przy commicie.

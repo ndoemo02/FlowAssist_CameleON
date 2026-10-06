@@ -173,7 +173,8 @@ jego materiał (kolor liniowy 0,07). Robi to też przy rejestracji meshy.
   - `catalog.ts: catalogCapabilities()` (obsługiwane reprezentacje per rodzaj) i `CATALOG_PROPS`;
   - `startScenario` liczy snapshot raz na przebieg; transport nigdy nie buduje capabilities sam.
   - Porażka negocjacji = status `error` z komunikatem `negotiation:<przyczyna>` przed pierwszym zdarzeniem.
-  - Ramka zdarzeń, lifecycle, reconnect, wiązanie AG-UI: profil P1.7b, adapter P1.6.
+  - Ramka zdarzeń, lifecycle, reconnect, wiązanie AG-UI: normatywnie w profilu
+    [`docs/protocol/flowassist-transport-1.md`](../../../docs/protocol/flowassist-transport-1.md) (P1.7b), implementacja w adapterze P1.6.
 - `scenarios/researchDemo.ts` — scenariusz `research` (`?demo=research`).
 - Prawdziwy transport: adapter AG-UI w P1.6, po zamknięciu profilu `flowassist-transport/1` (P1.7b); musi przejść
   wspólny test zgodności `__tests__/transportConformance.ts` (zestaw przyjmuje transport asynchroniczny).

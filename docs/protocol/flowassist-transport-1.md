@@ -474,8 +474,10 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 ## 15. Reguły maszynowe profilu
 
 Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wartości to świadoma zmiana profilu (ADR 0002).
-- Dziś testy porównują z blokiem schematy (`profileSchemas.test.ts`) i reguły już obecne w `PROFILE_RULES`.
-- Pełny test parytetu blok ↔ `transport/profile.ts: PROFILE_RULES` powstaje w pakiecie 2 [P1.7b-kod].
+- **Parytet** [kod]: blok = `transport/profile.ts: PROFILE_RULES` (`profileSchemas.test.ts`, `transportCapabilities.test.ts`).
+  Blok jest też strażnikiem dryfu `PROFILE_RULES`: ręcznie edytowany literał w osobnym pliku, a nie snapshot.
+- Stałe schematów (`schemas/flowassist-transport-1/`) też są porównywane z blokiem.
+- Stałe adaptera (limity bajtów i czasu, reconnect, akcje, kody) nie mają jeszcze konsumenta w runtime; użyje ich adapter P1.6.
 
 <!-- profile-rules:begin -->
 ```json

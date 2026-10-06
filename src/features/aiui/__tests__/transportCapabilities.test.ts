@@ -13,6 +13,7 @@ import { ITEM_KINDS } from '../contract';
 import { KIND_REPRESENTATIONS } from '../catalog';
 import { clientCapabilities, negotiate, NEGOTIATION_FAILURES, type ServerCapabilities } from '../transport/capabilities';
 import { PROFILE_RULES, TRANSPORT_PROFILE } from '../transport/profile';
+import { PROFILE_DOC_RULES } from './fixtures/profileDoc';
 
 const readJson = (rel: string) => JSON.parse(readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf-8'));
 const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
@@ -35,17 +36,19 @@ describe('strażnik dryfu profilu flowassist-transport/1', () => {
         expect(Object.isFrozen(PROFILE_RULES.envelope.accept)).toBe(true);
         expect(Object.isFrozen(PROFILE_RULES.limits)).toBe(true);
         expect(Object.isFrozen(PROFILE_RULES.reservedKeys)).toBe(true);
+        for (const key of ['agui', 'timeouts', 'reconnect', 'actions', 'literalOnlyProps', 'idForbiddenChars', 'codes'] as const) {
+            expect(Object.isFrozen(PROFILE_RULES[key]), key).toBe(true);
+        }
+        expect(Object.isFrozen(PROFILE_RULES.reconnect.delaysMs)).toBe(true);
+        expect(Object.isFrozen(PROFILE_RULES.codes.runErrors)).toBe(true);
         expect(() => { (PROFILE_RULES.envelope.accept as unknown as string[]).push('v1.0'); }).toThrow(TypeError);
     });
 
-    it('PROFILE_RULES — reguły stałe dla profilu (nie wysyłane)', () => {
-        expect(PROFILE_RULES).toEqual({
-            profile: 'flowassist-transport/1',
-            envelope: { send: 'v0.9.1', accept: ['v0.9', 'v0.9.1'] },
-            presentations: ['card', 'focus', 'screen'],
-            limits: { dataModelPathMaxLength: 512, dataModelPathMaxSegments: 32 },
-            reservedKeys: ['__proto__', 'constructor', 'prototype'],
-        });
+    // Strażnikiem dryfu PROFILE_RULES jest blok reguł maszynowych dokumentu profilu (§15): ręcznie edytowany,
+    // normatywny literał w osobnym pliku (nie snapshot). Zmiana reguły = świadoma zmiana dokumentu i kodu.
+    it('PROFILE_RULES — reguły stałe dla profilu (nie wysyłane) = blok reguł dokumentu profilu', () => {
+        expect(JSON.parse(JSON.stringify(PROFILE_RULES))).toEqual(PROFILE_DOC_RULES);
+        expect(PROFILE_RULES.limits).toMatchObject({ dataModelPathMaxLength: 512, dataModelPathMaxSegments: 32 });
     });
 });
 

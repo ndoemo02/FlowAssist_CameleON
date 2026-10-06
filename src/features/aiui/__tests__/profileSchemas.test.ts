@@ -11,6 +11,7 @@ import { buildAction, buildError, SURFACE_IDS } from '../contract';
 import { clientCapabilities, negotiate, type ServerCapabilities } from '../transport/capabilities';
 import { MOCK_SERVER_CAPABILITIES } from '../transport/mockTransport';
 import { PROFILE_RULES, TRANSPORT_PROFILE } from '../transport/profile';
+import { PROFILE_DOC_JSON_BLOCKS as jsonBlocks, PROFILE_DOC_RULES as RULES } from './fixtures/profileDoc';
 
 // ── schematy (jedna instancja Ajv: odwołania między plikami po $id) ─────────────
 
@@ -37,17 +38,9 @@ const clone = <T>(v: T): T => JSON.parse(JSON.stringify(v));
 
 // ── dokument profilu ──────────────────────────────────────────────
 
-// CRLF → LF: kopia robocza na Windows może mieć CRLF (core.autocrlf)
-const DOC = readFileSync(fileURLToPath(new URL('../../../../docs/protocol/flowassist-transport-1.md', import.meta.url)), 'utf-8')
-    .replace(/\r\n/g, '\n');
-// bloki także wcięte (przykład w elemencie listy)
-const jsonBlocks = Array.from(DOC.matchAll(/^[ \t]*```json\n([\s\S]*?)\n[ \t]*```/gm), (m) => m[1]); // bez spread: target tsconfig
-const rulesBlock = DOC.match(/<!-- profile-rules:begin -->\s*```json\n([\s\S]*?)\n```\s*<!-- profile-rules:end -->/);
-const RULES = JSON.parse(rulesBlock![1]);
 
 describe('dokument profilu: przykłady i reguły maszynowe', () => {
     it('blok reguł maszynowych istnieje i dotyczy profilu/1', () => {
-        expect(rulesBlock).not.toBeNull();
         expect(RULES.profile).toBe(TRANSPORT_PROFILE);
     });
 
@@ -91,12 +84,9 @@ describe('dokument profilu: przykłady i reguły maszynowe', () => {
         expect(RULES.codes.runErrors).toContain('transport:INPUT_REJECTED'); // odrzucenie treści to nie sieć
     });
 
-    it('reguły już obecne w kodzie mają te same wartości w dokumencie (pełny parytet: następny commit)', () => {
-        expect(RULES.envelope).toEqual({ send: PROFILE_RULES.envelope.send, accept: [...PROFILE_RULES.envelope.accept] });
-        expect(RULES.presentations).toEqual([...PROFILE_RULES.presentations]);
-        expect(RULES.reservedKeys).toEqual([...PROFILE_RULES.reservedKeys]);
-        expect(RULES.limits.dataModelPathMaxLength).toBe(PROFILE_RULES.limits.dataModelPathMaxLength);
-        expect(RULES.limits.dataModelPathMaxSegments).toBe(PROFILE_RULES.limits.dataModelPathMaxSegments);
+    it('pełny parytet: blok reguł dokumentu (§15) = PROFILE_RULES (kod)', () => {
+        // JSON round-trip: porównanie wartości, nie zamrożonych referencji ani kolejności kluczy
+        expect(JSON.parse(JSON.stringify(PROFILE_RULES))).toEqual(RULES);
     });
 });
 

@@ -1,6 +1,6 @@
 # Profil transportowy `flowassist-transport/1`
 
-- **Status:** normatywny (P1.7b, 2026-10-07). Decyzje właściciela: D2, D3, D6, D7, D9–D20, H1, M1, M2, N1–N3, A1–A4 (rejestr w §16).
+- **Status:** normatywny (P1.7b, 2026-10-07). Decyzje właściciela: D2, D3, D6, D7, D9–D20, H1, M1, M2, N1–N3, A1–A5 (rejestr w §16).
 - **Zakres:** jak klient CameleON i agent wymieniają komunikaty A2UI i rozszerzenia aplikacji przez AG-UI.
   To trzecia oś zgodności z [ADR 0002](../adr/0002-protocol-compatibility-axes.md). Adapter P1.6 implementuje ten
   dokument i nie dodaje reguł w locie.
@@ -243,7 +243,7 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
     - dla każdego swojego surface'u istniejącego **po obu stronach**:
       - komponenty: jedno albo więcej `updateComponents`, łącznie ze wszystkimi komponentami;
       - dane: pierwsza wiadomość danych tego surface'u to `updateDataModel` **bez `path`** (podstawa), a kolejne `updateDataModel` **z `path`** uzupełniają poddrzewa. Efekt końcowy musi równać się pełnemu bieżącemu modelowi;
-      - każda część MUSI mieścić się w 256 KiB (§10.8). Duży stan **dzieli się na części**; rozmiar całego stanu surface'u nie jest ograniczony do jednej wiadomości (Astra 1);
+      - każda część MUSI mieścić się w 256 KiB (§10.8). Duży stan **dzieli się na części**; rozmiar całego stanu surface'u nie jest ograniczony do jednej wiadomości (Astra 1). Że takie odtworzenie w limitach istnieje, gwarantuje niezmiennik odtwarzalności (§7.8);
     - **puste miejsca w tablicach** (element usunięty, `undefined`, §10.7): podstawa i części materializują je jako `null`. W tej samej transakcji agent MUSI odtworzyć każde z nich osobnym `updateDataModel` z `path` do elementu, **bez `value`** (Astra 2);
     - dla swojego surface'u, którego klient nie trzyma: `createSurface` + to samo;
     - dla surface'u istniejącego **tylko po stronie klienta** (nieaktualnego, którego agent już nie ma): `deleteSurface` (§7.6, Astra 3);
@@ -278,17 +278,21 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
     ```
   - **Limity** (jawne i ograniczone, `resync` w §15):
     - najwyżej **1024 części** (`maxParts`);
-    - suma bajtów części (miara z §10.8) najwyżej **16 MiB** (`maxBytes`);
-    - każda część ≤ 256 KiB.
+    - suma bajtów części (miara z §10.8) najwyżej **16 MiB** (`maxBytes`).
 
-    Przekroczenie jest fatalne: `profile:RESYNC_LIMIT`.
+    Przekroczenie **liczby części albo łącznego rozmiaru** jest fatalne: `profile:RESYNC_LIMIT`. Tylko te dwa limity dają ten kod.
+  - **Część większa niż 256 KiB** (A5, decyzja właściciela):
+    - daje diagnostykę `MESSAGE_TOO_LARGE`, która jest **niefatalna dla połączenia i przebiegu**;
+    - **przerywa całą bieżącą transakcję**: bufor i kopia przepadają, a aktywny stan zostaje bez zmian;
+    - klient przerywa invocation i **nie akceptuje późniejszego `complete`**. Pominięcie części i opublikowanie stanu jest zakazane;
+    - to nieudana próba resync (§7.3). Następna próba niesie diagnostykę (§11.4), a po wyczerpaniu prób połączenie przechodzi w `offline` z przebiegiem wznawialnym.
   - **Budowa poza aktywnym stanem.** Klient buforuje części i stosuje je kolejno do **kopii** stanu surface'ów: ten sam reducer i ta sama walidacja §11 dla każdej części. Aktywny stan i renderer nie widzą niczego przed `complete`.
   - **Publikacja dopiero po `complete`.** Wynik staje się widoczny **jednym krokiem koordynatora**: jeden zapis stanu, jedno uzgodnienie układu (P8, P9), a raporty walidacji liczone są z opublikowanego stanu.
     - Efekty części nie są wykonywane w trakcie. Mowy nie ma nigdy, a kamera rusza najwyżej raz, dla końcowego `stage.focus`, jeśli się zmienił (reguła P3).
     - Raporty reducera z części trafiają do raportów §11.4.
     - Przejściowe `null` z pustych miejsc (§7.5) nie są więc nigdy widoczne dla renderera.
     - Wymaga to atomowego wejścia koordynatora. To zmiana kernela w P1.6, za zgodą przy commicie.
-  - **Niefatalne odrzucenie części** (§11, także `MESSAGE_TOO_LARGE`) nie przerywa transakcji: część jest pomijana z raportem i liczy się do `parts`.
+  - **Niefatalne odrzucenie części z powodu treści** (§11: kształt, wersja, surface, komponent, ścieżka — **nie rozmiar**) nie przerywa transakcji: część jest pomijana z raportem i liczy się do `parts`.
     - `maxBytes` liczy bajty **wszystkich** części, także odrzuconych, mierzone przed walidacją (miara z §10.8).
     - Publikacja stanu z odrzuconą częścią jest **świadoma** i idzie z raportem. Jeśli odrzucona była część odtwarzająca puste miejsce, `null` z podstawy pozostaje widoczny, bo to niezgodność agenta, zgłoszona raportem.
   - **Przerwanie oznacza odrzucenie całej transakcji.** Bufor i kopia przepadają, a aktywny stan zostaje bez zmian. Przyczyny:
@@ -299,9 +303,28 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
       - `complete` bez `begin` albo z `parts` różnym od liczby części;
       - `RUN_FINISHED` biegu przed `complete`;
       - zniekształcona wiadomość sterująca;
-    - przekroczenie limitów → fatalne `profile:RESYNC_LIMIT`;
+    - przekroczenie liczby części albo łącznego rozmiaru → fatalne `profile:RESYNC_LIMIT`;
+    - część > 256 KiB → `MESSAGE_TOO_LARGE` i nieudana próba resync (wyżej);
+    - publikowany stan naruszałby niezmiennik §7.8 → fatalne `profile:RESYNC_LIMIT`;
     - `RUN_ERROR` przed `complete` → transakcja odrzucona, a status `error` `agent:*` (warstwa agenta ma pierwszeństwo, §7.1, M2). To nie jest `RESYNC_INVALID`.
   - Po `complete` dalsze ramki biegu są zwykłymi wiadomościami (trwająca praca, §7.5), a potem przychodzi lifecycle (§6).
+
+- **7.8 Niezmiennik odtwarzalności** (A1, decyzja właściciela) [kod: `transport/resyncPlan.ts` jako wyrocznia; egzekwowanie P1.6]:
+  - **Każdy legalny, zatwierdzony stan profilu/1 musi być odtwarzalny.** To nie jest tylko obowiązek agenta przy reconnect. Stan jest legalny wtedy i tylko wtedy, gdy jego **kanoniczny plan resync** mieści się w ≤ 1024 częściach i ≤ 16 MiB, a każda część w ≤ 256 KiB. Plan obejmuje także odtworzenie pustych miejsc.
+  - **Kanoniczny plan** jest deterministyczny i liczony wyłącznie ze stanu (`resyncPlan`). Dla każdego surface'u w kolejności `workspace`, `tasks-drawer`, `hud`:
+    - `createSurface`;
+    - każdy komponent osobnym `updateComponents`;
+    - dane: podstawa `updateDataModel` bez `path`. Jeśli nie mieści się w części, obiekt dzielony jest po kluczach: `{}` pod jego ścieżką, potem kolejno dzieci. **Tablice i wartości proste są niepodzielne** (z pustymi miejscami jako `null`);
+    - każde puste miejsce osobnym `updateDataModel` z `path`, bez `value`, w kolejności DFS (klucze, indeksy rosnąco).
+
+    Na końcu idą `stage` i `narration` (`speak: false`). Miara bajtów jest ta sama co w §10.8.
+  - **Plan jest górnym ograniczeniem.** Agent MOŻE odtworzyć stan mniejszą liczbą części. Jeśli plan kanoniczny się mieści, poprawne odtworzenie w limitach istnieje. Faktyczne odtworzenie agenta też MUSI mieścić się w limitach §7.7.
+  - **Egzekwowanie** [P1.6]: przed zatwierdzeniem każdej zmiany stanu z transportu (wiadomość profilu poza transakcją albo publikacja transakcji) klient liczy plan dla stanu **po** zmianie.
+    - Stan nieodtwarzalny oznacza, że zmiana **nie jest zatwierdzana**: aktywny stan zostaje bez zmian.
+    - Przebieg kończy się `error` `profile:RESYNC_LIMIT`. To naruszenie profilu: fatalne, bez resync i bez ścieżki D14.
+    - Wymaga to sprawdzenia w koordynatorze (zmiana kernela w P1.6, za zgodą przy commicie). Implementacja MOŻE liczyć plan przyrostowo; norma dotyczy wyniku.
+  - **Obowiązek agenta:** utrzymuje model w przestrzeni odtwarzalnej. Profil nie przepisuje, jak to robić.
+  - Przykład z review Astry: 1025 pustych miejsc w jednej tablicy daje ≥ 1029 części planu, więc taki stan jest nielegalny, a zmiana, która by go utworzyła, jest odrzucana. Granica: przy jednym surface'ie bez komponentów stan z 1020 pustymi miejscami ma dokładnie 1024 części i jest legalny (`resyncPlan.test.ts`).
 
 ## 8. Akcje semantyczne (I9, D12, M1)
 
@@ -390,7 +413,8 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - ścieżka `updateDataModel`: ≤ 512 punktów kodowych i ≤ 32 segmenty [kod: FU-3];
   - **zdarzenie AG-UI** (bajty UTF-8 pola `data` jednej ramki SSE, mierzone **przed** `JSON.parse` we własnej warstwie strumienia adaptera) ≤ **1 MiB**. Przekroczenie jest fatalne: `profile:EVENT_TOO_LARGE` [P1.6];
   - **wiadomość profilu** (`JSON.stringify(frame.message)`, bajty UTF-8) ≤ **256 KiB**. Przekroczenie odrzuca wiadomość z diagnostyką `MESSAGE_TOO_LARGE`; `seq` liczy się dalej [P1.6];
-  - **transakcja resync:** ≤ 1024 części i ≤ 16 MiB łącznie (§7.7). Przekroczenie: `profile:RESYNC_LIMIT` [P1.6].
+  - **transakcja resync:** ≤ 1024 części i ≤ 16 MiB łącznie (§7.7). Przekroczenie: `profile:RESYNC_LIMIT` [P1.6]. Część > 256 KiB w transakcji: `MESSAGE_TOO_LARGE` i przerwanie transakcji (§7.7);
+  - **niezmiennik odtwarzalności:** każdy zatwierdzony stan mieści się w planie kanonicznym (§7.8). Zmiana, która by go złamała, nie jest zatwierdzana: `profile:RESYNC_LIMIT` [P1.6].
 - **10.9 Świeżość danych** [P1.6]:
   - klient przekazuje do `transportDispatch` wynik **round-tripu JSON** pola `frame.message`;
   - nigdy nie przekazuje obiektu dzielonego z potokiem klienta AG-UI, nie zatrzymuje referencji i nie mutuje.
@@ -479,9 +503,10 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
    - przejmuje trwającą pracę i kończy ją faktycznym wynikiem;
    - porzucony interrupt traktuje jako „decyzja nie zapadła” i podnosi go ponownie, bez odrzucania wejścia;
    - resync ze `scenario` dla nieznanego wątku traktuje jak start, ale nadal w kształcie `resync.begin` → (stan początkowy albo nic) → `resync.complete` → praca scenariusza.
-9. Nie używa katalogów inline, `context`, `tools` ani `state`. `id` nie zawiera `/` ani `~`, a dane nie zawierają kluczy zarezerwowanych (§10).
-10. `narration` traktuje jako dyrektywę prezentacji. Wypowiedź do historii emituje dodatkowo jako `TEXT_MESSAGE_*` (§9.2).
-11. Czyta raporty klienta z `forwardedProps.flowassist.a2uiErrors` i `diagnostics` (§11.4).
+9. Utrzymuje model w przestrzeni odtwarzalnej: kanoniczny plan resync każdego stanu mieści się w limitach (§7.8).
+10. Nie używa katalogów inline, `context`, `tools` ani `state`. `id` nie zawiera `/` ani `~`, a dane nie zawierają kluczy zarezerwowanych (§10).
+11. `narration` traktuje jako dyrektywę prezentacji. Wypowiedź do historii emituje dodatkowo jako `TEXT_MESSAGE_*` (§9.2).
+12. Czyta raporty klienta z `forwardedProps.flowassist.a2uiErrors` i `diagnostics` (§11.4).
 
 ## 14. Macierz pokrycia (reakcja klienta)
 
@@ -507,7 +532,9 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | bieg resync: `begin` → części → `complete` z poprawnym `parts`, w limitach | części stosowane do kopii, publikacja jednym krokiem po `complete` | wg lifecycle | `connected` | raporty części §11.4 | 7.7 |
 | bieg resync bez `begin` jako pierwszej ramki; `begin` poza resync / powtórzony; `complete` bez `begin` / zła liczba `parts`; `RUN_FINISHED` przed `complete`; zła wiadomość sterująca (także `resync` z innymi kluczami) | transakcja odrzucona, przerwanie | `error` `profile:RESYNC_INVALID` | — | — | 4.5, 7.7 |
 | `RUN_ERROR` przed `complete` | transakcja odrzucona | `error` `agent:*` | — | — | 7.1, 7.7 |
-| część odrzucona niefatalnie (także > 256 KiB) | pominięta, liczona do `parts` i `maxBytes`; publikacja świadoma | wg lifecycle | — | §11 | 7.7 |
+| część odrzucona niefatalnie z powodu treści (nie rozmiaru) | pominięta, liczona do `parts` i `maxBytes`; publikacja świadoma | wg lifecycle | — | §11 | 7.7 |
+| część > 256 KiB w transakcji resync | transakcja przerwana, invocation przerwana, późniejsze `complete` nieakceptowane; nieudana próba resync | bez zmian | `reconnecting` (po wyczerpaniu prób `offline`) | `MESSAGE_TOO_LARGE` w następnej próbie | 7.3, 7.7 |
+| zmiana stanu (wiadomość albo publikacja transakcji), po której stan byłby nieodtwarzalny (np. 1025 pustych miejsc) | zmiana niezatwierdzona, stan bez zmian, bez resync | `error` `profile:RESYNC_LIMIT` | — | — | 7.8 |
 | resync zastępujący niepotwierdzony start, wątek nieznany agentowi | `begin` → (stan początkowy albo nic) → `complete` → praca scenariusza | `running` | `connected` | — | 7.5, 7.7 |
 | transakcja resync > 1024 części albo > 16 MiB | transakcja odrzucona, przerwanie | `error` `profile:RESYNC_LIMIT` | — | — | 7.7, 10.8 |
 | awaria transportu w trakcie transakcji resync | transakcja odrzucona, aktywny stan bez zmian, kolejna próba | bez zmian | `reconnecting` | — | 7.3, 7.7 |
@@ -641,6 +668,8 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
 | A1 | (Astra HIGH) resync dzielony na części ≤ 256 KiB w transakcji `begin` → części → `complete`; budowa na kopii, publikacja atomowa po `complete`, przerwana transakcja odrzucana w całości; limity 1024 części / 16 MiB; bez limitu stanu surface'u do jednej wiadomości (właściciel) | §7.5, §7.7, §10.8 |
 | A2 | (Astra MEDIUM) puste miejsca tablic w resync: `null` w podstawie + odtworzenie bez `value` w tej samej transakcji; renderer nie widzi przejściowych `null` (właściciel) | §7.5, §7.7, §10.7 |
 | A3 | (Astra MEDIUM) zakaz `deleteSurface` w resync tylko dla surface'ów istniejących po obu stronach; surface istniejący tylko u klienta jest usuwany (właściciel) | §7.5, §7.6 |
+| A1+ | (weryfikacja Astry) **niezmiennik odtwarzalności** każdego zatwierdzonego stanu: kanoniczny plan resync z odtworzeniem pustych miejsc ≤ 1024 części i ≤ 16 MiB; zmiana tworząca stan nieodtwarzalny jest odrzucana przed zatwierdzeniem jako `profile:RESYNC_LIMIT`, bez D14; bez recepty przepisywania tablic (właściciel) | §7.8 |
+| A5 | (weryfikacja Astry) część > 256 KiB: `MESSAGE_TOO_LARGE` niefatalne dla połączenia, ale przerywa całą transakcję resync (nieudana próba); `RESYNC_LIMIT` wyłącznie za liczbę części albo łączny rozmiar; zakaz pominięcia części i przyjęcia późniejszego `complete` (właściciel) | §7.7 |
 | A4 | (Astra MEDIUM) fatalnie walidowana jest tylko koperta transportowa ramki; wiadomość sterująca osobno (fatalnie); treść wiadomości profilu niefatalnie wg §11; pełny schemat wiadomości nie jest fatalną bramką (właściciel) | §4.5, §5.4 |
 
 Implementacja reguł oznaczonych [P1.6] należy do P1.6 i każda zmiana zachowania przechodzi przez zgodę właściciela przy commicie.

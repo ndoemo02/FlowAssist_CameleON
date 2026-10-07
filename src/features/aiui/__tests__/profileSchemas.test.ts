@@ -202,6 +202,7 @@ describe('warstwa 2: wiadomość sterująca transakcji resync (fatalna, §7.7)',
         ['complete', { resync: { phase: 'complete', parts: 3 } }],
         ['complete z zerem części', { resync: { phase: 'complete', parts: 0 } }],
         ['complete z maksimum części', { resync: { phase: 'complete', parts: 1024 } }],
+        ['start nieznanego wątku: begin → complete bez części (§7.5)', { resync: { phase: 'complete', parts: 0 } }],
     ])('przyjmuje: %s', (_, m) => {
         expect(control(m), errors(control)).toBe(true);
     });
@@ -213,7 +214,8 @@ describe('warstwa 2: wiadomość sterująca transakcji resync (fatalna, §7.7)',
         ['parts ponad limit', { resync: { phase: 'complete', parts: 1025 } }],
         ['parts ułamkowe', { resync: { phase: 'complete', parts: 1.5 } }],
         ['begin z parts', { resync: { phase: 'begin', parts: 1 } }],
-        ['dodatkowy klucz obok resync', { resync: { phase: 'begin' }, stage: { focus: 'back' } }],
+        // L1: każdy obiekt z własnym kluczem resync trafia do warstwy sterującej — klucz obok to jej wada (fatalna)
+        ['dodatkowy klucz obok resync (routing do warstwy sterującej, §4.5)', { resync: { phase: 'begin' }, stage: { focus: 'back' } }],
         ['dodatkowe pole w resync', { resync: { phase: 'begin', id: 'x' } }],
     ])('odrzuca: %s', (_, m) => {
         expect(control(m)).toBe(false);

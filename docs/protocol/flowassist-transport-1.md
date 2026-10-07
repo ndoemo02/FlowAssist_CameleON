@@ -116,7 +116,7 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - Zdarzenie MOŻE nieść `subagentRunId`. Atrybucja nie zmienia reguł.
   - **Trzy rozdzielne warstwy walidacji** (Astra 4, decyzja właściciela) [P1.6]. Klient waliduje je **po** potoku klienta AG-UI, który wcześniej usuwa nieznane pola zdarzenia (F11):
     1. **Koperta transportowa ramki — fatalnie.** Sprawdzane są `type`, `name`, zamknięte `value` z `profile` i `seq`, oraz **obecność** `message` (dowolna wartość JSON, także `null`). Schemat: `frame.schema.json`. Wada → §5.4.
-    2. **Wiadomość sterująca** (`message` jest obiektem z jedynym kluczem `resync`) — fatalnie, bo psuje transakcję. Schemat: `control.schema.json`. Wada → `profile:RESYNC_INVALID` (§7.7).
+    2. **Wiadomość sterująca** — **każdy** obiekt `message` z własnym kluczem `resync`, także z innymi kluczami obok. Walidowana fatalnie, bo psuje transakcję. Schemat: `control.schema.json`, który dopuszcza wyłącznie klucz `resync`. Wada (np. `{ resync, stage }`) → `profile:RESYNC_INVALID` (§7.7).
     3. **Wiadomość profilu — niefatalnie.** Sprawdza ją `parseEventDiagnostic` razem z regułami [P1.6] z §9.3 i §10. Schematy `message.schema.json` i `flowassist-v2/envelope.agent-to-client.schema.json` opisują obowiązek agenta. Wada (także `null`, tablica, wiadomość mieszana) odrzuca **tylko tę wiadomość** z raportem §11; `seq` liczy się dalej, a bieg trwa.
 
     Pełnego schematu wiadomości NIE WOLNO używać jako fatalnej bramki ramki.
@@ -253,7 +253,11 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - bez trwającej pracy kończy bieżącym wynikiem lifecycle (§6). Otwarty interrupt podnosi ponownie;
   - wpis `resume` ze `status: "cancelled"` dla interruptu `flowassist.awaiting_action` oznacza „decyzja nie zapadła”, a nie odrzucenie decyzji. Agent NIE MOŻE z tego powodu ani z powodu niepokrytego interruptu odrzucić wejścia resync (`4xx` ani `RUN_ERROR`), ani uznać decyzji za podjętą. MUSI ponownie podnieść interrupt, jeśli nadal czeka;
   - wpis dotyczący interruptu, którego agent już nie ma (akcja jednak dotarła), to w AG-UI „nierozpoznany wpis”: agent kontynuuje i ostrzega;
-  - resync ze `scenario` dla wątku, którego agent nie zna (start nie dotarł), traktuje jak bieg startu tego scenariusza. Dla znanego wątku `scenario` ignoruje i odtwarza stan.
+  - resync ze `scenario` dla wątku, którego agent nie zna (start nie dotarł), traktuje jak bieg startu tego scenariusza, **ale nadal w kształcie biegu resync**:
+    - pierwsza ramka to `resync.begin`, potem stan początkowy (albo nic) i `resync.complete` (np. `parts: 0`);
+    - dopiero potem praca scenariusza idzie zwykłymi ramkami.
+
+    Dla znanego wątku `scenario` ignoruje i odtwarza stan.
 - **7.6** Resync **nie resetuje układu surface'ów istniejących po obu stronach**: dla nich nie ma `deleteSurface` ani ponownego `createSurface`, a członkostwo wynika z `children` (P6). Komponenty, które agent porzucił, zostają w mapie, ale nie są członkami.
   - Zakaz dotyczy **tylko** surface'ów istniejących po obu stronach (Astra 3, decyzja właściciela).
   - Surface istniejący tylko po stronie klienta (nieaktualny) jest w trakcie uzgadniania **usuwany** (`deleteSurface`, §7.5). Dla `workspace` oznacza to reset układu (P7).
@@ -284,16 +288,19 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
     - Raporty reducera z części trafiają do raportów §11.4.
     - Przejściowe `null` z pustych miejsc (§7.5) nie są więc nigdy widoczne dla renderera.
     - Wymaga to atomowego wejścia koordynatora. To zmiana kernela w P1.6, za zgodą przy commicie.
-  - **Niefatalne odrzucenie części** (§11) nie przerywa transakcji: część jest pomijana z raportem i liczy się do `parts`.
+  - **Niefatalne odrzucenie części** (§11, także `MESSAGE_TOO_LARGE`) nie przerywa transakcji: część jest pomijana z raportem i liczy się do `parts`.
+    - `maxBytes` liczy bajty **wszystkich** części, także odrzuconych, mierzone przed walidacją (miara z §10.8).
+    - Publikacja stanu z odrzuconą częścią jest **świadoma** i idzie z raportem. Jeśli odrzucona była część odtwarzająca puste miejsce, `null` z podstawy pozostaje widoczny, bo to niezgodność agenta, zgłoszona raportem.
   - **Przerwanie oznacza odrzucenie całej transakcji.** Bufor i kopia przepadają, a aktywny stan zostaje bez zmian. Przyczyny:
     - awaria transportu przed `complete` → kolejna próba resync (§7.3), od nowa;
     - naruszenie transakcji → fatalne `profile:RESYNC_INVALID`:
       - brak `begin` jako pierwszej ramki biegu resync;
       - `begin` poza biegiem resync albo powtórzony;
       - `complete` bez `begin` albo z `parts` różnym od liczby części;
-      - zdarzenie terminalne biegu przed `complete`;
+      - `RUN_FINISHED` biegu przed `complete`;
       - zniekształcona wiadomość sterująca;
-    - przekroczenie limitów → fatalne `profile:RESYNC_LIMIT`.
+    - przekroczenie limitów → fatalne `profile:RESYNC_LIMIT`;
+    - `RUN_ERROR` przed `complete` → transakcja odrzucona, a status `error` `agent:*` (warstwa agenta ma pierwszeństwo, §7.1, M2). To nie jest `RESYNC_INVALID`.
   - Po `complete` dalsze ramki biegu są zwykłymi wiadomościami (trwająca praca, §7.5), a potem przychodzi lifecycle (§6).
 
 ## 8. Akcje semantyczne (I9, D12, M1)
@@ -471,7 +478,7 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
    - nie wysyła `createSurface` dla surface'ów istniejących po obu stronach i usuwa surface'y istniejące tylko u klienta;
    - przejmuje trwającą pracę i kończy ją faktycznym wynikiem;
    - porzucony interrupt traktuje jako „decyzja nie zapadła” i podnosi go ponownie, bez odrzucania wejścia;
-   - resync ze `scenario` dla nieznanego wątku traktuje jak start.
+   - resync ze `scenario` dla nieznanego wątku traktuje jak start, ale nadal w kształcie `resync.begin` → (stan początkowy albo nic) → `resync.complete` → praca scenariusza.
 9. Nie używa katalogów inline, `context`, `tools` ani `state`. `id` nie zawiera `/` ani `~`, a dane nie zawierają kluczy zarezerwowanych (§10).
 10. `narration` traktuje jako dyrektywę prezentacji. Wypowiedź do historii emituje dodatkowo jako `TEXT_MESSAGE_*` (§9.2).
 11. Czyta raporty klienta z `forwardedProps.flowassist.a2uiErrors` i `diagnostics` (§11.4).
@@ -498,7 +505,10 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | koperta transportowa ramki: zły kształt `value` / nieznany klucz / brak `message` / profil / typ `seq` | przerwanie | `error` `profile:FRAME_INVALID` | — | — | 4.5, 5.4 |
 | poprawna koperta, wadliwa treść wiadomości profilu (`null`, tablica, wiadomość mieszana, zły payload) | wiadomość pominięta, `seq` dalej, bieg trwa | — | — | §11 (`ENVELOPE_` / `STAGE_` / `NARRATION_REJECTED` albo `VALIDATION_FAILED`) | 4.5, 5.4, 11 |
 | bieg resync: `begin` → części → `complete` z poprawnym `parts`, w limitach | części stosowane do kopii, publikacja jednym krokiem po `complete` | wg lifecycle | `connected` | raporty części §11.4 | 7.7 |
-| bieg resync bez `begin` jako pierwszej ramki; `begin` poza resync / powtórzony; `complete` bez `begin` / zła liczba `parts`; terminal przed `complete`; zła wiadomość sterująca | transakcja odrzucona, przerwanie | `error` `profile:RESYNC_INVALID` | — | — | 7.7 |
+| bieg resync bez `begin` jako pierwszej ramki; `begin` poza resync / powtórzony; `complete` bez `begin` / zła liczba `parts`; `RUN_FINISHED` przed `complete`; zła wiadomość sterująca (także `resync` z innymi kluczami) | transakcja odrzucona, przerwanie | `error` `profile:RESYNC_INVALID` | — | — | 4.5, 7.7 |
+| `RUN_ERROR` przed `complete` | transakcja odrzucona | `error` `agent:*` | — | — | 7.1, 7.7 |
+| część odrzucona niefatalnie (także > 256 KiB) | pominięta, liczona do `parts` i `maxBytes`; publikacja świadoma | wg lifecycle | — | §11 | 7.7 |
+| resync zastępujący niepotwierdzony start, wątek nieznany agentowi | `begin` → (stan początkowy albo nic) → `complete` → praca scenariusza | `running` | `connected` | — | 7.5, 7.7 |
 | transakcja resync > 1024 części albo > 16 MiB | transakcja odrzucona, przerwanie | `error` `profile:RESYNC_LIMIT` | — | — | 7.7, 10.8 |
 | awaria transportu w trakcie transakcji resync | transakcja odrzucona, aktywny stan bez zmian, kolejna próba | bez zmian | `reconnecting` | — | 7.3, 7.7 |
 | resync: surface istniejący tylko u klienta | `deleteSurface` w transakcji (dla `workspace` reset układu, P7) | — | — | — | 7.5, 7.6 |

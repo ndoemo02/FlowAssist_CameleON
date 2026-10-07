@@ -26,6 +26,12 @@ for (const dir of ['flowassist-v2/', 'flowassist-transport-1/']) {
 }
 const ref = (path: string): ValidateFunction => ajv.compile({ $ref: T1 + path });
 const frame = ref('frame.schema.json');
+const control = ref('control.schema.json');
+// wiadomość profilu (warstwa 3, niefatalna): oś 1–2 + obiekty zamknięte profilu
+const profileMessage = ajv.compile({ allOf: [
+    { $ref: 'https://flowassist.local/schemas/flowassist-v2/envelope.agent-to-client.schema.json' },
+    { $ref: T1 + 'message.schema.json' },
+] });
 const forwardedProps = ref('forwarded-props.schema.json');
 const diagnostic = ref('diagnostic.schema.json');
 const interrupt = ref('interrupt.schema.json');
@@ -44,11 +50,31 @@ describe('dokument profilu: przykłady i reguły maszynowe', () => {
         expect(RULES.profile).toBe(TRANSPORT_PROFILE);
     });
 
-    it('przykład ramki z §4.5 spełnia schemat ramki (razem z kopertą osi 1–2)', () => {
+    it('przykład ramki z §4.5: koperta transportowa i wiadomość profilu poprawne', () => {
         const example = jsonBlocks.map((b) => { try { return JSON.parse(b); } catch { return null; } })
             .find((o) => o?.name === 'flowassist.frame');
         expect(example).toBeTruthy();
         expect(frame(example), errors(frame)).toBe(true);
+        expect(profileMessage(example.value.message), errors(profileMessage)).toBe(true);
+    });
+
+    it('przykład transakcji resync z §7.7: begin → części → complete z poprawnym parts', () => {
+        const example = jsonBlocks.map((b) => { try { return JSON.parse(b); } catch { return null; } })
+            .find((o) => Array.isArray(o) && o[0]?.message?.resync?.phase === 'begin');
+        expect(example).toBeTruthy();
+        example.forEach((value: { seq: number; message: unknown }, i: number) => {
+            expect(value.seq).toBe(i); // seq od 0, +1 na ramkę
+            expect(frame({ type: 'CUSTOM', name: 'flowassist.frame', value }), errors(frame)).toBe(true);
+        });
+        const [first, ...rest] = example;
+        const last = rest.pop();
+        expect(control(first.message), errors(control)).toBe(true);
+        expect(control(last.message), errors(control)).toBe(true);
+        expect(last.message.resync).toEqual({ phase: 'complete', parts: rest.length });
+        for (const part of rest) expect(profileMessage(part.message), errors(profileMessage)).toBe(true);
+        // puste miejsce: null w podstawie, potem odtworzenie bez value (Astra 2)
+        expect(rest.some((p: { message: { updateDataModel?: { path?: string; value?: unknown } } }) =>
+            p.message.updateDataModel?.path !== undefined && !('value' in p.message.updateDataModel))).toBe(true);
     });
 
     it('przykład wejścia biegu akcji z §8.1: wpis resume spełnia schemat', () => {
@@ -68,6 +94,9 @@ describe('dokument profilu: przykłady i reguły maszynowe', () => {
         const a2uiErrorCodes = readSchema('forwarded-props.schema.json').properties.flowassist.properties.a2uiErrors.items.allOf[2];
         expect(a2uiErrorCodes.properties.error.properties.code.enum).toEqual(RULES.codes.a2uiErrors);
         expect(readSchema('message.schema.json').$defs.id.pattern).toBe(`^[^${RULES.idForbiddenChars.join('')}]+$`);
+        const c = readSchema('control.schema.json');
+        expect(c.required).toEqual([RULES.resync.controlKey]);
+        expect(c.properties.resync.oneOf[1].properties.parts.maximum).toBe(RULES.resync.maxParts);
         const fp = readSchema('forwarded-props.schema.json').properties.flowassist.properties;
         expect(fp.profile.const).toBe(RULES.profile);
         expect(fp.a2uiErrors.maxItems).toBe(RULES.limits.pendingReportsMax);
@@ -90,7 +119,7 @@ describe('dokument profilu: przykłady i reguły maszynowe', () => {
     });
 });
 
-// ── ramka ─────────────────────────────────────────────────────────
+// ── ramka: trzy warstwy walidacji (profil §4.5, §5.4, §7.7; Astra 4) ─────────
 
 const FRAME = {
     type: 'CUSTOM',
@@ -99,14 +128,20 @@ const FRAME = {
 };
 const withValue = (patch: Record<string, unknown>) => ({ ...FRAME, value: { ...FRAME.value, ...patch } });
 
-describe('schemat ramki', () => {
+describe('warstwa 1: koperta transportowa ramki (fatalna bramka)', () => {
     it.each([
         ['stage', FRAME],
         ['narration', withValue({ message: { narration: { text: 'Gotowe.', speak: true } } })],
         ['updateDataModel', withValue({ seq: 7, message: { version: 'v0.9', updateDataModel: { surfaceId: 'workspace', path: '/rows', value: [] } } })],
         ['pola wspólne AG-UI', { ...FRAME, timestamp: 1759766400000, metadata: { trace: 'x' }, subagentRunId: 'sub-1' }],
         ['seq = 2^53 − 1', withValue({ seq: Number.MAX_SAFE_INTEGER })],
-    ])('przyjmuje: %s', (_, f) => {
+        ['wiadomość sterująca resync', withValue({ message: { resync: { phase: 'begin' } } })],
+        // Astra 4: wada TREŚCI nie jest wadą ramki — koperta poprawna, wiadomość odrzucana niefatalnie (§11)
+        ['message: null (treść wadliwa → niefatalnie)', withValue({ message: null })],
+        ['message: tablica (treść wadliwa → niefatalnie)', withValue({ message: [{ stage: { focus: 'back' } }] })],
+        ['message mieszana (treść wadliwa → niefatalnie)', withValue({ message: { stage: { focus: 'back' }, narration: { text: null } } })],
+        ['message z nieznanym polem (treść wadliwa → niefatalnie)', withValue({ message: { narration: { text: 'a', extra: true } } })],
+    ])('przyjmuje kopertę: %s', (_, f) => {
         expect(frame(f), errors(frame)).toBe(true);
     });
 
@@ -114,38 +149,74 @@ describe('schemat ramki', () => {
         ['inna nazwa CUSTOM', { ...FRAME, name: 'flowassist.other' }],
         ['inny typ zdarzenia', { ...FRAME, type: 'ACTIVITY_SNAPSHOT' }],
         ['brak seq', { ...FRAME, value: { profile: FRAME.value.profile, message: FRAME.value.message } }],
+        ['brak message', { ...FRAME, value: { profile: FRAME.value.profile, seq: 0 } }],
         ['seq ujemne', withValue({ seq: -1 })],
         ['seq ułamkowe', withValue({ seq: 1.5 })],
         ['seq jako tekst', withValue({ seq: '0' })],
         ['inny profil', withValue({ profile: 'flowassist-transport/2' })],
         ['dodatkowy klucz w value', withValue({ id: 'x' })],
-        ['dodatkowe pole zdarzenia', { ...FRAME, extra: 1 }],
-        ['wiadomość mieszana (OBS-4)', withValue({ message: { stage: { focus: 'back' }, narration: { text: null } } })],
-        // FU-4: klucz zarezerwowany w danych, które poza nim są poprawne (sam klucz jest jedyną przyczyną odrzucenia)
-        ['klucz zarezerwowany w wartości data modelu (FU-4)', withValue({ message: JSON.parse('{"version":"v0.9.1","updateDataModel":{"surfaceId":"workspace","path":"/m","value":{"constructor":1}}}') })],
-        ['kilka wiadomości w jednej ramce', withValue({ message: [{ stage: { focus: 'back' } }] })],
-        // D17: obiekty zamknięte (dziś runtime je przepuszcza — egzekwowanie w P1.6)
-        ['narration z nieznanym kluczem (D17)', withValue({ message: { narration: { text: 'a', extra: true } } })],
-        ['koperta z dodatkowym polem najwyższego poziomu (D17)', withValue({ message: { version: 'v0.9.1', deleteSurface: { surfaceId: 'hud' }, trace: 1 } })],
-        ['payload z polem spoza upstream (D17)', withValue({ message: { version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2', extra: 1 } } })],
-        ['updateDataModel z polem spoza upstream (D17)', withValue({ message: { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a', value: 1, op: 'add' } } })],
-        // D19: znaki ścieżki w identyfikatorach
-        ['id z "/" (D19)', withValue({ message: { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'a/b', component: 'TaskList' }] } } })],
-        ['id z "~" (D19)', withValue({ message: { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'a~1', component: 'TaskList' }] } } })],
-        ['wpis children z "/" (D19)', withValue({ message: { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'root', component: 'TaskList', children: ['x/y'] }] } } })],
-    ])('odrzuca: %s', (_, f) => {
+        ['value nie jest obiektem', { ...FRAME, value: 'x' }],
+        ['dodatkowe pole zdarzenia (obowiązek agenta; w kliencie usuwa je wcześniej potok AG-UI)', { ...FRAME, extra: 1 }],
+    ])('odrzuca kopertę: %s', (_, f) => {
         expect(frame(f)).toBe(false);
+    });
+});
+
+describe('warstwa 3: wiadomość profilu (niefatalna; message.schema + oś 1–2)', () => {
+    it.each([
+        ['null', null],
+        ['tablica (kilka wiadomości)', [{ stage: { focus: 'back' } }]],
+        ['wiadomość mieszana (OBS-4)', { stage: { focus: 'back' }, narration: { text: null } }],
+        ['wiadomość sterująca to nie wiadomość profilu', { resync: { phase: 'begin' } }],
+        // FU-4: klucz zarezerwowany w danych, które poza nim są poprawne (sam klucz jest jedyną przyczyną odrzucenia)
+        ['klucz zarezerwowany w wartości data modelu (FU-4)', JSON.parse('{"version":"v0.9.1","updateDataModel":{"surfaceId":"workspace","path":"/m","value":{"constructor":1}}}')],
+        // D17: obiekty zamknięte (dziś runtime je przepuszcza — egzekwowanie w P1.6)
+        ['narration z nieznanym kluczem (D17)', { narration: { text: 'a', extra: true } }],
+        ['koperta z dodatkowym polem najwyższego poziomu (D17)', { version: 'v0.9.1', deleteSurface: { surfaceId: 'hud' }, trace: 1 }],
+        ['payload z polem spoza upstream (D17)', { version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2', extra: 1 } }],
+        ['updateDataModel z polem spoza upstream (D17)', { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud', path: '/a', value: 1, op: 'add' } }],
+        // D19: znaki ścieżki w identyfikatorach
+        ['id z "/" (D19)', { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'a/b', component: 'TaskList' }] } }],
+        ['id z "~" (D19)', { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'a~1', component: 'TaskList' }] } }],
+        ['wpis children z "/" (D19)', { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'root', component: 'TaskList', children: ['x/y'] }] } }],
+    ])('odrzuca: %s', (_, message) => {
+        expect(profileMessage(message)).toBe(false);
     });
 
     it.each([
         ['propsy komponentu otwarte (I3, OBS-6)', { version: 'v0.9.1', updateComponents: { surfaceId: 'workspace', components: [{ id: 'c1', component: 'WorkspaceItem', kind: 'chart', x: 3, custom: { a: 1 } }] } }],
         ['createSurface z theme i sendDataModel (upstream; klient ignoruje)', { version: 'v0.9.1', createSurface: { surfaceId: 'hud', catalogId: 'flowassist/v2', theme: {}, sendDataModel: false } }],
         ['updateDataModel bez path i value (upstream)', { version: 'v0.9.1', updateDataModel: { surfaceId: 'hud' } }],
+        ['odtworzenie pustego miejsca: path bez value (Astra 2)', { version: 'v0.9.1', updateDataModel: { surfaceId: 'workspace', path: '/rows/0' } }],
         ['narration bez speak', { narration: { text: null } }],
         ['kontrola FU-4: ta sama wartość z kluczem podobnym (constructorName)', { version: 'v0.9.1', updateDataModel: { surfaceId: 'workspace', path: '/m', value: { constructorName: 1 } } }],
         ['id z innymi znakami (kropka, myślnik, unicode)', { version: 'v0.9.1', updateComponents: { surfaceId: 'hud', components: [{ id: 'zad-1.ą', component: 'TaskList', children: ['b.2'] }] } }],
     ])('znane otwarte — przyjmuje: %s', (_, message) => {
-        expect(frame(withValue({ message })), errors(frame)).toBe(true);
+        expect(profileMessage(message), errors(profileMessage)).toBe(true);
+    });
+});
+
+describe('warstwa 2: wiadomość sterująca transakcji resync (fatalna, §7.7)', () => {
+    it.each([
+        ['begin', { resync: { phase: 'begin' } }],
+        ['complete', { resync: { phase: 'complete', parts: 3 } }],
+        ['complete z zerem części', { resync: { phase: 'complete', parts: 0 } }],
+        ['complete z maksimum części', { resync: { phase: 'complete', parts: 1024 } }],
+    ])('przyjmuje: %s', (_, m) => {
+        expect(control(m), errors(control)).toBe(true);
+    });
+
+    it.each([
+        ['nieznana faza', { resync: { phase: 'abort' } }],
+        ['complete bez parts', { resync: { phase: 'complete' } }],
+        ['parts ujemne', { resync: { phase: 'complete', parts: -1 } }],
+        ['parts ponad limit', { resync: { phase: 'complete', parts: 1025 } }],
+        ['parts ułamkowe', { resync: { phase: 'complete', parts: 1.5 } }],
+        ['begin z parts', { resync: { phase: 'begin', parts: 1 } }],
+        ['dodatkowy klucz obok resync', { resync: { phase: 'begin' }, stage: { focus: 'back' } }],
+        ['dodatkowe pole w resync', { resync: { phase: 'begin', id: 'x' } }],
+    ])('odrzuca: %s', (_, m) => {
+        expect(control(m)).toBe(false);
     });
 });
 

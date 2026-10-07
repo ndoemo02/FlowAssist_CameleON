@@ -1,41 +1,70 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://flowassist.local/schemas/flowassist-transport-1/message.schema.json",
-  "title": "flowassist-transport/1 — wiadomość profilu: obiekty zamknięte i identyfikatory",
-  "description": "Profil §9.3, §10.1, §10.6 (D17, D19). Warstwa nakładana na schemat osi 1–2 (flowassist-v2/envelope.agent-to-client.schema.json), który pozostaje parytetem z dzisiejszym runtime (P0.3). Tu: koperta = version + jeden payload; treść payloadu tylko z polami schematu upstream A2UI v0.9.1; stage i narration zamknięte; id komponentu i wpisy children bez '/' i '~'. Propsy komponentów pozostają otwarte (I3, OBS-6). Egzekwowanie w kliencie: P1.6.",
+  "title": "flowassist-transport/1 — wiadomość profilu: obiekty zamknięte i identyfikatory (walidacja NIEFATALNA)",
+  "description": "Profil §4.5, §9.3, §10.1, §10.6 (D17, D19). Warstwa nakładana na schemat osi 1–2 (flowassist-v2/envelope.agent-to-client.schema.json), który pozostaje parytetem z dzisiejszym runtime (P0.3). Tu: koperta = version + jeden payload; treść payloadu tylko z polami schematu upstream A2UI v0.9.1; stage i narration zamknięte; id komponentu i wpisy children bez \"/\" i \"~\". Propsy komponentów pozostają otwarte (I3, OBS-6). Opisuje obowiązek agenta; po stronie klienta wada wiadomości jest NIEFATALNA (odrzucenie z raportem §11), nigdy wadą ramki. Wiadomości sterujące resync opisuje control.schema.json. Egzekwowanie w kliencie: P1.6.",
   "oneOf": [
     {
       "type": "object",
-      "required": ["stage"],
+      "required": [
+        "stage"
+      ],
       "additionalProperties": false,
       "properties": {
-        "stage": { "type": "object", "additionalProperties": false, "properties": { "focus": {}, "drawer": {} } }
+        "stage": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "focus": {},
+            "drawer": {}
+          }
+        }
       }
     },
     {
       "type": "object",
-      "required": ["narration"],
+      "required": [
+        "narration"
+      ],
       "additionalProperties": false,
       "properties": {
-        "narration": { "type": "object", "additionalProperties": false, "properties": { "text": {}, "speak": {} } }
+        "narration": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "text": {},
+            "speak": {}
+          }
+        }
       }
     },
     {
       "type": "object",
-      "required": ["version", "createSurface"],
+      "required": [
+        "version",
+        "createSurface"
+      ],
       "additionalProperties": false,
       "properties": {
         "version": {},
         "createSurface": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "surfaceId": {}, "catalogId": {}, "theme": {}, "sendDataModel": {} }
+          "properties": {
+            "surfaceId": {},
+            "catalogId": {},
+            "theme": {},
+            "sendDataModel": {}
+          }
         }
       }
     },
     {
       "type": "object",
-      "required": ["version", "updateComponents"],
+      "required": [
+        "version",
+        "updateComponents"
+      ],
       "additionalProperties": false,
       "properties": {
         "version": {},
@@ -49,8 +78,15 @@
               "items": {
                 "type": "object",
                 "properties": {
-                  "id": { "$ref": "#/$defs/id" },
-                  "children": { "type": "array", "items": { "$ref": "#/$defs/id" } }
+                  "id": {
+                    "$ref": "#/$defs/id"
+                  },
+                  "children": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/$defs/id"
+                    }
+                  }
                 }
               }
             }
@@ -60,28 +96,47 @@
     },
     {
       "type": "object",
-      "required": ["version", "updateDataModel"],
+      "required": [
+        "version",
+        "updateDataModel"
+      ],
       "additionalProperties": false,
       "properties": {
         "version": {},
         "updateDataModel": {
           "type": "object",
           "additionalProperties": false,
-          "properties": { "surfaceId": {}, "path": {}, "value": {} }
+          "properties": {
+            "surfaceId": {},
+            "path": {},
+            "value": {}
+          }
         }
       }
     },
     {
       "type": "object",
-      "required": ["version", "deleteSurface"],
+      "required": [
+        "version",
+        "deleteSurface"
+      ],
       "additionalProperties": false,
       "properties": {
         "version": {},
-        "deleteSurface": { "type": "object", "additionalProperties": false, "properties": { "surfaceId": {} } }
+        "deleteSurface": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "surfaceId": {}
+          }
+        }
       }
     }
   ],
   "$defs": {
-    "id": { "type": "string", "pattern": "^[^/~]+$" }
+    "id": {
+      "type": "string",
+      "pattern": "^[^/~]+$"
+    }
   }
 }

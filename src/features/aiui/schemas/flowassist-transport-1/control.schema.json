@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://flowassist.local/schemas/flowassist-transport-1/control.schema.json",
+  "title": "flowassist-transport/1 — wiadomość sterująca transakcji resync",
+  "description": "Profil §7.7. message ramki, który jest obiektem z jedynym kluczem resync, to wiadomość sterująca (nie trafia do transportDispatch). begin MUSI być pierwszą ramką biegu resync; complete zamyka transakcję i podaje liczbę części (wiadomości profilu) między begin a complete. Wada wiadomości sterującej jest fatalna (profile:RESYNC_INVALID), bo psuje transakcję. Limity (resync.maxParts, resync.maxBytes) i kolejność sprawdza adapter.",
+  "type": "object",
+  "required": ["resync"],
+  "additionalProperties": false,
+  "properties": {
+    "resync": {
+      "oneOf": [
+        {
+          "title": "begin",
+          "type": "object",
+          "required": ["phase"],
+          "additionalProperties": false,
+          "properties": { "phase": { "const": "begin" } }
+        },
+        {
+          "title": "complete",
+          "type": "object",
+          "required": ["phase", "parts"],
+          "additionalProperties": false,
+          "properties": {
+            "phase": { "const": "complete" },
+            "parts": { "type": "integer", "minimum": 0, "maximum": 1024 }
+          }
+        }
+      ]
+    }
+  }
+}

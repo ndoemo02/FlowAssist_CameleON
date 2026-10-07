@@ -1,6 +1,6 @@
 # Profil transportowy `flowassist-transport/1`
 
-- **Status:** normatywny (P1.7b, 2026-10-07). Decyzje właściciela: D2, D3, D6, D7, D9–D20, H1, M1, M2, N1–N3 (rejestr w §16).
+- **Status:** normatywny (P1.7b, 2026-10-07). Decyzje właściciela: D2, D3, D6, D7, D9–D20, H1, M1, M2, N1–N3, A1–A4 (rejestr w §16).
 - **Zakres:** jak klient CameleON i agent wymieniają komunikaty A2UI i rozszerzenia aplikacji przez AG-UI.
   To trzecia oś zgodności z [ADR 0002](../adr/0002-protocol-compatibility-axes.md). Adapter P1.6 implementuje ten
   dokument i nie dodaje reguł w locie.
@@ -109,10 +109,17 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   { "type": "CUSTOM", "name": "flowassist.frame",
     "value": { "profile": "flowassist-transport/1", "seq": 0, "message": { "version": "v0.9.1", "createSurface": { "surfaceId": "workspace", "catalogId": "flowassist/v2" } } } }
   ```
-  - `value` jest zamknięte: tylko `profile`, `seq`, `message`.
-  - `message` to **dokładnie jedna** wiadomość profilu: koperta A2UI (`createSurface` | `updateComponents` | `updateDataModel` | `deleteSurface`), `stage` albo `narration`.
+  - `value` jest zamknięte: tylko `profile`, `seq`, `message`. `message` jest **wymagane**.
+  - `message` to **dokładnie jedna** wiadomość:
+    - **wiadomość profilu**: koperta A2UI (`createSurface` | `updateComponents` | `updateDataModel` | `deleteSurface`), `stage` albo `narration`;
+    - albo **wiadomość sterująca** transakcji resync (§7.7).
   - Zdarzenie MOŻE nieść `subagentRunId`. Atrybucja nie zmienia reguł.
-  - **Gdzie się waliduje:** klient sprawdza ramkę **po** potoku klienta AG-UI, który usuwa nieznane pola zdarzenia (F11). Dodatkowe pola zdarzenia nie przerywają więc biegu. Schemat ramki opisuje to, co agent MUSI emitować [agent], a zamknięte `value` i wiadomość sprawdza klient [P1.6].
+  - **Trzy rozdzielne warstwy walidacji** (Astra 4, decyzja właściciela) [P1.6]. Klient waliduje je **po** potoku klienta AG-UI, który wcześniej usuwa nieznane pola zdarzenia (F11):
+    1. **Koperta transportowa ramki — fatalnie.** Sprawdzane są `type`, `name`, zamknięte `value` z `profile` i `seq`, oraz **obecność** `message` (dowolna wartość JSON, także `null`). Schemat: `frame.schema.json`. Wada → §5.4.
+    2. **Wiadomość sterująca** (`message` jest obiektem z jedynym kluczem `resync`) — fatalnie, bo psuje transakcję. Schemat: `control.schema.json`. Wada → `profile:RESYNC_INVALID` (§7.7).
+    3. **Wiadomość profilu — niefatalnie.** Sprawdza ją `parseEventDiagnostic` razem z regułami [P1.6] z §9.3 i §10. Schematy `message.schema.json` i `flowassist-v2/envelope.agent-to-client.schema.json` opisują obowiązek agenta. Wada (także `null`, tablica, wiadomość mieszana) odrzuca **tylko tę wiadomość** z raportem §11; `seq` liczy się dalej, a bieg trwa.
+
+    Pełnego schematu wiadomości NIE WOLNO używać jako fatalnej bramki ramki.
 - **4.6 Inne zdarzenia AG-UI** nie zmieniają stanu CameleON w profilu/1 [P1.6]:
   - `TEXT_MESSAGE_*`, `REASONING_*`, `TOOL_CALL_*`, `STATE_*`, `MESSAGES_SNAPSHOT`, `ACTIVITY_*`, `STEP_*`, `SUBAGENT_*`, `RAW`, `CUSTOM` o innej nazwie;
   - klient MOŻE je logować w dev;
@@ -141,7 +148,13 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
 - **5.3 Kontrola, a nie bufor.** Binding gwarantuje kolejność i kompletność (F5), więc klient niczego nie przestawia ani nie buforuje.
   - Ramka o `seq` innym niż oczekiwany (luka, cofnięcie, powtórzenie) jest **fatalna**: klient przerywa żądanie, a przebieg kończy się `error` `profile:FRAME_SEQUENCE` [P1.6].
   - Ramka poza jakimkolwiek otwartym biegiem to naruszenie AG-UI wykrywane przez potok klienta: `agui:PROTOCOL_VIOLATION`.
-- **5.4 Ramka zniekształcona** (zły kształt `value`, nieznany klucz w `value`, `profile` inny niż wynegocjowany, `seq` niebędący liczbą całkowitą ≥ 0) jest fatalna: `profile:FRAME_INVALID` [P1.6]. Profil w każdej ramce działa jako echo negocjacji.
+- **5.4 Ramka zniekształcona** jest fatalna: `profile:FRAME_INVALID` [P1.6]. Dotyczy to **wyłącznie koperty transportowej** (warstwa 1 z §4.5):
+  - `value` nie jest obiektem albo ma nieznany klucz;
+  - brak `message`;
+  - `profile` inny niż wynegocjowany;
+  - `seq` niebędący liczbą całkowitą ≥ 0.
+
+  Profil w każdej ramce działa jako echo negocjacji. **Wada samej treści `message` nie jest wadą ramki.** Dla wiadomości profilu to niefatalne odrzucenie z raportem (§11), a dla wiadomości sterującej obowiązuje §7.7.
 - **5.5 Deduplikacja.**
   - Tożsamością ramki jest para (`runId` AG-UI, `seq`), a ramka jest stosowana **najwyżej raz** [P1.6].
   - Powtórzenie klucza w biegu jest naruszeniem (§5.3), a nie cichym pominięciem.
@@ -223,19 +236,65 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - `resume`: jeśli klient trzyma otwarty interrupt, którego nie pokrył żaden bieg potwierdzony `RUN_STARTED` (typowo invocation akcji padła przed `RUN_STARTED`), resync **MUSI** go pokryć wpisem `{ interruptId, status: "cancelled" }` bez `payload`.
     - To porzucenie wymagane regułą pokrycia AG-UI (konsument nie może po cichu pominąć otwartego interruptu), a nie ponowienie akcji (zatwierdzone przez właściciela).
     - Bieg akcji, który dostał `RUN_STARTED`, pokrył interrupt, więc po jego awarii klient nie trzyma otwartego interruptu i `resume` jest nieobecne;
-  - niesie raporty i diagnostykę według §11.4.
+  - niesie raporty i diagnostykę według §11.4;
+  - odtworzenie stanu w odpowiedzi jest **transakcją** (§7.7).
 - **7.5 Obowiązek agenta w biegu resync** [agent]:
-  - ramkami odtwarza **pełny bieżący stan**:
-    - dla każdego swojego surface'u, który klient trzyma: `updateComponents` ze wszystkimi komponentami, a potem `updateDataModel` bez `path` (całość);
+  - **pełny bieżący stan** odtwarza w transakcji §7.7. Pierwszą ramką biegu jest `resync.begin`, potem idą części:
+    - dla każdego swojego surface'u istniejącego **po obu stronach**:
+      - komponenty: jedno albo więcej `updateComponents`, łącznie ze wszystkimi komponentami;
+      - dane: pierwsza wiadomość danych tego surface'u to `updateDataModel` **bez `path`** (podstawa), a kolejne `updateDataModel` **z `path`** uzupełniają poddrzewa. Efekt końcowy musi równać się pełnemu bieżącemu modelowi;
+      - każda część MUSI mieścić się w 256 KiB (§10.8). Duży stan **dzieli się na części**; rozmiar całego stanu surface'u nie jest ograniczony do jednej wiadomości (Astra 1);
+    - **puste miejsca w tablicach** (element usunięty, `undefined`, §10.7): podstawa i części materializują je jako `null`. W tej samej transakcji agent MUSI odtworzyć każde z nich osobnym `updateDataModel` z `path` do elementu, **bez `value`** (Astra 2);
     - dla swojego surface'u, którego klient nie trzyma: `createSurface` + to samo;
-    - dla surface'u trzymanego przez klienta, którego agent już nie ma: `deleteSurface`;
+    - dla surface'u istniejącego **tylko po stronie klienta** (nieaktualnego, którego agent już nie ma): `deleteSurface` (§7.6, Astra 3);
     - potem `stage` (bieżące) i `narration` (bieżący tekst albo `null`, `speak: false`);
-  - **trwająca praca:** jeśli osierocony bieg (po zerwaniu) nadal pracuje, resync go **przejmuje**. Po odtworzeniu stanu strumieniuje dalszą pracę i kończy się jej **faktycznym** wynikiem. NIE WOLNO mu kończyć się `success`, gdy praca trwa. Na wątku jest najwyżej jeden aktywny bieg agenta;
+    - na końcu `resync.complete` z liczbą części;
+  - **trwająca praca:** jeśli osierocony bieg (po zerwaniu) nadal pracuje, resync go **przejmuje**. Po `resync.complete` strumieniuje dalszą pracę zwykłymi ramkami i kończy się jej **faktycznym** wynikiem. NIE WOLNO mu kończyć się `success`, gdy praca trwa. Na wątku jest najwyżej jeden aktywny bieg agenta;
   - bez trwającej pracy kończy bieżącym wynikiem lifecycle (§6). Otwarty interrupt podnosi ponownie;
   - wpis `resume` ze `status: "cancelled"` dla interruptu `flowassist.awaiting_action` oznacza „decyzja nie zapadła”, a nie odrzucenie decyzji. Agent NIE MOŻE z tego powodu ani z powodu niepokrytego interruptu odrzucić wejścia resync (`4xx` ani `RUN_ERROR`), ani uznać decyzji za podjętą. MUSI ponownie podnieść interrupt, jeśli nadal czeka;
   - wpis dotyczący interruptu, którego agent już nie ma (akcja jednak dotarła), to w AG-UI „nierozpoznany wpis”: agent kontynuuje i ostrzega;
   - resync ze `scenario` dla wątku, którego agent nie zna (start nie dotarł), traktuje jak bieg startu tego scenariusza. Dla znanego wątku `scenario` ignoruje i odtwarza stan.
-- **7.6** Resync **nie resetuje układu**: dla trzymanych surface'ów nie ma `deleteSurface`, a członkostwo wynika z `children` (P6). Komponenty, które agent porzucił, zostają w mapie, ale nie są członkami.
+- **7.6** Resync **nie resetuje układu surface'ów istniejących po obu stronach**: dla nich nie ma `deleteSurface` ani ponownego `createSurface`, a członkostwo wynika z `children` (P6). Komponenty, które agent porzucił, zostają w mapie, ale nie są członkami.
+  - Zakaz dotyczy **tylko** surface'ów istniejących po obu stronach (Astra 3, decyzja właściciela).
+  - Surface istniejący tylko po stronie klienta (nieaktualny) jest w trakcie uzgadniania **usuwany** (`deleteSurface`, §7.5). Dla `workspace` oznacza to reset układu (P7).
+- **7.7 Transakcja resync** (Astra 1–2, decyzja właściciela) [agent; P1.6]:
+  - **Wiadomości sterujące** (schemat `control.schema.json`) jadą w ramkach jak każda wiadomość, z własnym `seq`:
+    - `{ "resync": { "phase": "begin" } }` — MUSI być **pierwszą ramką** biegu resync. Poza biegiem resync jest naruszeniem;
+    - **części** — wiadomości profilu (koperty A2UI, `stage`, `narration`) w kolejności `seq`;
+    - `{ "resync": { "phase": "complete", "parts": N } }`, gdzie `N` to liczba części między `begin` a `complete`.
+
+    Przykład (pola `value` kolejnych ramek):
+    ```json
+    [
+      { "profile": "flowassist-transport/1", "seq": 0, "message": { "resync": { "phase": "begin" } } },
+      { "profile": "flowassist-transport/1", "seq": 1, "message": { "version": "v0.9.1", "updateDataModel": { "surfaceId": "workspace", "value": { "rows": [null, 20] } } } },
+      { "profile": "flowassist-transport/1", "seq": 2, "message": { "version": "v0.9.1", "updateDataModel": { "surfaceId": "workspace", "path": "/rows/0" } } },
+      { "profile": "flowassist-transport/1", "seq": 3, "message": { "resync": { "phase": "complete", "parts": 2 } } }
+    ]
+    ```
+  - **Limity** (jawne i ograniczone, `resync` w §15):
+    - najwyżej **1024 części** (`maxParts`);
+    - suma bajtów części (miara z §10.8) najwyżej **16 MiB** (`maxBytes`);
+    - każda część ≤ 256 KiB.
+
+    Przekroczenie jest fatalne: `profile:RESYNC_LIMIT`.
+  - **Budowa poza aktywnym stanem.** Klient buforuje części i stosuje je kolejno do **kopii** stanu surface'ów: ten sam reducer i ta sama walidacja §11 dla każdej części. Aktywny stan i renderer nie widzą niczego przed `complete`.
+  - **Publikacja dopiero po `complete`.** Wynik staje się widoczny **jednym krokiem koordynatora**: jeden zapis stanu, jedno uzgodnienie układu (P8, P9), a raporty walidacji liczone są z opublikowanego stanu.
+    - Efekty części nie są wykonywane w trakcie. Mowy nie ma nigdy, a kamera rusza najwyżej raz, dla końcowego `stage.focus`, jeśli się zmienił (reguła P3).
+    - Raporty reducera z części trafiają do raportów §11.4.
+    - Przejściowe `null` z pustych miejsc (§7.5) nie są więc nigdy widoczne dla renderera.
+    - Wymaga to atomowego wejścia koordynatora. To zmiana kernela w P1.6, za zgodą przy commicie.
+  - **Niefatalne odrzucenie części** (§11) nie przerywa transakcji: część jest pomijana z raportem i liczy się do `parts`.
+  - **Przerwanie oznacza odrzucenie całej transakcji.** Bufor i kopia przepadają, a aktywny stan zostaje bez zmian. Przyczyny:
+    - awaria transportu przed `complete` → kolejna próba resync (§7.3), od nowa;
+    - naruszenie transakcji → fatalne `profile:RESYNC_INVALID`:
+      - brak `begin` jako pierwszej ramki biegu resync;
+      - `begin` poza biegiem resync albo powtórzony;
+      - `complete` bez `begin` albo z `parts` różnym od liczby części;
+      - zdarzenie terminalne biegu przed `complete`;
+      - zniekształcona wiadomość sterująca;
+    - przekroczenie limitów → fatalne `profile:RESYNC_LIMIT`.
+  - Po `complete` dalsze ramki biegu są zwykłymi wiadomościami (trwająca praca, §7.5), a potem przychodzi lifecycle (§6).
 
 ## 8. Akcje semantyczne (I9, D12, M1)
 
@@ -318,11 +377,13 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
   - zapis pod indeksem `< długość` zastępuje, a `= długość` dopisuje (jak `add` w RFC 6902);
   - **`> długość` odrzuca kopertę** z `VALIDATION_FAILED` `/updateDataModel/path`, bo dziur nie da się wyrazić w JSON. Wykrywa to stosowanie koperty w reducerze, więc raport wymaga efektu raportu z reducera (zmiana kernela w zakresie D16, za zgodą przy commicie P1.6);
   - usunięcie (brak `value`) elementu tablicy **zachowuje długość**, a element staje się `undefined` (A2UI v0.9.1). Walidatory treści traktują `undefined` jak brak wartości (fallback z raportem);
-  - reguła dotyczy też segmentów pośrednich. Indeksy kanoniczne bez zmian (ADR 0002), klucze obiektów bez zmian.
+  - reguła dotyczy też segmentów pośrednich. Indeksy kanoniczne bez zmian (ADR 0002), klucze obiektów bez zmian;
+  - JSON nie przenosi `undefined`. W resync puste miejsca przechodzą przez transakcję §7.7: `null` w podstawie, a potem odtworzenie wiadomością bez `value`. Publikacja jest atomowa, więc renderer nie widzi przejściowego `null`.
 - **10.8 Limity** (D15):
   - ścieżka `updateDataModel`: ≤ 512 punktów kodowych i ≤ 32 segmenty [kod: FU-3];
   - **zdarzenie AG-UI** (bajty UTF-8 pola `data` jednej ramki SSE, mierzone **przed** `JSON.parse` we własnej warstwie strumienia adaptera) ≤ **1 MiB**. Przekroczenie jest fatalne: `profile:EVENT_TOO_LARGE` [P1.6];
-  - **wiadomość profilu** (`JSON.stringify(frame.message)`, bajty UTF-8) ≤ **256 KiB**. Przekroczenie odrzuca wiadomość z diagnostyką `MESSAGE_TOO_LARGE`; `seq` liczy się dalej [P1.6].
+  - **wiadomość profilu** (`JSON.stringify(frame.message)`, bajty UTF-8) ≤ **256 KiB**. Przekroczenie odrzuca wiadomość z diagnostyką `MESSAGE_TOO_LARGE`; `seq` liczy się dalej [P1.6];
+  - **transakcja resync:** ≤ 1024 części i ≤ 16 MiB łącznie (§7.7). Przekroczenie: `profile:RESYNC_LIMIT` [P1.6].
 - **10.9 Świeżość danych** [P1.6]:
   - klient przekazuje do `transportDispatch` wynik **round-tripu JSON** pola `frame.message`;
   - nigdy nie przekazuje obiektu dzielonego z potokiem klienta AG-UI, nie zatrzymuje referencji i nie mutuje.
@@ -346,7 +407,7 @@ Mechanizm z P1.7a [kod: `transport/capabilities.ts`, `transport/runPermission.ts
     - `MESSAGE_TOO_LARGE`;
   - status `error` przebiegu (format `<przestrzeń>:<KOD>[: szczegół]`):
     - `negotiation:<przyczyna>` [kod];
-    - `profile:FRAME_INVALID`, `profile:FRAME_SEQUENCE`, `profile:EVENT_TOO_LARGE`, `profile:AGUI_VERSION`, `profile:UNSUPPORTED_INTERRUPTS`, `profile:UNEXPECTED_TOOL_CALLS`;
+    - `profile:FRAME_INVALID`, `profile:FRAME_SEQUENCE`, `profile:EVENT_TOO_LARGE`, `profile:AGUI_VERSION`, `profile:UNSUPPORTED_INTERRUPTS`, `profile:UNEXPECTED_TOOL_CALLS`, `profile:RESYNC_INVALID`, `profile:RESYNC_LIMIT`;
     - `agui:PROTOCOL_VIOLATION`;
     - `agent:<kod>`;
     - `transport:AUTH_REJECTED`, `transport:INPUT_REJECTED`, `transport:SERVER_ERROR`, `transport:UNEXPECTED_RESPONSE`.
@@ -403,8 +464,11 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 5. Czekając na użytkownika, kończy bieg interruptem `flowassist.awaiting_action`. Zawsze dokładnie jednym, bez `expiresAt`. Nowa decyzja dostaje nowe `id` interruptu (§6.4).
 6. Kończy przebieg wynikiem `success`, a przerwanie z własnej woli zgłasza wynikiem `cancelled`. Nie wywołuje narzędzi frontendu (§6.1).
 7. Akcję czyta z `resume[0].payload` (koperta A2UI `action`) i nie zakłada jej ponowienia (§8).
-8. W biegu resync (§7.5):
-   - odtwarza pełny stan bez `createSurface` dla surface'ów klienta;
+8. W biegu resync (§7.5, §7.7):
+   - odtwarza pełny stan w transakcji `resync.begin` → części → `resync.complete`:
+     - każda część ≤ 256 KiB, duże dane w podstawie bez `path` i częściach z `path`;
+     - puste miejsca w tablicach jako `null`, a potem odtworzenie bez `value`;
+   - nie wysyła `createSurface` dla surface'ów istniejących po obu stronach i usuwa surface'y istniejące tylko u klienta;
    - przejmuje trwającą pracę i kończy ją faktycznym wynikiem;
    - porzucony interrupt traktuje jako „decyzja nie zapadła” i podnosi go ponownie, bez odrzucania wejścia;
    - resync ze `scenario` dla nieznanego wątku traktuje jak start.
@@ -431,7 +495,13 @@ Dane od agenta są niezaufane. Granica protokołu [kod: `parseEvent`] i walidato
 | zerwanie połączenia przed `RUN_STARTED` biegu żądanego (np. w trakcie replayu) | resync | bez zmian | `reconnecting` | — | 4.8, 7.1 |
 | biegi replayu (inny `runId`), także ich spóźnione `RUN_ERROR` i brak wersji | pominięte w całości | — | — | — | 4.7, 6.3 |
 | `CUSTOM flowassist.frame` poprawna | round-trip → `transportDispatch` | — | — | — | 4.5, 10.9 |
-| ramka: zły kształt / profil / typ `seq` / nieznany klucz w `value` | przerwanie | `error` `profile:FRAME_INVALID` | — | — | 5.4 |
+| koperta transportowa ramki: zły kształt `value` / nieznany klucz / brak `message` / profil / typ `seq` | przerwanie | `error` `profile:FRAME_INVALID` | — | — | 4.5, 5.4 |
+| poprawna koperta, wadliwa treść wiadomości profilu (`null`, tablica, wiadomość mieszana, zły payload) | wiadomość pominięta, `seq` dalej, bieg trwa | — | — | §11 (`ENVELOPE_` / `STAGE_` / `NARRATION_REJECTED` albo `VALIDATION_FAILED`) | 4.5, 5.4, 11 |
+| bieg resync: `begin` → części → `complete` z poprawnym `parts`, w limitach | części stosowane do kopii, publikacja jednym krokiem po `complete` | wg lifecycle | `connected` | raporty części §11.4 | 7.7 |
+| bieg resync bez `begin` jako pierwszej ramki; `begin` poza resync / powtórzony; `complete` bez `begin` / zła liczba `parts`; terminal przed `complete`; zła wiadomość sterująca | transakcja odrzucona, przerwanie | `error` `profile:RESYNC_INVALID` | — | — | 7.7 |
+| transakcja resync > 1024 części albo > 16 MiB | transakcja odrzucona, przerwanie | `error` `profile:RESYNC_LIMIT` | — | — | 7.7, 10.8 |
+| awaria transportu w trakcie transakcji resync | transakcja odrzucona, aktywny stan bez zmian, kolejna próba | bez zmian | `reconnecting` | — | 7.3, 7.7 |
+| resync: surface istniejący tylko u klienta | `deleteSurface` w transakcji (dla `workspace` reset układu, P7) | — | — | — | 7.5, 7.6 |
 | ramka: luka / cofnięcie / powtórzenie `seq` | przerwanie | `error` `profile:FRAME_SEQUENCE` | — | — | 5.3 |
 | ramka poza otwartym biegiem | przerwanie (potok AG-UI) | `error` `agui:PROTOCOL_VIOLATION` | — | — | 5.3 |
 | dodatkowe pole zdarzenia AG-UI | usunięte przez potok AG-UI z ostrzeżeniem | — | — | — | 4.5, F11 |
@@ -509,6 +579,7 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
     "retryableHttpStatus": [408, 429, 502, 503, 504],
     "retryAfterMaxMs": 60000
   },
+  "resync": { "controlKey": "resync", "maxParts": 1024, "maxBytes": 16777216 },
   "actions": { "slots": 1, "pendingMatch": ["interruptId", "surfaceId", "sourceComponentId", "itemInstance"] },
   "literalOnlyProps": { "WorkspaceItem": ["presentation", "priority"] },
   "idForbiddenChars": ["/", "~"],
@@ -518,6 +589,7 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
     "runErrors": [
       "profile:FRAME_INVALID", "profile:FRAME_SEQUENCE", "profile:EVENT_TOO_LARGE", "profile:AGUI_VERSION",
       "profile:UNSUPPORTED_INTERRUPTS", "profile:UNEXPECTED_TOOL_CALLS", "agui:PROTOCOL_VIOLATION",
+      "profile:RESYNC_INVALID", "profile:RESYNC_LIMIT",
       "transport:AUTH_REJECTED", "transport:INPUT_REJECTED", "transport:SERVER_ERROR", "transport:UNEXPECTED_RESPONSE"
     ],
     "runErrorPrefixes": ["negotiation:", "agent:"],
@@ -556,5 +628,9 @@ Blok niżej jest **normatywnym źródłem** stałych profilu. Zmiana dowolnej wa
 | D18 | AG-UI major 1 wymagany dla biegu żądanego (świadomy wyjątek od „kontynuuj i ostrzeż”) | §2.4 |
 | D19 | zakaz `/` i `~` w `id` / `children` | §10.6 |
 | D20 | addytywne API transportu P1.6: stan połączenia, `reconnect()`, komunikaty, `BackendCall 'resync'` | §7, §8 |
+| A1 | (Astra HIGH) resync dzielony na części ≤ 256 KiB w transakcji `begin` → części → `complete`; budowa na kopii, publikacja atomowa po `complete`, przerwana transakcja odrzucana w całości; limity 1024 części / 16 MiB; bez limitu stanu surface'u do jednej wiadomości (właściciel) | §7.5, §7.7, §10.8 |
+| A2 | (Astra MEDIUM) puste miejsca tablic w resync: `null` w podstawie + odtworzenie bez `value` w tej samej transakcji; renderer nie widzi przejściowych `null` (właściciel) | §7.5, §7.7, §10.7 |
+| A3 | (Astra MEDIUM) zakaz `deleteSurface` w resync tylko dla surface'ów istniejących po obu stronach; surface istniejący tylko u klienta jest usuwany (właściciel) | §7.5, §7.6 |
+| A4 | (Astra MEDIUM) fatalnie walidowana jest tylko koperta transportowa ramki; wiadomość sterująca osobno (fatalnie); treść wiadomości profilu niefatalnie wg §11; pełny schemat wiadomości nie jest fatalną bramką (właściciel) | §4.5, §5.4 |
 
 Implementacja reguł oznaczonych [P1.6] należy do P1.6 i każda zmiana zachowania przechodzi przez zgodę właściciela przy commicie.

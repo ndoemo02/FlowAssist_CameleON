@@ -33,6 +33,13 @@ export const RECONNECT_POLICY = {
     retryAfterMaxMs: 60_000,
 } as const;
 
+/** Profil §7.7 (Astra 1–2, decyzja właściciela): transakcja resync begin → części → complete, z limitami całości. */
+export const RESYNC_TRANSACTION = {
+    controlKey: 'resync',
+    maxParts: 1_024,
+    maxBytes: 16_777_216,
+} as const;
+
 /** Profil §8.3 (D12, M1, N1, N2): jedno miejsce na akcję i warunki wysłania akcji oczekującej. */
 export const ACTION_POLICY = {
     slots: 1,
@@ -54,6 +61,7 @@ export const PROFILE_CODES = {
     runErrors: [
         'profile:FRAME_INVALID', 'profile:FRAME_SEQUENCE', 'profile:EVENT_TOO_LARGE', 'profile:AGUI_VERSION',
         'profile:UNSUPPORTED_INTERRUPTS', 'profile:UNEXPECTED_TOOL_CALLS', 'agui:PROTOCOL_VIOLATION',
+        'profile:RESYNC_INVALID', 'profile:RESYNC_LIMIT',
         'transport:AUTH_REJECTED', 'transport:INPUT_REJECTED', 'transport:SERVER_ERROR', 'transport:UNEXPECTED_RESPONSE',
     ],
     runErrorPrefixes: ['negotiation:', 'agent:'],
@@ -84,6 +92,7 @@ export const PROFILE_RULES = freezeDeep({
     agui: AGUI_BINDING,
     timeouts: TRANSPORT_TIMEOUTS,
     reconnect: RECONNECT_POLICY,
+    resync: RESYNC_TRANSACTION,
     actions: ACTION_POLICY,
     literalOnlyProps: LITERAL_ONLY_PROPS,
     idForbiddenChars: ID_FORBIDDEN_CHARS,

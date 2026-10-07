@@ -61,6 +61,7 @@ describe('strażnik dryfu profilu flowassist-transport/1', () => {
         expect(PROFILE_RULES.envelope).toEqual({ send: 'v0.9.1', accept: ['v0.9', 'v0.9.1'] });
         expect(PROFILE_RULES.reservedKeys).toEqual(['__proto__', 'constructor', 'prototype']);
         expect(PROFILE_RULES.actions.slots).toBe(1);
+        expect(PROFILE_RULES.resync).toEqual({ controlKey: 'resync', maxParts: 1_024, maxBytes: 16_777_216 });
         expect(PROFILE_RULES.codes.parseReasons).toEqual([
             'NOT_OBJECT', 'RESERVED_KEY', 'PAYLOAD_COUNT', 'STAGE_INVALID', 'NARRATION_INVALID', 'VERSION_UNSUPPORTED',
             'SURFACE_UNKNOWN', 'CATALOG_MISMATCH', 'COMPONENT_INVALID', 'PATH_INVALID', 'PATH_LIMIT',
